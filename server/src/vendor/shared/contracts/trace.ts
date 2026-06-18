@@ -112,5 +112,8 @@ export const RunSummary = z.object({
   // findings that trip the agent's gate. Null on failed/cancelled runs.
   score: z.number().int().nullable(),
   blockers: z.number().int().nullable(),
+  findings_critical: z.number().int().nullish(),
+  findings_warning: z.number().int().nullish(),
+  findings_suggestion: z.number().int().nullish(),
 });
 export type RunSummary = z.infer<typeof RunSummary>;

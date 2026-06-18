@@ -4,11 +4,11 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Toggle, EmptyState } from "@devdigest/ui";
-import type { FindingRecord } from "@devdigest/shared";
+import { Toggle, EmptyState, SEV, Icon } from "@devdigest/ui";
+import type { FindingRecord, Severity } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
 import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
-import { KEY_TO_ACTION } from "./constants";
+import { KEY_TO_ACTION, SEVERITY_FILTERS } from "./constants";
 import { visibleFindings } from "./helpers";
 import { s } from "./styles";
 
@@ -26,9 +26,22 @@ export function FindingsPanel({
   const t = useTranslations("prReview");
   const action = useFindingAction();
   const [hideLow, setHideLow] = React.useState(false);
+  const [activeSeverity, setActiveSeverity] = React.useState<Severity | null>(null);
   const [focusIdx, setFocusIdx] = React.useState(0);
 
-  const shown = React.useMemo(() => visibleFindings(findings, hideLow), [findings, hideLow]);
+  const counts = React.useMemo(
+    () => ({
+      CRITICAL: findings.filter((f) => f.severity === "CRITICAL").length,
+      WARNING: findings.filter((f) => f.severity === "WARNING").length,
+      SUGGESTION: findings.filter((f) => f.severity === "SUGGESTION").length,
+    }),
+    [findings],
+  );
+
+  const shown = React.useMemo(
+    () => visibleFindings(findings, hideLow, activeSeverity),
+    [findings, hideLow, activeSeverity],
+  );
 
   // j/k navigation + a/d shortcuts on the focused finding (keyboard).
   React.useEffect(() => {
@@ -48,6 +61,27 @@ export function FindingsPanel({
   return (
     <div>
       <div style={s.toolbar}>
+        <div style={s.sevPills}>
+          {SEVERITY_FILTERS.map(({ sev }) => {
+            const n = counts[sev];
+            if (!n) return null;
+            const meta = SEV[sev];
+            const SIcon = Icon[meta.icon];
+            const active = activeSeverity === sev;
+            return (
+              <button
+                key={sev}
+                type="button"
+                style={s.sevPill(active, meta.c)}
+                onClick={() => setActiveSeverity(active ? null : sev)}
+              >
+                <SIcon size={12} />
+                {n} {t(`panel.severity${sev}`)}
+              </button>
+            );
+          })}
+        </div>
+        <div style={s.divider} />
         <div style={s.toggleGroup}>
           {t("panel.hideLowConfidence")}
           <Toggle on={hideLow} onChange={setHideLow} size={16} />

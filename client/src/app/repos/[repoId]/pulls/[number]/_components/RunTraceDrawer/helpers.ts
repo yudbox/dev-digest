@@ -29,5 +29,5 @@ export function formatTokens(tokensIn: number, tokensOut: number): string {
 
 /** USD cost or "n/a". */
 export function formatCost(usd: number | null | undefined): string {
-  return usd == null ? "n/a" : `$${usd.toFixed(2)}`;
+  return usd == null ? "n/a" : `$${usd.toFixed(3)}`;
 }

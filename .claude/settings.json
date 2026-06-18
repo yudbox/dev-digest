@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Before ending this session, invoke the engineering-insights skill. Detect which modules (client/, server/, reviewer-core/, e2e/) were meaningfully touched. Rank candidates by signal strength: user corrections first, then failed approaches, repeated patterns, non-obvious solutions, workflow discoveries. Apply the quality filter (discard anything obvious from 5 minutes of reading the code). For each surviving insight, append to {module}/insights/INSIGHTS.md with the format: 'YYYY-MM-DD — actionable fact. ref: file:line' — create the file with the 7-section template if it does not exist. If the session was trivial (typo fix, rename, formatting) or no insights passed the filter, skip silently. Do not ask for confirmation."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -3,7 +3,8 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
-import type { RunSummary, PrCommit } from "@devdigest/shared";
+import { Severity, type RunSummary, type PrCommit } from "@devdigest/shared";
+import { SeverityChip } from "@/components/SeverityChip/SeverityChip";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first
@@ -190,9 +191,16 @@ export function RunHistory({
                 </div>
               )}
               {settled && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {t("runStatus.findings", { count: r.findings_count ?? 0 })}
-                  {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
+                  {(r.findings_critical ?? 0) > 0 && (
+                    <SeverityChip sev={Severity.enum.CRITICAL} count={r.findings_critical!} />
+                  )}
+                  {(r.findings_warning ?? 0) > 0 && (
+                    <SeverityChip sev={Severity.enum.WARNING} count={r.findings_warning!} />
+                  )}
+                  {(r.findings_suggestion ?? 0) > 0 && (
+                    <SeverityChip sev={Severity.enum.SUGGESTION} count={r.findings_suggestion!} />
+                  )}
                 </div>
               )}
             </div>
@@ -200,7 +208,7 @@ export function RunHistory({
               {r.ran_at && <span>{new Date(r.ran_at).toLocaleTimeString()}</span>}
               {tok > 0 && (
                 <span className="mono">
-                  {tok} tok{r.cost_usd != null ? ` · $${r.cost_usd.toFixed(4)}` : ""}
+                  {tok} tok{r.cost_usd != null ? ` · $${r.cost_usd.toFixed(3)}` : ""}
                 </span>
               )}
             </div>

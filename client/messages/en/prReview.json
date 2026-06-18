@@ -29,7 +29,10 @@
   "panel": {
     "hideLowConfidence": "Hide low confidence",
     "noMatchTitle": "No findings match",
-    "noMatchBody": "Adjust the filters above, or run a review to generate findings."
+    "noMatchBody": "Adjust the filters above, or run a review to generate findings.",
+    "severityCRITICAL": "Critical",
+    "severityWARNING": "Warning",
+    "severitySUGGESTION": "Suggestion"
   },
   "runReview": {
     "runAll": "Run all enabled agents",
@@ -93,6 +96,7 @@
       "score": "Score",
       "findings": "Findings",
       "status": "Status",
+      "cost": "Cost",
       "updated": "Updated"
     },
     "filesCount": "{count} files",

@@ -42,7 +42,7 @@ export const s = {
   scoreCell: { display: "flex", alignItems: "center" } satisfies CSSProperties,
   findingsCell: {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-end",
     gap: 10,
     fontSize: 12.5,
     color: "var(--text-secondary)",
@@ -53,6 +53,10 @@ export const s = {
     gap: 3,
     color,
   }),
+  costCell: {
+    fontSize: 12.5,
+    fontVariantNumeric: "tabular-nums",
+  } satisfies CSSProperties,
   updatedCell: {
     fontSize: 12,
     color: "var(--text-muted)",

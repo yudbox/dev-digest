@@ -53,6 +53,7 @@ export function usePrReviews(prId: string | null | undefined) {
     queryKey: ["reviews", prId],
     queryFn: () => api.get<ReviewRecord[]>(`/pulls/${prId}/reviews`),
     enabled: !!prId,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
