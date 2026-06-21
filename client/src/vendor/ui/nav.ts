@@ -48,6 +48,13 @@ export const NAV: NavGroup[] = [
         href: "/agents",
         gKey: "a",
       },
+      {
+        key: "conventions",
+        label: "Conventions",
+        icon: "ListChecks",
+        href: "/conventions",
+        gKey: "v",
+      },
     ],
   },
 ];
@@ -78,6 +85,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { keys: "g p", label: "Go to Pull Requests", group: "Navigation" },
   { keys: "g a", label: "Go to Agents", group: "Navigation" },
   { keys: "g s", label: "Go to Skills", group: "Navigation" },
+  { keys: "g v", label: "Go to Conventions", group: "Navigation" },
   { keys: "j / k", label: "Next / previous finding", group: "Findings" },
   { keys: "a", label: "Accept finding", group: "Findings" },
   { keys: "d", label: "Dismiss finding", group: "Findings" },

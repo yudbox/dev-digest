@@ -127,6 +127,14 @@ export const SkillSource = z.enum([
 ]);
 export type SkillSource = z.infer<typeof SkillSource>;
 
+export const SkillThreatLevel = z.enum([
+  "unknown",
+  "safe",
+  "suspicious",
+  "dangerous",
+]);
+export type SkillThreatLevel = z.infer<typeof SkillThreatLevel>;
+
 export const Skill = z.object({
   id: z.string(),
   name: z.string(),
@@ -137,6 +145,7 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  threat_level: SkillThreatLevel.optional(),
 });
 export type Skill = z.infer<typeof Skill>;
 

@@ -1,7 +1,9 @@
-import type { Container } from '../../platform/container.js';
-import type { Skill, SkillSource, SkillType } from '@devdigest/shared';
-import { SkillsRepository } from './repository.js';
-import type { SkillRow, SkillStats, SkillVersionRow } from './repository.js';
+import type { Container } from "../../platform/container.js";
+import type { Skill, SkillSource, SkillType } from "@devdigest/shared";
+import { SkillsRepository } from "./repository.js";
+import type { SkillRow, SkillStats, SkillVersionRow } from "./repository.js";
+import { THREAT_LEVEL } from "./scanner.js";
+import type { ThreatLevel } from "./scanner.js";
 
 /**
  * A1 — skills service. Business logic for the Skills library.
@@ -25,6 +27,8 @@ export interface ImportSkillInput {
   body: string;
   source?: SkillSource;
   description?: string;
+  enabled?: boolean;
+  threatLevel?: ThreatLevel;
 }
 
 export interface UpdateSkillInput {
@@ -46,11 +50,12 @@ function toSkillDto(row: SkillRow): Skill {
     enabled: row.enabled,
     version: row.version,
     evidence_files: (row.evidenceFiles as string[] | null) ?? null,
+    threat_level: (row.threatLevel as ThreatLevel) ?? THREAT_LEVEL.UNKNOWN,
   };
 }
 
 export class SkillsService {
-  private repo: SkillsRepository;
+  repo: SkillsRepository;
 
   constructor(private container: Container) {
     this.repo = new SkillsRepository(container.db);
@@ -70,9 +75,9 @@ export class SkillsService {
     const row = await this.repo.insert({
       workspaceId,
       name: input.name,
-      description: input.description ?? '',
+      description: input.description ?? "",
       type: input.type,
-      source: input.source ?? 'manual',
+      source: input.source ?? "manual",
       body: input.body,
       ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
     });
@@ -84,10 +89,14 @@ export class SkillsService {
     const row = await this.repo.insert({
       workspaceId,
       name: input.name,
-      description: input.description ?? '',
-      type: 'custom',
-      source: input.source ?? 'imported_url',
+      description: input.description ?? "",
+      type: "custom",
+      source: input.source ?? "manual",
       body: input.body,
+      ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
+      ...(input.threatLevel !== undefined
+        ? { threatLevel: input.threatLevel }
+        : {}),
     });
     return toSkillDto(row);
   }
@@ -99,7 +108,9 @@ export class SkillsService {
   ): Promise<Skill | undefined> {
     const row = await this.repo.update(workspaceId, id, {
       ...(patch.name !== undefined ? { name: patch.name } : {}),
-      ...(patch.description !== undefined ? { description: patch.description } : {}),
+      ...(patch.description !== undefined
+        ? { description: patch.description }
+        : {}),
       ...(patch.type !== undefined ? { type: patch.type } : {}),
       ...(patch.body !== undefined ? { body: patch.body } : {}),
       ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
@@ -118,11 +129,22 @@ export class SkillsService {
     return this.repo.listVersions(id);
   }
 
-  async stats(workspaceId: string, id: string): Promise<SkillStats | undefined> {
+  async stats(
+    workspaceId: string,
+    id: string,
+  ): Promise<SkillStats | undefined> {
     return this.repo.stats(workspaceId, id);
   }
 
-  async restore(workspaceId: string, id: string, version: number): Promise<Skill | undefined> {
+  async updateThreatLevel(id: string, threatLevel: ThreatLevel): Promise<void> {
+    await this.repo.updateThreatLevel(id, threatLevel);
+  }
+
+  async restore(
+    workspaceId: string,
+    id: string,
+    version: number,
+  ): Promise<Skill | undefined> {
     const row = await this.repo.restore(workspaceId, id, version);
     return row ? toSkillDto(row) : undefined;
   }

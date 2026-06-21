@@ -1,4 +1,4 @@
-import * as t from './schema.js';
+import * as t from "./schema.js";
 
 /**
  * Shared row types inferred from the Drizzle schema.
@@ -14,3 +14,4 @@ export type FindingRow = typeof t.findings.$inferSelect;
 export type PullRow = typeof t.pullRequests.$inferSelect;
 export type AgentRunRow = typeof t.agentRuns.$inferSelect;
 export type SkillRow = typeof t.skills.$inferSelect;
+export type ConventionRow = typeof t.conventions.$inferSelect;

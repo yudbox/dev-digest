@@ -7,6 +7,7 @@ import { Badge, Skeleton, ErrorState, Toggle } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
 import { useSkills } from "@/lib/hooks/skills";
 import { useAgentSkills, useSetAgentSkills } from "@/lib/hooks/skills";
+import { resolveSkillThreat } from "@/lib/skill-threat";
 
 const TYPE_COLOR: Record<string, string> = {
   rubric: "var(--accent)",
@@ -160,38 +161,60 @@ export function SkillsTab({ agentId }: { agentId: string }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {sorted.map((skill) => {
           const linked = isLinked(skill.id);
+          const { isDangerous, isSuspicious, isScanning, isBlocked, badge } =
+            resolveSkillThreat(skill);
+          const canLink = !isBlocked;
+
+          const borderColor = isDangerous
+            ? "var(--crit)"
+            : isSuspicious
+              ? "var(--warn)"
+              : dragOver === skill.id
+                ? "var(--accent)"
+                : "var(--border)";
+
+          const bgColor = isDangerous
+            ? "color-mix(in srgb, var(--crit) 6%, var(--bg-elevated))"
+            : isSuspicious
+              ? "color-mix(in srgb, var(--warn) 6%, var(--bg-elevated))"
+              : dragOver === skill.id
+                ? "var(--accent-bg)"
+                : "var(--bg-elevated)";
           return (
             <div
               key={skill.id}
-              draggable={linked}
+              draggable={linked && canLink}
               onDragStart={(e) => e.dataTransfer.setData("skillId", skill.id)}
               onDragOver={(e) => {
-                if (linked) {
+                if (linked && canLink) {
                   e.preventDefault();
                   setDragOver(skill.id);
                 }
               }}
               onDragLeave={() => setDragOver(null)}
               onDrop={(e) => handleDrop(e, skill.id)}
+              title={
+                isBlocked
+                  ? "Vet and enable this skill before attaching it to an agent"
+                  : undefined
+              }
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
                 padding: "10px 12px",
                 borderRadius: 8,
-                border: `1px solid ${dragOver === skill.id ? "var(--accent)" : "var(--border)"}`,
-                background:
-                  dragOver === skill.id
-                    ? "var(--accent-bg)"
-                    : "var(--bg-elevated)",
+                border: `1px solid ${borderColor}`,
+                background: bgColor,
                 opacity: linked ? 1 : 0.6,
               }}
             >
               {/* Drag handle */}
               <span
                 style={{
-                  cursor: linked ? "grab" : "default",
-                  color: linked ? "var(--text-muted)" : "transparent",
+                  cursor: linked && canLink ? "grab" : "default",
+                  color:
+                    linked && canLink ? "var(--text-muted)" : "transparent",
                   fontSize: 16,
                   userSelect: "none",
                   flexShrink: 0,
@@ -200,12 +223,33 @@ export function SkillsTab({ agentId }: { agentId: string }) {
                 ≡
               </span>
 
-              {/* Toggle */}
-              <Toggle
-                on={linked}
-                size={13}
-                onChange={(checked) => handleToggle(skill.id, checked)}
-              />
+              {/* Toggle — blocked for unvetted skills */}
+              <div
+                title={
+                  isDangerous
+                    ? "Blocked: injection detected"
+                    : isSuspicious
+                      ? "Review skill body before enabling"
+                      : isScanning
+                        ? "Scan in progress"
+                        : undefined
+                }
+                style={{
+                  flexShrink: 0,
+                  cursor: isBlocked ? "not-allowed" : "pointer",
+                }}
+                onClick={(e) => {
+                  if (isBlocked) e.stopPropagation();
+                }}
+              >
+                <Toggle
+                  on={linked && canLink}
+                  size={13}
+                  onChange={(checked) => {
+                    if (canLink) handleToggle(skill.id, checked);
+                  }}
+                />
+              </div>
 
               {/* Name + type */}
               <span
@@ -224,6 +268,26 @@ export function SkillsTab({ agentId }: { agentId: string }) {
               <Badge color={TYPE_COLOR[skill.type] ?? "var(--text-muted)"}>
                 {tSkills(`listItem.type.${skill.type}`)}
               </Badge>
+
+              {/* Threat badge */}
+              {badge && (
+                <span
+                  title={badge.title}
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: badge.color,
+                    background: badge.bg,
+                    border: `1px solid ${badge.border}`,
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    flexShrink: 0,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {badge.text}
+                </span>
+              )}
 
               {/* Order badge for linked */}
               {linked && (

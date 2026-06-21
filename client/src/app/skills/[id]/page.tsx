@@ -25,6 +25,13 @@ export default function SkillDetailPage() {
     isError,
     refetch,
   } = useSkill(id);
+
+  // Redirect to /skills when the current skill is deleted or not found
+  React.useEffect(() => {
+    if (!skillLoading && !skill && !isError) {
+      router.replace("/skills");
+    }
+  }, [skill, skillLoading, isError, router]);
   const [creating, setCreating] = React.useState(false);
   const [listSearch, setListSearch] = React.useState("");
 
@@ -137,6 +144,7 @@ export default function SkillDetailPage() {
                 skill={s}
                 active={s.id === id}
                 onClick={() => router.push(`/skills/${s.id}?tab=${tab}`)}
+                onDeleted={() => { if (s.id === id) router.push("/skills"); }}
               />
             ))}
           </div>
@@ -151,7 +159,7 @@ export default function SkillDetailPage() {
             flexDirection: "column",
           }}
         >
-          {skillLoading ? (
+          {skillLoading || !skill ? (
             <div
               style={{
                 padding: 28,
@@ -163,7 +171,7 @@ export default function SkillDetailPage() {
               <Skeleton height={24} width={240} />
               <Skeleton height={300} />
             </div>
-          ) : isError || !skill ? (
+          ) : isError ? (
             <ErrorState
               fullScreen
               title={t("detail.loadError")}

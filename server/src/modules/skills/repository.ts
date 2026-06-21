@@ -1,7 +1,17 @@
-import { and, count, countDistinct, desc, eq, gte, inArray, sql } from 'drizzle-orm';
-import type { Db } from '../../db/client.js';
-import * as t from '../../db/schema.js';
-import type { SkillRow } from '../../db/rows.js';
+import {
+  and,
+  count,
+  countDistinct,
+  desc,
+  eq,
+  gte,
+  inArray,
+  sql,
+} from "drizzle-orm";
+import type { Db } from "../../db/client.js";
+import * as t from "../../db/schema.js";
+import type { SkillRow } from "../../db/rows.js";
+import type { ThreatLevel } from "./scanner.js";
 export type { SkillRow };
 
 /**
@@ -18,6 +28,7 @@ export interface InsertSkill {
   body: string;
   enabled?: boolean;
   evidenceFiles?: string[] | null;
+  threatLevel?: ThreatLevel;
 }
 
 export interface UpdateSkill {
@@ -58,12 +69,18 @@ export class SkillsRepository {
   constructor(private db: Db) {}
 
   async list(workspaceId: string): Promise<SkillRow[]> {
-    return this.db.select().from(t.skills).where(eq(t.skills.workspaceId, workspaceId));
+    return this.db
+      .select()
+      .from(t.skills)
+      .where(eq(t.skills.workspaceId, workspaceId));
   }
 
   /** List skills with denormalized agent_count. pull_frequency_pct / accept_rate_pct are stubbed 0 for MVP. */
   async listWithStats(workspaceId: string): Promise<SkillWithStats[]> {
-    const rows = await this.db.select().from(t.skills).where(eq(t.skills.workspaceId, workspaceId));
+    const rows = await this.db
+      .select()
+      .from(t.skills)
+      .where(eq(t.skills.workspaceId, workspaceId));
 
     if (rows.length === 0) return [];
 
@@ -79,7 +96,9 @@ export class SkillsRepository {
       .where(inArray(t.agentSkills.skillId, skillIds))
       .groupBy(t.agentSkills.skillId);
 
-    const countMap = new Map<string, number>(agentCounts.map((r) => [r.skillId, r.count]));
+    const countMap = new Map<string, number>(
+      agentCounts.map((r) => [r.skillId, r.count]),
+    );
 
     return rows.map((skill) => ({
       skill,
@@ -89,7 +108,10 @@ export class SkillsRepository {
     }));
   }
 
-  async getById(workspaceId: string, id: string): Promise<SkillRow | undefined> {
+  async getById(
+    workspaceId: string,
+    id: string,
+  ): Promise<SkillRow | undefined> {
     const [row] = await this.db
       .select()
       .from(t.skills)
@@ -105,12 +127,21 @@ export class SkillsRepository {
         workspaceId: values.workspaceId,
         name: values.name,
         description: values.description,
-        type: values.type as 'rubric' | 'convention' | 'security' | 'custom',
-        source: values.source as 'manual' | 'imported_url' | 'extracted' | 'community',
+        type: values.type as "rubric" | "convention" | "security" | "custom",
+        source: values.source as
+          | "manual"
+          | "imported_url"
+          | "extracted"
+          | "community",
         body: values.body,
         enabled: values.enabled ?? true,
         version: INITIAL_SKILL_VERSION,
-        ...(values.evidenceFiles !== undefined ? { evidenceFiles: values.evidenceFiles } : {}),
+        ...(values.evidenceFiles !== undefined
+          ? { evidenceFiles: values.evidenceFiles }
+          : {}),
+        ...(values.threatLevel !== undefined
+          ? { threatLevel: values.threatLevel }
+          : {}),
       })
       .returning();
     await this.snapshotVersion(row!.id, INITIAL_SKILL_VERSION, row!.body);
@@ -129,26 +160,41 @@ export class SkillsRepository {
     const existing = await this.getById(workspaceId, id);
     if (!existing) return undefined;
 
-    const bodyChanged = patch.body !== undefined && patch.body !== existing.body;
+    const bodyChanged =
+      patch.body !== undefined && patch.body !== existing.body;
     const nextVersion = bodyChanged ? existing.version + 1 : existing.version;
 
     const [row] = await this.db
       .update(t.skills)
       .set({
         ...(patch.name !== undefined ? { name: patch.name } : {}),
-        ...(patch.description !== undefined ? { description: patch.description } : {}),
+        ...(patch.description !== undefined
+          ? { description: patch.description }
+          : {}),
         ...(patch.type !== undefined
-          ? { type: patch.type as 'rubric' | 'convention' | 'security' | 'custom' }
+          ? {
+              type: patch.type as
+                | "rubric"
+                | "convention"
+                | "security"
+                | "custom",
+            }
           : {}),
         ...(patch.body !== undefined ? { body: patch.body } : {}),
         ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
-        ...(patch.evidenceFiles !== undefined ? { evidenceFiles: patch.evidenceFiles } : {}),
-        ...(bodyChanged ? { version: nextVersion } : {}),
+        ...(patch.evidenceFiles !== undefined
+          ? { evidenceFiles: patch.evidenceFiles }
+          : {}),
+        // Body change resets threat level — a re-scan will run asynchronously.
+        ...(bodyChanged
+          ? { version: nextVersion, threatLevel: "unknown" as const }
+          : {}),
       })
       .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.id, id)))
       .returning();
 
-    if (bodyChanged && row) await this.snapshotVersion(row.id, nextVersion, row.body);
+    if (bodyChanged && row)
+      await this.snapshotVersion(row.id, nextVersion, row.body);
     return row;
   }
 
@@ -174,7 +220,10 @@ export class SkillsRepository {
     }));
   }
 
-  async stats(workspaceId: string, id: string): Promise<SkillStats | undefined> {
+  async stats(
+    workspaceId: string,
+    id: string,
+  ): Promise<SkillStats | undefined> {
     const skill = await this.getById(workspaceId, id);
     if (!skill) return undefined;
 
@@ -184,7 +233,10 @@ export class SkillsRepository {
       .from(t.agentSkills)
       .innerJoin(t.agents, eq(t.agentSkills.agentId, t.agents.id))
       .where(
-        and(eq(t.agentSkills.skillId, id), eq(t.agents.workspaceId, workspaceId)),
+        and(
+          eq(t.agentSkills.skillId, id),
+          eq(t.agents.workspaceId, workspaceId),
+        ),
       );
 
     const agentIds = linkedAgents.map((a) => a.id);
@@ -217,7 +269,8 @@ export class SkillsRepository {
 
       findings_30d = findingRows.length;
       for (const f of findingRows) {
-        findings_by_category[f.category] = (findings_by_category[f.category] ?? 0) + 1;
+        findings_by_category[f.category] =
+          (findings_by_category[f.category] ?? 0) + 1;
       }
 
       // accept_rate_pct: runs where verdict = 'approved' / total runs
@@ -233,7 +286,9 @@ export class SkillsRepository {
         .where(inArray(t.agentRuns.agentId, agentIds));
 
       if (runStats && runStats.total > 0) {
-        accept_rate_pct = Math.round((runStats.approved / runStats.total) * 100);
+        accept_rate_pct = Math.round(
+          (runStats.approved / runStats.total) * 100,
+        );
       }
 
       // pull_frequency_pct: distinct prIds from runs / total PRs in workspace
@@ -248,7 +303,9 @@ export class SkillsRepository {
         .where(eq(t.pullRequests.workspaceId, workspaceId));
 
       if (totalPrCount && totalPrCount.total > 0 && prRunCount) {
-        pull_frequency_pct = Math.round((prRunCount.covered / totalPrCount.total) * 100);
+        pull_frequency_pct = Math.round(
+          (prRunCount.covered / totalPrCount.total) * 100,
+        );
       }
     }
 
@@ -277,17 +334,33 @@ export class SkillsRepository {
     const [versionRow] = await this.db
       .select()
       .from(t.skillVersions)
-      .where(and(eq(t.skillVersions.skillId, id), eq(t.skillVersions.version, version)));
+      .where(
+        and(
+          eq(t.skillVersions.skillId, id),
+          eq(t.skillVersions.version, version),
+        ),
+      );
 
     if (!versionRow) return undefined;
 
     return this.update(workspaceId, id, { body: versionRow.body });
   }
 
-  private async snapshotVersion(skillId: string, version: number, body: string): Promise<void> {
+  private async snapshotVersion(
+    skillId: string,
+    version: number,
+    body: string,
+  ): Promise<void> {
     await this.db
       .insert(t.skillVersions)
       .values({ skillId, version, body })
       .onConflictDoNothing();
+  }
+
+  async updateThreatLevel(id: string, threatLevel: ThreatLevel): Promise<void> {
+    await this.db
+      .update(t.skills)
+      .set({ threatLevel })
+      .where(eq(t.skills.id, id));
   }
 }

@@ -5,6 +5,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Button, FormField, TextInput, SelectInput } from "@devdigest/ui";
 import { useCreateSkill, useImportSkill } from "@/lib/hooks/skills";
+import { useImportSkillFromUrl } from "@/lib/hooks/conventions";
 
 const MODAL_OVERLAY: React.CSSProperties = {
   position: "fixed",
@@ -109,7 +110,7 @@ export function CreateSkillModal({
   onCreated?: (id: string) => void;
 }) {
   const t = useTranslations("skills");
-  const [tab, setTab] = React.useState<"create" | "import">("create");
+  const [tab, setTab] = React.useState<"create" | "import" | "url">("create");
 
   // Create form
   const [name, setName] = React.useState("");
@@ -127,6 +128,11 @@ export function CreateSkillModal({
   >([]);
   const [zipPick, setZipPick] = React.useState<string | null>(null);
   const importSkill = useImportSkill();
+
+  // URL import form
+  const [importUrl, setImportUrl] = React.useState("");
+  const [urlName, setUrlName] = React.useState("");
+  const importFromUrl = useImportSkillFromUrl();
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -176,7 +182,19 @@ export function CreateSkillModal({
 
   const handleImport = () => {
     importSkill.mutate(
-      { name: importName, body: importBody, source: "imported_file" },
+      { name: importName, body: importBody },
+      {
+        onSuccess: (s) => {
+          onCreated?.(s.id);
+          onClose();
+        },
+      },
+    );
+  };
+
+  const handleImportFromUrl = () => {
+    importFromUrl.mutate(
+      { url: importUrl, name: urlName },
       {
         onSuccess: (s) => {
           onCreated?.(s.id);
@@ -214,7 +232,7 @@ export function CreateSkillModal({
             paddingBottom: 8,
           }}
         >
-          {(["create", "import"] as const).map((k) => (
+          {(["create", "import", "url"] as const).map((k) => (
             <button
               key={k}
               onClick={() => setTab(k)}
@@ -233,7 +251,11 @@ export function CreateSkillModal({
                 } as React.CSSProperties
               }
             >
-              {k === "create" ? "Create" : t("drawer.tabs.file")}
+              {k === "create"
+                ? "Create"
+                : k === "import"
+                  ? t("drawer.tabs.file")
+                  : "Import from URL"}
             </button>
           ))}
         </div>
@@ -354,6 +376,36 @@ export function CreateSkillModal({
               disabled={!importName || !importBody || importSkill.isPending}
             >
               {importSkill.isPending ? t("file.importing") : t("file.import")}
+            </Button>
+          </>
+        )}
+
+        {tab === "url" && (
+          <>
+            <FormField label="URL (https:// only)">
+              <TextInput
+                value={importUrl}
+                onChange={setImportUrl}
+                placeholder="https://raw.githubusercontent.com/org/repo/main/skill.md"
+              />
+            </FormField>
+            <FormField label="Skill name">
+              <TextInput
+                value={urlName}
+                onChange={setUrlName}
+                placeholder="my-skill"
+              />
+            </FormField>
+            <Button
+              kind="primary"
+              onClick={handleImportFromUrl}
+              disabled={
+                !importUrl.startsWith("https://") ||
+                !urlName.trim() ||
+                importFromUrl.isPending
+              }
+            >
+              {importFromUrl.isPending ? "Importing…" : "Import from URL"}
             </Button>
           </>
         )}
