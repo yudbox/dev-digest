@@ -1,11 +1,11 @@
-/* repo-context.tsx — tracks the active repo for the shell + :repoId routing.
+/* repoContext.tsx — tracks the active repo for the shell + :repoId routing.
    Priority: repoId in the URL path > localStorage > first repo from the API. */
 "use client";
 
 import React from "react";
 import { usePathname } from "next/navigation";
-import { useRepos } from "./hooks";
-import type { Repo } from "./types";
+import { useRepos } from "../hooks";
+import type { Repo } from "../types";
 
 const RepoCtx = React.createContext<{
   repoId: string | null;

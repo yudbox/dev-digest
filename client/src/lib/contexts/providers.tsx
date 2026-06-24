@@ -9,9 +9,9 @@ import {
   MutationCache,
 } from "@tanstack/react-query";
 import { ThemeProvider } from "./theme";
-import { RepoProvider } from "./repo-context";
+import { RepoProvider } from "./repoContext";
 import { ToastProvider, notify } from "./toast";
-import { ApiError } from "./api";
+import { ApiError } from "../api";
 
 function errorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;

@@ -1,14 +1,25 @@
 {
   "hooks": {
-    "Stop": [
+    "PreToolUse": [
       {
+        "matcher": "Bash(git push*)",
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Before ending this session, invoke the engineering-insights skill. Detect which modules (client/, server/, reviewer-core/, e2e/) were meaningfully touched. Rank candidates by signal strength: user corrections first, then failed approaches, repeated patterns, non-obvious solutions, workflow discoveries. Apply the quality filter (discard anything obvious from 5 minutes of reading the code). For each surviving insight, append to {module}/insights/INSIGHTS.md with the format: 'YYYY-MM-DD — actionable fact. ref: file:line' — create the file with the 7-section template if it does not exist. If the session was trivial (typo fix, rename, formatting) or no insights passed the filter, skip silently. Do not ask for confirmation."
+            "prompt": "Before executing this git push command, invoke the pr-self-review skill. Run: git diff $(git merge-base origin/main HEAD)...HEAD --name-only --diff-filter=AM to get changed files. Filter out vendor/, node_modules/, migrations/, *.md, *.json, e2e/. Route remaining files to buckets: UI Frontend (client/**/*.ts,tsx,css), Backend/Domain (server/**, reviewer-core/**), Tests (*.test.ts,tsx). Spawn one sub-agent per non-empty bucket, applying the skills assigned to each bucket per the pr-self-review skill. Also run: diff -r client/src/vendor/shared/contracts/ server/src/vendor/shared/contracts/ and add a CRITICAL finding if any differences exist. Collect all findings, deduplicate by file:line, sort by severity. Output the PR Self-Review Report in the format defined in the pr-self-review skill. If any CRITICAL findings exist: print 🚫 BLOCKER and DO NOT execute the git push — tell the user to fix CRITICAL issues first. If no CRITICAL findings: print ✅ PASS and proceed with git push."
           }
         ]
       }
     ]
+    // "Stop": [
+    //   {
+    //     "hooks": [
+    //       {
+    //         "type": "prompt",
+    //         "prompt": "Invoke the engineering-insights skill exactly once now. Do not check whether it was already invoked earlier in the session — just invoke it. The skill itself handles deduplication and the quality filter. Do not repeat this after future messages."
+    //       }
+    //     ]
+    //   }
+    // ]
   }
 }

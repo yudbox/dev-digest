@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
@@ -212,5 +212,30 @@ export class AgentsRepository {
     await this.db
       .insert(t.agentSkills)
       .values(skillIds.map((skillId, i) => ({ agentId, skillId, order: i })));
+  }
+
+  /** Number of skills linked to a single agent. */
+  async skillCount(agentId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ n: count(t.agentSkills.skillId) })
+      .from(t.agentSkills)
+      .where(eq(t.agentSkills.agentId, agentId));
+    return row?.n ?? 0;
+  }
+
+  /**
+   * Map of agentId → skill count for all agents in a workspace.
+   * Used by AgentsService.list() to attach skill_count without N+1 queries.
+   */
+  async skillCountsForWorkspace(workspaceId: string): Promise<Map<string, number>> {
+    const agents = await this.list(workspaceId);
+    if (agents.length === 0) return new Map();
+    const agentIds = agents.map((a) => a.id);
+    const rows = await this.db
+      .select({ agentId: t.agentSkills.agentId, n: count(t.agentSkills.skillId) })
+      .from(t.agentSkills)
+      .where(inArray(t.agentSkills.agentId, agentIds))
+      .groupBy(t.agentSkills.agentId);
+    return new Map(rows.map((r) => [r.agentId, r.n]));
   }
 }

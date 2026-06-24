@@ -1,4 +1,4 @@
-/* github-urls.ts — build github.com deep-links from data we already hold.
+/* githubUrls.ts — build github.com deep-links from data we already hold.
    PR detail has repo full_name (owner/repo), PR number, head sha, and finding
    file/line — enough to open the PR or a file blob at a line range in a new tab. */
 

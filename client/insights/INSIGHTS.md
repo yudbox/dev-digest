@@ -37,13 +37,27 @@ See also: `insights/gotchas.md` for known quirks at project start.
 
 2026-06-17 — PR list column layout is controlled by two constants that MUST change in sync: `GRID` (CSS `grid-template-columns` string) and `COLUMN_KEYS` (string array of column identifiers) in `constants.ts`. Missing one causes misaligned headers/rows with no TypeScript error. ref: client/src/app/repos/[repoId]/pulls/constants.ts:1
 
+2026-06-20 — `src/lib/` is structured into three groups: `hooks/` (React Query hooks by domain: settings, repos, pulls, context-files, agents, reviews, trace, repo-intel), `contexts/` (React providers: RepoProvider/useActiveRepo, ThemeProvider/useTheme, ToastProvider/useToast/notify, Providers composite), and `utils/` (pure functions with no React deps: githubUrls, modelLabel, featureModels). Each group has an `index.ts` barrel. `api.ts` and `types.ts` stay at `lib/` root as core infrastructure. ref: client/src/lib/contexts/index.ts:1
+
+2026-06-20 — Team convention: use `@/` path alias for any import going 3+ levels up (`../../../`). Short relative paths (1–2 levels, same feature) are fine. The `@/` alias maps to `src/` via `client/tsconfig.json`. Deep relative paths like `../../../../../lib/hooks/reviews` are explicitly rejected — write `@/lib/hooks/reviews` instead. This is a preference, not a TS enforcement — the compiler accepts both. ref: client/tsconfig.json:1
+
 ## Tool & Library Notes
+
+2026-06-20 — `pr-self-review` skill has two authoritative files that can drift: `SKILL.md` (step descriptions) and `rules/severity-levels.md` (severity definitions). They duplicate the test-coverage-gate rule — SKILL.md Step 6.5 is the source of truth; severity-levels.md must mirror it exactly. Gaps found: missing `< 20 lines changed` skip condition and `not-found.tsx` in the skip list. Always compare both files when editing either. ref: .claude/skills/pr-self-review/rules/severity-levels.md:58
+
+2026-06-20 — `pr-self-review` Step 6.6 (`npm audit`) runs without a `cd` — in this monorepo (`client/`, `server/`, `reviewer-core/` each have their own `package.json`) the command must be scoped: if `client/package.json` in diff → `cd client && npm audit`; if `server/package.json` → `cd server && npm audit`. Running from repo root misses package-specific vulnerabilities. ref: .claude/skills/pr-self-review/SKILL.md:211
+
+2026-06-20 — Sub-agent template in `pr-self-review` SKILL.md says `Use the \`<skill-name>\` skill` but does NOT say to use the Skill tool. Sub-agents reading this template may not know they need to call the Skill tool explicitly — they could skip loading skill rules and hallucinate the review criteria instead. Template must say `Call the Skill tool with skill: "<skill-name>"`. ref: .claude/skills/pr-self-review/SKILL.md:127
 
 2026-06-18 — In RTL tests, `[style*="flex-direction: column"]` is too broad to assert "no SeverityChip rendered" — RunHistory's content wrapper also uses `flexDirection: column`, producing false positives. The reliable proxy for SeverityChip absence is `[style*="opacity: 0.2"]` (the faded dot elements), which is unique to that component. ref: client/src/app/repos/[repoId]/pulls/[number]/_components/RunHistory/RunHistory.test.tsx:110
 
 ## Recurring Errors & Fixes
 
 2026-06-17 — `git add` on paths with square brackets (Next.js dynamic routes like `[repoId]`, `[number]`) fails in zsh with "no matches found: client/src/app/repos/[repoId]/..." — zsh glob-expands brackets before git sees them. Fix: always quote such paths: `git add "client/src/app/repos/[repoId]/pulls/..."`. ref: client/src/app/repos/[repoId]/pulls/constants.ts:1
+
+2026-06-20 — `src/lib/hooks/reviews.ts` imports `notify` directly via `from "../toast"` (sibling relative path), NOT through any barrel. When moving `toast.tsx` into `lib/contexts/`, updating only `app/` consumers is not enough — files inside `lib/hooks/` have their own direct imports. Always grep inside `lib/hooks/*.ts` when relocating lib files. Fix: change to `from "../contexts/toast"`. ref: client/src/lib/hooks/reviews.ts:8
+
+2026-06-20 — `src/components/showcase/Showcase.tsx` exports `Gallery`, not `Showcase` — despite the filename. Writing `export { Showcase } from "./showcase/Showcase"` in a barrel produces `TS2305: Module has no exported member 'Showcase'`. Fix: `export { Gallery } from "./showcase/Showcase"`. ref: client/src/components/showcase/Showcase.tsx:58
 
 ## Session Notes
 
@@ -54,5 +68,13 @@ See also: `insights/gotchas.md` for known quirks at project start.
 2026-06-18 — SeverityChip visual redesign + RunHistory chips: fixed dot model to 12-slot filled/faded pattern, added `findings_critical/warning/suggestion` to `RunSummary` via server JOIN, replaced "5 finding(s) · 4 blockers" text in RunHistory with SeverityChip components. Files: client/src/components/SeverityChip/SeverityChip.tsx, client/src/app/repos/[repoId]/pulls/[number]/_components/RunHistory/RunHistory.tsx, server/src/modules/reviews/repository/run.repo.ts, both vendor/shared/contracts/trace.ts.
 
 2026-06-17 — Severity filter pills + findings hover popover: added severity pills to FindingsPanel (PR detail) and lazy-fetch popover to PR list rows. Zero server changes — all data already existed (`findings_critical/warning/suggestion` counts in PrMeta, full findings via `usePrReviews`). Files: client/src/app/repos/[repoId]/pulls/[number]/_components/FindingsPanel/FindingsPanel.tsx, client/src/app/repos/[repoId]/pulls/_components/FindingsPopover/FindingsPopover.tsx, client/src/app/repos/[repoId]/pulls/_components/PRRow/PRRow.tsx.
+
+2026-06-20 — Frontend architecture refactor: split `hooks/core.ts` god-file into 4 domain files (settings/repos/pulls/context-files), reorganized `src/lib/` flat layout into `contexts/` + `utils/` subdirectories, added `src/components/index.ts` barrel. All 32 tests stayed green. Hidden issue: `reviews.ts` had a direct sibling import (`../toast`) that broke on move — caught by typecheck. Files: client/src/lib/hooks/, client/src/lib/contexts/, client/src/lib/utils/, client/src/components/index.ts.
+
+2026-06-20 — pr-self-review skill audit: found 4 gaps — (1) severity-levels.md missing `< 20 lines changed` skip + `not-found.tsx` in HIGH test gate; (2) npm audit needs per-package `cd`; (3) sub-agent template unclear about Skill tool call. All 4 gaps fixed. Files: .claude/skills/pr-self-review/SKILL.md, .claude/skills/pr-self-review/rules/severity-levels.md.
+
+2026-06-20 — `pr-self-review` uses `git diff $(git merge-base origin/main HEAD)...HEAD` — this only reviews **committed** changes in a feature branch. When run on `main` with HEAD = origin/main (e.g. after a merge, with unstaged changes), the diff is empty and the skill silently reports nothing. To test the skill, changes must be committed to a branch first. ref: .claude/skills/pr-self-review/SKILL.md:49
+
+2026-06-20 — To invoke `pr-self-review`, just call the Skill tool (or say "review my changes") — do NOT manually run `git diff` bash commands to collect the diff first. The skill's execution algorithm runs those commands itself internally. Manually pre-collecting diff before calling the skill is redundant and was explicitly corrected by the user. ref: .claude/skills/pr-self-review/SKILL.md:1
 
 ## Open Questions

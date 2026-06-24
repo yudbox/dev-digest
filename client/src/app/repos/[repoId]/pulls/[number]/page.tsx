@@ -18,9 +18,9 @@ import RunTraceDrawer from "./_components/RunTraceDrawer";
 import { usePullDetail, usePulls } from "../../../../../lib/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePrReviews, useCancelRun, usePrActiveRuns, usePrRuns, useDeleteRun } from "../../../../../lib/hooks/reviews";
-import { useActiveRepo, useRepoNotFound } from "../../../../../lib/repo-context";
+import { useActiveRepo, useRepoNotFound } from "../../../../../lib/contexts/repoContext";
 import { ApiError } from "../../../../../lib/api";
-import { githubPrUrl } from "../../../../../lib/github-urls";
+import { githubPrUrl } from "../../../../../lib/utils/githubUrls";
 import type { FindingRecord } from "@devdigest/shared";
 
 export default function PRDetailPage() {

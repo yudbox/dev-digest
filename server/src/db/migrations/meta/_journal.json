@@ -64,6 +64,20 @@
       "when": 1781383504315,
       "tag": "0008_striped_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1782038928436,
+      "tag": "0009_fantastic_rogue",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782048825838,
+      "tag": "0010_skill_threat_level",
+      "breakpoints": true
     }
   ]
 }
