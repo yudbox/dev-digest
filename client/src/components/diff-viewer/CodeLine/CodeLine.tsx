@@ -24,6 +24,16 @@ const BADGE_LABEL: Record<string, string> = {
   WARNING: '△ warning',
   SUGGESTION: '◇ suggestion',
 };
+const BADGE_BORDER: Record<string, string> = {
+  CRITICAL:   '#ef4444',
+  WARNING:    '#f97316',
+  SUGGESTION: '#3b82f6',
+};
+const BADGE_BG: Record<string, string> = {
+  CRITICAL:   'rgba(239, 68, 68, 0.06)',
+  WARNING:    'rgba(249, 115, 22, 0.06)',
+  SUGGESTION: 'rgba(59, 130, 246, 0.06)',
+};
 
 export function CodeLine({
   ln,
@@ -61,7 +71,13 @@ export function CodeLine({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind)}>
+      <div style={{
+        ...lineRowFor(ln.kind),
+        ...(badge && BADGE_BORDER[badge] ? {
+          borderLeft: `3px solid ${BADGE_BORDER[badge]}`,
+          background: BADGE_BG[badge],
+        } : {}),
+      }}>
         <span
           className="mono tnum"
           style={{ ...s.lineNo, position: "relative" }}
