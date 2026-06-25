@@ -2,6 +2,7 @@
 
 import React from "react";
 import { SectionLabel, Icon } from "@devdigest/ui";
+import { useTranslations } from "next-intl";
 import type { Intent, RiskAreaKind } from "@devdigest/shared";
 import type { CSSProperties } from "react";
 
@@ -102,6 +103,20 @@ const s = {
     alignSelf: "flex-start",
   } satisfies CSSProperties,
 
+  emptyTitle: {
+    margin: 0,
+    fontSize: 13,
+    fontWeight: 600,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+
+  emptyBody: {
+    margin: 0,
+    fontSize: 12,
+    color: "var(--text-muted)",
+    lineHeight: 1.5,
+  } satisfies CSSProperties,
+
   divider: {
     borderTop: "1px solid var(--border)",
     margin: "2px 0",
@@ -142,7 +157,21 @@ export function IntentCard({
   onRecalculate,
   recalculating,
 }: IntentCardProps) {
-  if (isLoading || !intent) return null;
+  const t = useTranslations("prReview.intent");
+
+  if (isLoading) return null;
+
+  if (!intent) {
+    return (
+      <section>
+        <SectionLabel icon="Target">Intent</SectionLabel>
+        <div style={s.card}>
+          <p style={s.emptyTitle}>{t("notRunTitle")}</p>
+          <p style={s.emptyBody}>{t("notRunBody")}</p>
+        </div>
+      </section>
+    );
+  }
 
   const hasScope = intent.in_scope.length > 0 || intent.out_of_scope.length > 0;
 

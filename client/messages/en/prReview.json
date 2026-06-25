@@ -114,6 +114,10 @@
     "emptyAllBody": "No open PRs found for this repo yet. Refresh to sync from GitHub.",
     "emptyStatusBody": "No PRs with status “{status}”."
   },
+  "intent": {
+    "notRunTitle": "Intent not yet analysed",
+    "notRunBody": "Run review agents to analyse the intent and scope of this pull request."
+  },
   "timeline": {
     "goToReview": "Jump to this run’s findings below",
     "openTrace": "Open run trace & logs",
