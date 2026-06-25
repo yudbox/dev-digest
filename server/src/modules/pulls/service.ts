@@ -1,10 +1,10 @@
 /** PullsService — assembles SmartDiff for a PR.
  *  Zero LLM calls: reads only from the DB via ReviewRepository. */
 
-import type { SmartDiff } from '@devdigest/shared';
-import { NotFoundError } from '../../platform/errors.js';
-import type { ReviewRepository } from '../reviews/repository.js';
-import { buildSmartDiff } from './classifier.js';
+import type { SmartDiff } from "@devdigest/shared";
+import { NotFoundError } from "../../platform/errors.js";
+import type { ReviewRepository } from "../reviews/repository.js";
+import { buildSmartDiff } from "./classifier.js";
 
 export class PullsService {
   constructor(private reviewRepo: ReviewRepository) {}
@@ -16,7 +16,7 @@ export class PullsService {
       this.reviewRepo.getLatestReviewData(prId),
     ]);
 
-    if (!pr) throw new NotFoundError('Pull request not found');
+    if (!pr) throw new NotFoundError("Pull request not found");
 
     // Group files by classifier role (no DB, pure CPU).
     const base = buildSmartDiff(prFiles);
@@ -29,7 +29,8 @@ export class PullsService {
       findingsByFile.set(f.file, list);
     }
 
-    const hasReview = latestReview.findings.length > 0 || latestReview.reviewTokens !== null;
+    const hasReview =
+      latestReview.findings.length > 0 || latestReview.reviewTokens !== null;
 
     // Enrich each file with finding_lines + severity_counts from latest review.
     const enrichedGroups = base.groups.map((group) => ({
@@ -38,12 +39,17 @@ export class PullsService {
         const findings = findingsByFile.get(file.path) ?? [];
         return {
           ...file,
-          finding_lines: [...new Set(findings.map((f) => f.startLine))].sort((a, b) => a - b),
+          finding_lines: [...new Set(findings.map((f) => f.startLine))].sort(
+            (a, b) => a - b,
+          ),
           severity_counts: hasReview
             ? {
-                critical: findings.filter((f) => f.severity === 'CRITICAL').length,
-                warning: findings.filter((f) => f.severity === 'WARNING').length,
-                suggestion: findings.filter((f) => f.severity === 'SUGGESTION').length,
+                critical: findings.filter((f) => f.severity === "CRITICAL")
+                  .length,
+                warning: findings.filter((f) => f.severity === "WARNING")
+                  .length,
+                suggestion: findings.filter((f) => f.severity === "SUGGESTION")
+                  .length,
               }
             : null,
         };

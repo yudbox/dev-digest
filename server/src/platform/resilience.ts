@@ -6,7 +6,7 @@
 export class TimeoutError extends Error {
   constructor(ms: number) {
     super(`Operation timed out after ${ms}ms`);
-    this.name = 'TimeoutError';
+    this.name = "TimeoutError";
   }
 }
 
@@ -37,13 +37,38 @@ function defaultIsRetryable(err: unknown): boolean {
     (err as { status?: number })?.status ??
     (err as { statusCode?: number })?.statusCode ??
     (err as { response?: { status?: number } })?.response?.status;
-  if (typeof status === 'number') return status === 429 || status >= 500;
+  if (typeof status === "number") {
+    // 429 can mean either rate-limit (retryable) OR quota-exceeded (not retryable).
+    // Quota-exceeded messages contain "quota" or "billing" — don't waste retries on those.
+    if (status === 429) {
+      const msg = String(
+        (err as { message?: string })?.message ??
+          (err as { error?: { message?: string } })?.error?.message ??
+          "",
+      ).toLowerCase();
+      const isQuotaExceeded =
+        msg.includes("quota") ||
+        msg.includes("billing") ||
+        msg.includes("exceeded your current");
+      if (isQuotaExceeded) {
+        console.error(
+          "[resilience] 429 quota-exceeded — not retrying. Check OpenAI billing at https://platform.openai.com/usage",
+        );
+        return false;
+      }
+      return true; // rate-limit 429 — retryable
+    }
+    return status >= 500;
+  }
   // network-ish errors
   const code = (err as { code?: string })?.code;
-  return code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'ENOTFOUND';
+  return code === "ECONNRESET" || code === "ETIMEDOUT" || code === "ENOTFOUND";
 }
 
-export async function withRetry<T>(fn: () => Promise<T>, opts: RetryOptions = {}): Promise<T> {
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  opts: RetryOptions = {},
+): Promise<T> {
   const retries = opts.retries ?? 3;
   const base = opts.baseDelayMs ?? 250;
   const max = opts.maxDelayMs ?? 8000;

@@ -1,8 +1,8 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
-import type { Db } from '../../../db/client.js';
-import * as t from '../../../db/schema.js';
-import type { Finding } from '@devdigest/shared';
-import type { FindingRow, PullRow } from '../../../db/rows.js';
+import { and, desc, eq, inArray } from "drizzle-orm";
+import type { Db } from "../../../db/client.js";
+import * as t from "../../../db/schema.js";
+import type { Finding } from "@devdigest/shared";
+import type { FindingRow, PullRow } from "../../../db/rows.js";
 
 export type ReviewRow = typeof t.reviews.$inferSelect;
 
@@ -15,7 +15,7 @@ export async function insertReview(
     prId: string;
     agentId: string | null;
     runId: string | null;
-    kind: 'summary' | 'review';
+    kind: "summary" | "review";
     verdict: string | null;
     summary: string | null;
     score: number | null;
@@ -46,7 +46,7 @@ export async function insertFindings(
         rationale: f.rationale,
         suggestion: f.suggestion ?? null,
         confidence: f.confidence,
-        kind: f.kind ?? 'finding',
+        kind: f.kind ?? "finding",
         trifectaComponents: f.trifecta_components ?? null,
       })),
     )
@@ -66,15 +66,24 @@ export async function reviewsForPull(
     .orderBy(desc(t.reviews.createdAt));
   if (reviews.length === 0) return [];
   const ids = reviews.map((r) => r.id);
-  const findings = await db.select().from(t.findings).where(inArray(t.findings.reviewId, ids));
+  const findings = await db
+    .select()
+    .from(t.findings)
+    .where(inArray(t.findings.reviewId, ids));
   return reviews.map((review) => ({
     review,
     findings: findings.filter((f) => f.reviewId === review.id),
   }));
 }
 
-export async function getReview(db: Db, reviewId: string): Promise<ReviewRow | undefined> {
-  const [row] = await db.select().from(t.reviews).where(eq(t.reviews.id, reviewId));
+export async function getReview(
+  db: Db,
+  reviewId: string,
+): Promise<ReviewRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(t.reviews)
+    .where(eq(t.reviews.id, reviewId));
   return row;
 }
 
@@ -87,15 +96,23 @@ export async function deleteReview(
 ): Promise<boolean> {
   const rows = await db
     .delete(t.reviews)
-    .where(and(eq(t.reviews.workspaceId, workspaceId), eq(t.reviews.id, reviewId)))
+    .where(
+      and(eq(t.reviews.workspaceId, workspaceId), eq(t.reviews.id, reviewId)),
+    )
     .returning({ id: t.reviews.id });
   return rows.length > 0;
 }
 
 // ---- finding actions ------------------------------------------------------
 
-export async function getFinding(db: Db, findingId: string): Promise<FindingRow | undefined> {
-  const [row] = await db.select().from(t.findings).where(eq(t.findings.id, findingId));
+export async function getFinding(
+  db: Db,
+  findingId: string,
+): Promise<FindingRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(t.findings)
+    .where(eq(t.findings.id, findingId));
   return row;
 }
 
@@ -103,7 +120,9 @@ export async function getFinding(db: Db, findingId: string): Promise<FindingRow 
 export async function findingContext(
   db: Db,
   findingId: string,
-): Promise<{ finding: FindingRow; review: ReviewRow; pull: PullRow } | undefined> {
+): Promise<
+  { finding: FindingRow; review: ReviewRow; pull: PullRow } | undefined
+> {
   const finding = await getFinding(db, findingId);
   if (!finding) return undefined;
   const review = await getReview(db, finding.reviewId);
@@ -145,17 +164,25 @@ export async function setFindingDismissed(
 // ---- smart diff data -------------------------------------------------------
 
 export interface LatestReviewData {
-  findings: Array<{ file: string; title: string; severity: string; startLine: number }>;
+  findings: Array<{
+    file: string;
+    title: string;
+    severity: string;
+    startLine: number;
+  }>;
   reviewTokens: number | null;
 }
 
 /** Returns findings + token count from the most recent 'review' run for a PR.
  *  Returns empty findings + null tokens when no review has run yet. */
-export async function getLatestReviewData(db: Db, prId: string): Promise<LatestReviewData> {
+export async function getLatestReviewData(
+  db: Db,
+  prId: string,
+): Promise<LatestReviewData> {
   const [review] = await db
     .select()
     .from(t.reviews)
-    .where(and(eq(t.reviews.prId, prId), eq(t.reviews.kind, 'review')))
+    .where(and(eq(t.reviews.prId, prId), eq(t.reviews.kind, "review")))
     .orderBy(desc(t.reviews.createdAt))
     .limit(1);
 
@@ -174,7 +201,10 @@ export async function getLatestReviewData(db: Db, prId: string): Promise<LatestR
   let reviewTokens: number | null = null;
   if (review.runId) {
     const [run] = await db
-      .select({ tokensIn: t.agentRuns.tokensIn, tokensOut: t.agentRuns.tokensOut })
+      .select({
+        tokensIn: t.agentRuns.tokensIn,
+        tokensOut: t.agentRuns.tokensOut,
+      })
       .from(t.agentRuns)
       .where(eq(t.agentRuns.id, review.runId));
     if (run) {

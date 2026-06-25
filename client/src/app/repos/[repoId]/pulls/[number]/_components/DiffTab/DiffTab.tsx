@@ -40,7 +40,11 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
         setShowComments(true); // a just-posted comment shouldn't stay hidden
         return res;
       } catch (err) {
-        notify.error(err instanceof Error ? err.message : "Couldn't post the comment to GitHub.");
+        notify.error(
+          err instanceof Error
+            ? err.message
+            : "Couldn't post the comment to GitHub.",
+        );
         throw err;
       }
     },
@@ -77,7 +81,8 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
                 icon={showComments ? "EyeOff" : "Eye"}
                 onClick={() => setShowComments((v) => !v)}
               >
-                {showComments ? "Hide comments" : "Show comments"} ({commentCount})
+                {showComments ? "Hide comments" : "Show comments"} (
+                {commentCount})
               </Button>
             )}
           </div>

@@ -13,8 +13,8 @@ import type { DiffCommentApi } from "@/components/diff-viewer";
 // ── Colour palette for roles ──────────────────────────────────────────────────
 
 const ROLE_DOT: Record<string, string> = {
-  core: "#3b82f6",       // blue
-  wiring: "#f59e0b",     // amber
+  core: "#3b82f6", // blue
+  wiring: "#f59e0b", // amber
   boilerplate: "#6b7280", // gray
 };
 
@@ -41,13 +41,19 @@ function FindingBadges({
   findingLines,
 }: {
   filePath: string;
-  severityCounts: NonNullable<SmartDiff["groups"][0]["files"][0]["severity_counts"]>;
+  severityCounts: NonNullable<
+    SmartDiff["groups"][0]["files"][0]["severity_counts"]
+  >;
   findingLines: number[];
 }) {
   const badges = [
     { key: "critical", label: "blocker", count: severityCounts.critical },
     { key: "warning", label: "warning", count: severityCounts.warning },
-    { key: "suggestion", label: "suggestion", count: severityCounts.suggestion },
+    {
+      key: "suggestion",
+      label: "suggestion",
+      count: severityCounts.suggestion,
+    },
   ].filter((b) => b.count > 0);
 
   if (badges.length === 0) return null;
@@ -63,7 +69,9 @@ function FindingBadges({
           type="button"
           style={{ ...s.badge, color: SEVERITY_COLOUR[b.key] }}
           onClick={() => {
-            const line = findingLines[lineIdx[b.key as keyof typeof lineIdx]] ?? findingLines[0];
+            const line =
+              findingLines[lineIdx[b.key as keyof typeof lineIdx]] ??
+              findingLines[0];
             if (line != null) scrollToLine(filePath, line);
           }}
           title={`${b.count} ${b.label}(s) — click to scroll`}
@@ -87,8 +95,12 @@ function GroupSection({
   t: ReturnType<typeof useTranslations<"prReview.smartDiff">>;
 }) {
   const dot = ROLE_DOT[group.role] ?? "#6b7280";
-  const label = t(`${group.role}Label` as "coreLabel" | "wiringLabel" | "boilerplateLabel");
-  const desc = t(`${group.role}Desc` as "coreDesc" | "wiringDesc" | "boilerplateDesc");
+  const label = t(
+    `${group.role}Label` as "coreLabel" | "wiringLabel" | "boilerplateLabel",
+  );
+  const desc = t(
+    `${group.role}Desc` as "coreDesc" | "wiringDesc" | "boilerplateDesc",
+  );
   const isBoilerplate = group.role === "boilerplate";
 
   const fileMap = new Map(files.map((f) => [f.path, f]));
@@ -141,7 +153,11 @@ interface SmartDiffViewerProps {
   commenting?: DiffCommentApi;
 }
 
-export function SmartDiffViewer({ smartDiff, files, commenting }: SmartDiffViewerProps) {
+export function SmartDiffViewer({
+  smartDiff,
+  files,
+  commenting,
+}: SmartDiffViewerProps) {
   const t = useTranslations("prReview.smartDiff");
   const { split_suggestion, review_tokens, groups } = smartDiff;
 
@@ -153,7 +169,9 @@ export function SmartDiffViewer({ smartDiff, files, commenting }: SmartDiffViewe
         {review_tokens != null ? (
           <>
             <span style={s.tokenMuted}>{t("zeroTokens")} · </span>
-            <span style={s.tokenMuted}>{t("builtOn", { count: review_tokens })}</span>
+            <span style={s.tokenMuted}>
+              {t("builtOn", { count: review_tokens })}
+            </span>
           </>
         ) : (
           <span style={s.tokenMuted}>{t("zeroTokens")}</span>
@@ -184,24 +202,37 @@ export function SmartDiffViewer({ smartDiff, files, commenting }: SmartDiffViewe
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const s: Record<string, CSSProperties> = {
-  root:        { display: "flex", flexDirection: "column", gap: 24 },
-  group:       { display: "flex", flexDirection: "column", gap: 8 },
-  groupHeader: { display: "flex", alignItems: "center", gap: 8, padding: "4px 0" },
-  dot:         { width: 10, height: 10, borderRadius: "50%", flexShrink: 0 },
-  groupLabel:  { fontWeight: 600, fontSize: 13, color: "var(--text-primary)" },
-  groupDesc:   { fontSize: 12, color: "var(--text-muted)" },
-  groupCount:  { fontSize: 12, color: "var(--text-muted)", marginLeft: "auto" },
+  root: { display: "flex", flexDirection: "column", gap: 24 },
+  group: { display: "flex", flexDirection: "column", gap: 8 },
+  groupHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "4px 0",
+  },
+  dot: { width: 10, height: 10, borderRadius: "50%", flexShrink: 0 },
+  groupLabel: { fontWeight: 600, fontSize: 13, color: "var(--text-primary)" },
+  groupDesc: { fontSize: 12, color: "var(--text-muted)" },
+  groupCount: { fontSize: 12, color: "var(--text-muted)", marginLeft: "auto" },
   fileWrapper: { display: "flex", flexDirection: "column", gap: 4 },
-  whatDoes:    { fontSize: 12, color: "var(--text-secondary)", paddingLeft: 4 },
+  whatDoes: { fontSize: 12, color: "var(--text-secondary)", paddingLeft: 4 },
   whatDoesLabel: { fontWeight: 600, color: "var(--text-muted)" },
-  badges:      { display: "flex", gap: 8, paddingLeft: 4 },
+  badges: { display: "flex", gap: 8, paddingLeft: 4 },
   badge: {
-    background: "none", border: "none", cursor: "pointer",
-    fontSize: 12, fontWeight: 600, padding: "2px 0",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+    padding: "2px 0",
   },
   tokenBadge: {
-    display: "flex", alignItems: "center", gap: 6,
-    fontSize: 12, fontWeight: 600, color: "#4ade80",
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#4ade80",
     padding: "4px 0",
   },
   tokenMuted: { fontWeight: 400, color: "var(--text-muted)" },

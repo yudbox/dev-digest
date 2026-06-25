@@ -253,6 +253,7 @@ export class ReviewRunExecutor {
     runLog.info(
       `Starting review with agent "${agent.name}" (${agent.provider}/${agent.model})`,
     );
+    console.log(`[run-executor] ▶ agent="${agent.name}" runId=${runId} provider=${agent.provider} model=${agent.model} featureModelId=${agent.featureModelId ?? 'none'}`);
 
     try {
       // Resolve provider + model: Feature Models settings take priority when the
@@ -457,6 +458,17 @@ export class ReviewRunExecutor {
       const status = cancelled ? "cancelled" : "failed";
       const msg = cancelled ? "Cancelled by user" : (err as Error).message;
       runLog.error(cancelled ? "Run cancelled by user" : `Run failed: ${msg}`);
+      if (!cancelled) {
+        const e = err as Record<string, unknown>;
+        console.error(
+          `[run-executor] ✖ agent="${agent.name}" runId=${runId}\n` +
+          `  message : ${msg}\n` +
+          `  status  : ${e.status ?? e.statusCode ?? 'n/a'}\n` +
+          `  type    : ${e.type ?? e.name ?? 'n/a'}\n` +
+          `  code    : ${e.code ?? 'n/a'}\n` +
+          `  body    : ${JSON.stringify(e.error ?? e.body ?? e.response ?? '').slice(0, 300)}`,
+        );
+      }
       await this.repo
         .completeAgentRun(runId, {
           status,

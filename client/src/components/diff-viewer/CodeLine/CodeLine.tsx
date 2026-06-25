@@ -3,7 +3,12 @@
 "use client";
 
 import React from "react";
-import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
+import {
+  commentTargetFor,
+  type CommentThread,
+  type DiffCommentApi,
+  cs,
+} from "../comments";
 import { type Line } from "../helpers";
 import { s, lineRowFor, lineSignFor } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
@@ -44,7 +49,10 @@ export function CodeLine({
       onMouseLeave={() => setHover(false)}
     >
       <div style={lineRowFor(ln.kind)}>
-        <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
+        <span
+          className="mono tnum"
+          style={{ ...s.lineNo, position: "relative" }}
+        >
           {showAdd && target && (
             <button
               type="button"
@@ -69,7 +77,12 @@ export function CodeLine({
       {commenting &&
         commenting.showComments &&
         threads.map((th) => (
-          <CommentThreadView key={th.rootId} thread={th} commenting={commenting} path={path} />
+          <CommentThreadView
+            key={th.rootId}
+            thread={th}
+            commenting={commenting}
+            path={path}
+          />
         ))}
 
       {commenting && composing && target && (

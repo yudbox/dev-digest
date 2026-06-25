@@ -1,6 +1,6 @@
-import type { Db } from '../../db/client.js';
-import * as t from '../../db/schema.js';
-import type { Finding, Intent, RunSummary, RunTrace } from '@devdigest/shared';
+import type { Db } from "../../db/client.js";
+import * as t from "../../db/schema.js";
+import type { Finding, Intent, RunSummary, RunTrace } from "@devdigest/shared";
 
 /**
  * A2 — review data-access. The ONLY layer touching the DB for the review
@@ -13,14 +13,14 @@ import type { Finding, Intent, RunSummary, RunTrace } from '@devdigest/shared';
  * composes them so its public API stays identical.
  */
 
-import type { FindingRow, PullRow } from '../../db/rows.js';
+import type { FindingRow, PullRow } from "../../db/rows.js";
 export type { FindingRow, PullRow };
 
 export type ReviewRow = typeof t.reviews.$inferSelect;
 
-import * as reviewRepo from './repository/review.repo.js';
-import * as runRepo from './repository/run.repo.js';
-import * as pullRepo from './repository/pull.repo.js';
+import * as reviewRepo from "./repository/review.repo.js";
+import * as runRepo from "./repository/run.repo.js";
+import * as pullRepo from "./repository/pull.repo.js";
 
 export class ReviewRepository {
   constructor(private db: Db) {}
@@ -46,7 +46,7 @@ export class ReviewRepository {
     prId: string;
     agentId: string | null;
     runId: string | null;
-    kind: 'summary' | 'review';
+    kind: "summary" | "review";
     verdict: string | null;
     summary: string | null;
     score: number | null;
@@ -60,7 +60,9 @@ export class ReviewRepository {
   }
 
   /** Reviews for a PR (newest first), each with its findings. */
-  reviewsForPull(prId: string): Promise<{ review: ReviewRow; findings: FindingRow[] }[]> {
+  reviewsForPull(
+    prId: string,
+  ): Promise<{ review: ReviewRow; findings: FindingRow[] }[]> {
     return reviewRepo.reviewsForPull(this.db, prId);
   }
 
@@ -73,7 +75,14 @@ export class ReviewRepository {
   activeRunsForPull(
     workspaceId: string,
     prId: string,
-  ): Promise<{ run_id: string; agent_id: string | null; agent_name: string | null; ran_at: string | null }[]> {
+  ): Promise<
+    {
+      run_id: string;
+      agent_id: string | null;
+      agent_name: string | null;
+      ran_at: string | null;
+    }[]
+  > {
     return runRepo.activeRunsForPull(this.db, workspaceId, prId);
   }
 
@@ -113,15 +122,23 @@ export class ReviewRepository {
   /** Resolve workspace_id + pr_id for a finding (via review → pr). */
   findingContext(
     findingId: string,
-  ): Promise<{ finding: FindingRow; review: ReviewRow; pull: PullRow } | undefined> {
+  ): Promise<
+    { finding: FindingRow; review: ReviewRow; pull: PullRow } | undefined
+  > {
     return reviewRepo.findingContext(this.db, findingId);
   }
 
-  setFindingAccepted(findingId: string, at: Date | null): Promise<FindingRow | undefined> {
+  setFindingAccepted(
+    findingId: string,
+    at: Date | null,
+  ): Promise<FindingRow | undefined> {
     return reviewRepo.setFindingAccepted(this.db, findingId, at);
   }
 
-  setFindingDismissed(findingId: string, at: Date | null): Promise<FindingRow | undefined> {
+  setFindingDismissed(
+    findingId: string,
+    at: Date | null,
+  ): Promise<FindingRow | undefined> {
     return reviewRepo.setFindingDismissed(this.db, findingId, at);
   }
 
@@ -151,7 +168,7 @@ export class ReviewRepository {
   completeAgentRun(
     runId: string,
     values: {
-      status: 'done' | 'failed' | 'cancelled';
+      status: "done" | "failed" | "cancelled";
       durationMs: number;
       tokensIn: number;
       tokensOut: number;
