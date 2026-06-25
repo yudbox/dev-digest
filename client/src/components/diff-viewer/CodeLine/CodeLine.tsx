@@ -3,6 +3,7 @@
 "use client";
 
 import React from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   commentTargetFor,
   type CommentThread,
@@ -69,6 +70,8 @@ export function CodeLine({
   commenting?: DiffCommentApi;
   badge?: { severity: string; findingId: string };
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
 
@@ -127,13 +130,23 @@ export function CodeLine({
           {ln.text || " "}
         </span>
         {badge && BADGE_STYLE[badge.severity] && (
-          <a
-            href={`?tab=findings&finding=${badge.findingId}`}
-            onClick={(e) => e.stopPropagation()}
-            style={{ ...BADGE_STYLE[badge.severity], cursor: "pointer", textDecoration: "none" }}
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              const sp = new URLSearchParams(searchParams.toString());
+              sp.set("tab", "findings");
+              sp.set("finding", badge.findingId);
+              router.push(`?${sp.toString()}`);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") e.currentTarget.click();
+            }}
+            style={{ ...BADGE_STYLE[badge.severity], cursor: "pointer" }}
           >
             {BADGE_LABEL[badge.severity] ?? badge.severity.toLowerCase()}
-          </a>
+          </span>
         )}
       </div>
 
