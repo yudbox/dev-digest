@@ -32,6 +32,7 @@ export function ReviewRunAccordion({
   headSha,
   targetRunId = null,
   targetNonce = 0,
+  targetFindingId = null,
 }: {
   review: ReviewRecord;
   prId: string;
@@ -42,6 +43,8 @@ export function ReviewRunAccordion({
    *  (driven from the Timeline: clicking an agent name navigates here). */
   targetRunId?: string | null;
   targetNonce?: number;
+  /** When set, the accordion opens and scrolls the matching FindingCard into view. */
+  targetFindingId?: string | null;
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
@@ -52,13 +55,36 @@ export function ReviewRunAccordion({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetRunId, targetNonce, review.run_id]);
+
+  React.useEffect(() => {
+    if (!open || !targetFindingId) return;
+    const timer = setTimeout(() => {
+      const el = rootRef.current?.querySelector(
+        `[data-finding-id="${targetFindingId}"]`,
+      );
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [open, targetFindingId]);
   const del = useDeleteReview(prId);
   const findings = review.findings;
-  const blockers = findings.filter((f) => f.severity === Severity.enum.CRITICAL && !f.dismissed_at).length;
-  const criticalCount = findings.filter((f) => f.severity === Severity.enum.CRITICAL).length;
-  const warningCount = findings.filter((f) => f.severity === Severity.enum.WARNING).length;
-  const suggestionCount = findings.filter((f) => f.severity === Severity.enum.SUGGESTION).length;
-  const verdictColor = review.verdict ? VERDICT_COLOR[review.verdict] ?? "var(--text-muted)" : "var(--text-muted)";
+  const blockers = findings.filter(
+    (f) => f.severity === Severity.enum.CRITICAL && !f.dismissed_at,
+  ).length;
+  const criticalCount = findings.filter(
+    (f) => f.severity === Severity.enum.CRITICAL,
+  ).length;
+  const warningCount = findings.filter(
+    (f) => f.severity === Severity.enum.WARNING,
+  ).length;
+  const suggestionCount = findings.filter(
+    (f) => f.severity === Severity.enum.SUGGESTION,
+  ).length;
+  const verdictColor = review.verdict
+    ? (VERDICT_COLOR[review.verdict] ?? "var(--text-muted)")
+    : "var(--text-muted)";
 
   return (
     <div
@@ -91,18 +117,35 @@ export function ReviewRunAccordion({
         }}
       >
         <Icon.Cpu size={15} style={{ color: "var(--text-muted)" }} />
-        <span style={{ fontWeight: 600, fontSize: 14 }}>{review.agent_name ?? "Agent"}</span>
+        <span style={{ fontWeight: 600, fontSize: 14 }}>
+          {review.agent_name ?? "Agent"}
+        </span>
         {review.verdict && (
           <Badge color={verdictColor} bg="transparent">
             {review.verdict.replace("_", " ")}
           </Badge>
         )}
         <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
-          {criticalCount > 0 && <SeverityChip sev={Severity.enum.CRITICAL} count={criticalCount} />}
-          {warningCount > 0 && <SeverityChip sev={Severity.enum.WARNING} count={warningCount} />}
-          {suggestionCount > 0 && <SeverityChip sev={Severity.enum.SUGGESTION} count={suggestionCount} />}
+          {criticalCount > 0 && (
+            <SeverityChip sev={Severity.enum.CRITICAL} count={criticalCount} />
+          )}
+          {warningCount > 0 && (
+            <SeverityChip sev={Severity.enum.WARNING} count={warningCount} />
+          )}
+          {suggestionCount > 0 && (
+            <SeverityChip
+              sev={Severity.enum.SUGGESTION}
+              count={suggestionCount}
+            />
+          )}
           {blockers > 0 && (
-            <span style={{ fontSize: 12, color: "var(--text-muted)", paddingBottom: 2 }}>
+            <span
+              style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                paddingBottom: 2,
+              }}
+            >
               · {blockers} blocker{blockers !== 1 ? "s" : ""}
             </span>
           )}
@@ -113,13 +156,20 @@ export function ReviewRunAccordion({
             {review.score}
           </Badge>
         )}
-        <span className="mono" style={{ fontSize: 12, color: "var(--text-muted)" }}>
+        <span
+          className="mono"
+          style={{ fontSize: 12, color: "var(--text-muted)" }}
+        >
           {formatWhen(review.created_at)}
         </span>
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (window.confirm(`Delete this "${review.agent_name ?? "agent"}" review run and its findings?`)) {
+            if (
+              window.confirm(
+                `Delete this "${review.agent_name ?? "agent"}" review run and its findings?`,
+              )
+            ) {
               del.mutate(review.id);
             }
           }}
@@ -135,11 +185,22 @@ export function ReviewRunAccordion({
             padding: 4,
           }}
         >
-          <Icon.Trash size={14} style={del.isPending ? { animation: "ddspin 1s linear infinite" } : undefined} />
+          <Icon.Trash
+            size={14}
+            style={
+              del.isPending
+                ? { animation: "ddspin 1s linear infinite" }
+                : undefined
+            }
+          />
         </button>
         <Icon.ChevronDown
           size={16}
-          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s", color: "var(--text-muted)" }}
+          style={{
+            transform: open ? "rotate(180deg)" : "none",
+            transition: "transform .15s",
+            color: "var(--text-muted)",
+          }}
         />
       </div>
 

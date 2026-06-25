@@ -20,7 +20,10 @@ import { CodeLine } from "../CodeLine";
 import { OutdatedComments } from "../OutdatedComments";
 
 /** Threads anchored to a given parsed line (RIGHT=new, LEFT=old). */
-function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): CommentThread[] {
+function threadsForLine(
+  ln: Line,
+  matched: Map<string, CommentThread[]>,
+): CommentThread[] {
   if (matched.size === 0) return [];
   const out: CommentThread[] = [];
   for (const key of keysForLine(ln)) {
@@ -30,10 +33,21 @@ function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): Commen
   return out;
 }
 
-export function FileCard({ file, commenting }: { file: PrFile; commenting?: DiffCommentApi }) {
+export function FileCard({
+  file,
+  commenting,
+  initialOpen,
+  lineBadges,
+}: {
+  file: PrFile;
+  commenting?: DiffCommentApi;
+  initialOpen?: boolean;
+  lineBadges?: Map<number, { severity: string; findingId: string }>;
+}) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
-    (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
+    initialOpen ??
+      (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES,
   );
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
 
@@ -41,10 +55,14 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
   // to a rendered line vs. "outdated" (GitHub dropped the line / it's not here).
   const comments = commenting?.comments;
   const { matched, outdated } = React.useMemo(() => {
-    if (!comments) return { matched: new Map<string, CommentThread[]>(), outdated: [] };
-    const fileThreads = buildThreads(comments.filter((c) => c.path === file.path));
+    if (!comments)
+      return { matched: new Map<string, CommentThread[]>(), outdated: [] };
+    const fileThreads = buildThreads(
+      comments.filter((c) => c.path === file.path),
+    );
     const renderedKeys = new Set<string>();
-    for (const ln of lines) for (const k of keysForLine(ln)) renderedKeys.add(k);
+    for (const ln of lines)
+      for (const k of keysForLine(ln)) renderedKeys.add(k);
     return partitionThreads(fileThreads, renderedKeys);
   }, [comments, file.path, lines]);
 
@@ -66,7 +84,13 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
         </span>
         {commentCount > 0 && (
           <span
-            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-muted)" }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 12,
+              color: "var(--text-muted)",
+            }}
           >
             <Icon.MessageSquare size={12} />
             {commentCount}
@@ -85,10 +109,13 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
                 path={file.path}
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
+                badge={lineBadges?.get(ln.newNo ?? ln.oldNo ?? -1)}
               />
             ))
           )}
-          {commenting && commenting.showComments && <OutdatedComments threads={outdated} />}
+          {commenting && commenting.showComments && (
+            <OutdatedComments threads={outdated} />
+          )}
         </div>
       )}
     </div>

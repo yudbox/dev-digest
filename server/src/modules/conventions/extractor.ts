@@ -67,8 +67,9 @@ export async function extractConventions(opts: {
   samplePaths: string[];
   repoName: string;
   llm: LLMProvider;
+  model: string;
 }): Promise<ExtractedCandidate[]> {
-  const { clonePath, samplePaths, repoName, llm } = opts;
+  const { clonePath, samplePaths, repoName, llm, model } = opts;
 
   const configFiles = [
     ".eslintrc.js",
@@ -107,7 +108,7 @@ export async function extractConventions(opts: {
   }
 
   const result = await llm.completeStructured({
-    model: "gpt-4.1-mini",
+    model,
     schema: ExtractionSchema,
     schemaName: "ConventionsExtraction",
     messages: [

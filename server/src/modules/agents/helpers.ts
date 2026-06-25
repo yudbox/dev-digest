@@ -1,5 +1,10 @@
-import type { Agent, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
-import type { AgentRow } from './repository.js';
+import type {
+  Agent,
+  CiFailOn,
+  Provider,
+  ReviewStrategy,
+} from "@devdigest/shared";
+import type { AgentRow } from "./repository.js";
 
 /**
  * Pure helpers for the agents module — DB row ⇄ DTO mapping and the
@@ -22,6 +27,7 @@ export function toAgentDto(row: AgentRow): Agent {
     strategy: row.strategy as ReviewStrategy,
     ci_fail_on: row.ciFailOn as CiFailOn,
     repo_intel: row.repoIntel,
+    feature_model_id: row.featureModelId ?? null,
   };
 }
 
@@ -45,23 +51,25 @@ export interface ConfigChangePatch {
 export function isConfigChange(
   existing: Pick<
     AgentRow,
-    | 'name'
-    | 'description'
-    | 'provider'
-    | 'model'
-    | 'systemPrompt'
-    | 'strategy'
-    | 'ciFailOn'
-    | 'repoIntel'
+    | "name"
+    | "description"
+    | "provider"
+    | "model"
+    | "systemPrompt"
+    | "strategy"
+    | "ciFailOn"
+    | "repoIntel"
   >,
   patch: ConfigChangePatch,
 ): boolean {
   return (
     (patch.name !== undefined && patch.name !== existing.name) ||
-    (patch.description !== undefined && patch.description !== existing.description) ||
+    (patch.description !== undefined &&
+      patch.description !== existing.description) ||
     (patch.provider !== undefined && patch.provider !== existing.provider) ||
     (patch.model !== undefined && patch.model !== existing.model) ||
-    (patch.systemPrompt !== undefined && patch.systemPrompt !== existing.systemPrompt) ||
+    (patch.systemPrompt !== undefined &&
+      patch.systemPrompt !== existing.systemPrompt) ||
     (patch.strategy !== undefined && patch.strategy !== existing.strategy) ||
     (patch.ciFailOn !== undefined && patch.ciFailOn !== existing.ciFailOn) ||
     (patch.repoIntel !== undefined && patch.repoIntel !== existing.repoIntel) ||

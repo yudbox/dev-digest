@@ -3,23 +3,75 @@
 "use client";
 
 import React from "react";
-import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  commentTargetFor,
+  type CommentThread,
+  type DiffCommentApi,
+  cs,
+} from "../comments";
 import { type Line } from "../helpers";
 import { s, lineRowFor, lineSignFor } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
+
+const BADGE_STYLE: Record<string, React.CSSProperties> = {
+  CRITICAL: {
+    color: "#ef4444",
+    fontSize: 11,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    paddingLeft: 8,
+    userSelect: "none",
+  },
+  WARNING: {
+    color: "#f97316",
+    fontSize: 11,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    paddingLeft: 8,
+    userSelect: "none",
+  },
+  SUGGESTION: {
+    color: "#3b82f6",
+    fontSize: 11,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    paddingLeft: 8,
+    userSelect: "none",
+  },
+};
+const BADGE_LABEL: Record<string, string> = {
+  CRITICAL: "⊘ blocker",
+  WARNING: "△ warning",
+  SUGGESTION: "◇ suggestion",
+};
+const BADGE_BORDER: Record<string, string> = {
+  CRITICAL: "#ef4444",
+  WARNING: "#f97316",
+  SUGGESTION: "#3b82f6",
+};
+const BADGE_BG: Record<string, string> = {
+  CRITICAL: "rgba(239, 68, 68, 0.06)",
+  WARNING: "rgba(249, 115, 22, 0.06)",
+  SUGGESTION: "rgba(59, 130, 246, 0.06)",
+};
 
 export function CodeLine({
   ln,
   path,
   threads,
   commenting,
+  badge,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
+  badge?: { severity: string; findingId: string };
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
 
@@ -38,11 +90,26 @@ export function CodeLine({
   return (
     <div
       style={cs.rowWrap}
+      data-line={ln.newNo ?? ln.oldNo}
+      data-path={path}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind)}>
-        <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
+      <div
+        style={{
+          ...lineRowFor(ln.kind),
+          ...(badge && BADGE_BORDER[badge.severity]
+            ? {
+                borderLeft: `3px solid ${BADGE_BORDER[badge.severity]}`,
+                background: BADGE_BG[badge.severity],
+              }
+            : {}),
+        }}
+      >
+        <span
+          className="mono tnum"
+          style={{ ...s.lineNo, position: "relative" }}
+        >
           {showAdd && target && (
             <button
               type="button"
@@ -62,12 +129,36 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
+        {badge && BADGE_STYLE[badge.severity] && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              const sp = new URLSearchParams(searchParams.toString());
+              sp.set("tab", "findings");
+              sp.set("finding", badge.findingId);
+              router.push(`?${sp.toString()}`);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") e.currentTarget.click();
+            }}
+            style={{ ...BADGE_STYLE[badge.severity], cursor: "pointer" }}
+          >
+            {BADGE_LABEL[badge.severity] ?? badge.severity.toLowerCase()}
+          </span>
+        )}
       </div>
 
       {commenting &&
         commenting.showComments &&
         threads.map((th) => (
-          <CommentThreadView key={th.rootId} thread={th} commenting={commenting} path={path} />
+          <CommentThreadView
+            key={th.rootId}
+            thread={th}
+            commenting={commenting}
+            path={path}
+          />
         ))}
 
       {commenting && composing && target && (

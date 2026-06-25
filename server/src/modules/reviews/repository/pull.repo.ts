@@ -1,8 +1,8 @@
-import { and, eq } from 'drizzle-orm';
-import type { Db } from '../../../db/client.js';
-import * as t from '../../../db/schema.js';
-import type { Intent } from '@devdigest/shared';
-import type { PullRow } from '../../../db/rows.js';
+import { and, eq } from "drizzle-orm";
+import type { Db } from "../../../db/client.js";
+import * as t from "../../../db/schema.js";
+import type { Intent } from "@devdigest/shared";
+import type { PullRow } from "../../../db/rows.js";
 
 // ---- PR lookup (workspace-scoped) -----------------------------------------
 
@@ -14,7 +14,12 @@ export async function getPull(
   const [row] = await db
     .select()
     .from(t.pullRequests)
-    .where(and(eq(t.pullRequests.workspaceId, workspaceId), eq(t.pullRequests.id, prId)));
+    .where(
+      and(
+        eq(t.pullRequests.workspaceId, workspaceId),
+        eq(t.pullRequests.id, prId),
+      ),
+    );
   return row;
 }
 
@@ -37,7 +42,11 @@ export async function getPrFiles(
  * Record the commit a review just ran against, so the PR list can derive
  * `reviewed` vs `needs_review` (head moved since the last review) vs `stale`.
  */
-export async function markReviewed(db: Db, prId: string, sha: string): Promise<void> {
+export async function markReviewed(
+  db: Db,
+  prId: string,
+  sha: string,
+): Promise<void> {
   await db
     .update(t.pullRequests)
     .set({ lastReviewedSha: sha })
@@ -46,7 +55,11 @@ export async function markReviewed(db: Db, prId: string, sha: string): Promise<v
 
 // ---- intent ---------------------------------------------------------------
 
-export async function upsertIntent(db: Db, prId: string, intent: Intent): Promise<void> {
+export async function upsertIntent(
+  db: Db,
+  prId: string,
+  intent: Intent,
+): Promise<void> {
   await db
     .insert(t.prIntent)
     .values({
@@ -54,15 +67,32 @@ export async function upsertIntent(db: Db, prId: string, intent: Intent): Promis
       intent: intent.intent,
       inScope: intent.in_scope,
       outOfScope: intent.out_of_scope,
+      riskAreas: intent.risk_areas,
     })
     .onConflictDoUpdate({
       target: t.prIntent.prId,
-      set: { intent: intent.intent, inScope: intent.in_scope, outOfScope: intent.out_of_scope },
+      set: {
+        intent: intent.intent,
+        inScope: intent.in_scope,
+        outOfScope: intent.out_of_scope,
+        riskAreas: intent.risk_areas,
+      },
     });
 }
 
-export async function getIntent(db: Db, prId: string): Promise<Intent | undefined> {
-  const [row] = await db.select().from(t.prIntent).where(eq(t.prIntent.prId, prId));
+export async function getIntent(
+  db: Db,
+  prId: string,
+): Promise<Intent | undefined> {
+  const [row] = await db
+    .select()
+    .from(t.prIntent)
+    .where(eq(t.prIntent.prId, prId));
   if (!row) return undefined;
-  return { intent: row.intent, in_scope: row.inScope, out_of_scope: row.outOfScope };
+  return {
+    intent: row.intent,
+    in_scope: row.inScope,
+    out_of_scope: row.outOfScope,
+    risk_areas: (row.riskAreas ?? []) as Intent["risk_areas"],
+  };
 }

@@ -9,7 +9,12 @@ export class ApiError extends Error {
   status: number;
   code?: string;
   details?: unknown;
-  constructor(message: string, status: number, code?: string, details?: unknown) {
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    details?: unknown,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
@@ -18,7 +23,10 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
@@ -37,7 +45,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       `Cannot reach the DevDigest engine at ${API_BASE}. Is the API running?`,
       0,
       "network_error",
-      e
+      e,
     );
   }
 
@@ -65,10 +73,27 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 export const api = {
   get: <T>(path: string) => apiFetch<T>(path),
   post: <T>(path: string, body?: unknown) =>
-    apiFetch<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
+    apiFetch<T>(path, {
+      method: "POST",
+      body: body ? JSON.stringify(body) : undefined,
+    }),
   put: <T>(path: string, body?: unknown) =>
-    apiFetch<T>(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined }),
+    apiFetch<T>(path, {
+      method: "PUT",
+      body: body ? JSON.stringify(body) : undefined,
+    }),
   patch: <T>(path: string, body?: unknown) =>
-    apiFetch<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined }),
+    apiFetch<T>(path, {
+      method: "PATCH",
+      body: body ? JSON.stringify(body) : undefined,
+    }),
   del: <T>(path: string) => apiFetch<T>(path, { method: "DELETE" }),
 };
+
+// ---- domain helpers -------------------------------------------------------
+
+import type { SmartDiff } from "@devdigest/shared";
+
+export function fetchSmartDiff(prId: string): Promise<SmartDiff> {
+  return api.get<SmartDiff>(`/pulls/${prId}/smart-diff`);
+}
