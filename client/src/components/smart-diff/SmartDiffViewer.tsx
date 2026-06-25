@@ -96,8 +96,26 @@ export function SmartDiffViewer({
   const t = useTranslations("prReview.smartDiff");
   const { split_suggestion, review_tokens, groups } = smartDiff;
 
+  const totalFiles = files.length;
+  const totalAdditions = files.reduce((sum, f) => sum + f.additions, 0);
+  const totalDeletions = files.reduce((sum, f) => sum + f.deletions, 0);
+
   return (
     <div style={s.root}>
+      {/* Section header */}
+      <div style={s.sectionHeader}>
+        <div style={s.sectionTitle}>
+          <span style={s.sectionIcon}>{"<>"}</span>
+          <span>REVIEWER-ORDERED DIFF</span>
+        </div>
+        <div style={s.sectionStats}>
+          <span style={s.statFiles}>{totalFiles} files</span>
+          <span style={s.statSep}>·</span>
+          <span style={s.statAdd}>+{totalAdditions}</span>
+          <span style={s.statDel}>-{totalDeletions}</span>
+        </div>
+      </div>
+
       {/* Token badge */}
       <div style={s.tokenBadge}>
         <span>⚡</span>
@@ -138,6 +156,39 @@ export function SmartDiffViewer({
 
 const s: Record<string, CSSProperties> = {
   root: { display: "flex", flexDirection: "column", gap: 24 },
+  sectionHeader: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+    paddingBottom: 8,
+    borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.08))",
+  },
+  sectionTitle: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.08em",
+    color: "var(--text-muted)",
+    textTransform: "uppercase",
+  },
+  sectionIcon: {
+    fontFamily: "monospace",
+    fontSize: 12,
+    color: "var(--text-muted)",
+  },
+  sectionStats: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 13,
+    fontWeight: 500,
+  },
+  statFiles: { color: "var(--text-secondary)" },
+  statSep: { color: "var(--text-muted)" },
+  statAdd: { color: "#4ade80" },
+  statDel: { color: "#f87171" },
   group: { display: "flex", flexDirection: "column", gap: 8 },
   groupHeader: {
     display: "flex",
