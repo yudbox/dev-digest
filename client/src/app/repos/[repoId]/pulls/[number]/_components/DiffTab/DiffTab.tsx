@@ -20,7 +20,14 @@ interface DiffTabProps {
   onSmartOrderChange: (v: boolean) => void;
 }
 
-export function DiffTab({ prId, filesCount, files, canComment, smartOrder, onSmartOrderChange }: DiffTabProps) {
+export function DiffTab({
+  prId,
+  filesCount,
+  files,
+  canComment,
+  smartOrder,
+  onSmartOrderChange,
+}: DiffTabProps) {
   const t = useTranslations("prReview.smartDiff");
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);

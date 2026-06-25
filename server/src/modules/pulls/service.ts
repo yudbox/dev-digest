@@ -48,7 +48,8 @@ export class PullsService {
           const existing = lineMap.get(f.startLine);
           if (
             !existing ||
-            (severityRank[f.severity] ?? 0) > (severityRank[existing.severity] ?? 0)
+            (severityRank[f.severity] ?? 0) >
+              (severityRank[existing.severity] ?? 0)
           ) {
             lineMap.set(f.startLine, { severity: f.severity, id: f.id });
           }
