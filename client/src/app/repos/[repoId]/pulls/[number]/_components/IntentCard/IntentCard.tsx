@@ -185,7 +185,9 @@ export function IntentCard({
 
   if (!intent) {
     return (
-      <section style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <section
+        style={{ display: "flex", flexDirection: "column", height: "100%" }}
+      >
         <SectionLabel icon="Target">Intent</SectionLabel>
         <div style={s.card}>
           <p style={s.emptyTitle}>{t("notRunTitle")}</p>
@@ -198,7 +200,9 @@ export function IntentCard({
   const hasScope = intent.in_scope.length > 0 || intent.out_of_scope.length > 0;
 
   return (
-    <section style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <section
+      style={{ display: "flex", flexDirection: "column", height: "100%" }}
+    >
       <SectionLabel icon="Target">Intent</SectionLabel>
       <div style={s.card}>
         {/* Quote */}

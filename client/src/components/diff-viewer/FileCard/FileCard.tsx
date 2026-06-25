@@ -42,7 +42,7 @@ export function FileCard({
   file: PrFile;
   commenting?: DiffCommentApi;
   initialOpen?: boolean;
-  lineBadges?: Map<number, string>;
+  lineBadges?: Map<number, { severity: string; findingId: string }>;
 }) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(

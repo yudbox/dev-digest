@@ -165,6 +165,7 @@ export async function setFindingDismissed(
 
 export interface LatestReviewData {
   findings: Array<{
+    id: string;
     file: string;
     title: string;
     severity: string;
@@ -190,6 +191,7 @@ export async function getLatestReviewData(
 
   const findings = await db
     .select({
+      id: t.findings.id,
       file: t.findings.file,
       title: t.findings.title,
       severity: t.findings.severity,
@@ -214,6 +216,7 @@ export async function getLatestReviewData(
 
   return {
     findings: findings.map((f) => ({
+      id: f.id,
       file: f.file,
       title: f.title,
       severity: f.severity,

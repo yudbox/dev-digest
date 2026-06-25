@@ -32,6 +32,7 @@ export function ReviewRunAccordion({
   headSha,
   targetRunId = null,
   targetNonce = 0,
+  targetFindingId = null,
 }: {
   review: ReviewRecord;
   prId: string;
@@ -42,6 +43,8 @@ export function ReviewRunAccordion({
    *  (driven from the Timeline: clicking an agent name navigates here). */
   targetRunId?: string | null;
   targetNonce?: number;
+  /** When set, the accordion opens and scrolls the matching FindingCard into view. */
+  targetFindingId?: string | null;
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
@@ -52,6 +55,19 @@ export function ReviewRunAccordion({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetRunId, targetNonce, review.run_id]);
+
+  React.useEffect(() => {
+    if (!open || !targetFindingId) return;
+    const timer = setTimeout(() => {
+      const el = rootRef.current?.querySelector(
+        `[data-finding-id="${targetFindingId}"]`,
+      );
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [open, targetFindingId]);
   const del = useDeleteReview(prId);
   const findings = review.findings;
   const blockers = findings.filter((f) => f.severity === Severity.enum.CRITICAL && !f.dismissed_at).length;

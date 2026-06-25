@@ -26,6 +26,7 @@ import { s } from "./styles";
 export function FindingCard({
   f,
   focused,
+  targeted,
   defaultExpanded,
   onAction,
   pending,
@@ -34,6 +35,7 @@ export function FindingCard({
 }: {
   f: FindingRecord;
   focused?: boolean;
+  targeted?: boolean;
   defaultExpanded?: boolean;
   onAction?: (action: FindingActionKind, reply?: string) => void;
   pending?: boolean;
@@ -51,8 +53,12 @@ export function FindingCard({
   const dismissed = !!f.dismissed_at;
   const muted = accepted || dismissed;
 
+  React.useEffect(() => {
+    if (targeted) setExpanded(true);
+  }, [targeted]);
+
   return (
-    <div data-finding-id={f.id} style={s.card(!!focused, sevColor, muted)}>
+    <div data-finding-id={f.id} style={s.card(!!focused || !!targeted, sevColor, muted)}>
       <div onClick={() => setExpanded((e) => !e)} style={s.header}>
         <div style={s.badgeWrap}>
           <SeverityBadge severity={f.severity as Severity} compact />

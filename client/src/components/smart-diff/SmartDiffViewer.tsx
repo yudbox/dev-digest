@@ -70,7 +70,10 @@ function GroupSection({
               lineBadges={
                 smartFile.line_findings
                   ? new Map(
-                      smartFile.line_findings.map((f) => [f.line, f.severity]),
+                      smartFile.line_findings.map((f) => [
+                        f.line,
+                        { severity: f.severity, findingId: f.id },
+                      ]),
                     )
                   : undefined
               }

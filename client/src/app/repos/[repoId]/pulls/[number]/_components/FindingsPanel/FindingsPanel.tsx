@@ -4,6 +4,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { Toggle, EmptyState, SEV, Icon } from "@devdigest/ui";
 import type { FindingRecord, Severity } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
@@ -25,6 +26,8 @@ export function FindingsPanel({
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
+  const searchParams = useSearchParams();
+  const targetFindingId = searchParams.get("finding");
   const [hideLow, setHideLow] = React.useState(false);
   const [activeSeverity, setActiveSeverity] = React.useState<Severity | null>(
     null,
@@ -106,6 +109,7 @@ export function FindingsPanel({
               key={f.id}
               f={f}
               focused={i === focusIdx}
+              targeted={f.id === targetFindingId}
               defaultExpanded={i === 0}
               pending={action.isPending}
               repoFullName={repoFullName}

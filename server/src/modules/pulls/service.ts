@@ -43,14 +43,14 @@ export class PullsService {
           WARNING: 2,
           SUGGESTION: 1,
         };
-        const lineMap = new Map<number, string>();
+        const lineMap = new Map<number, { severity: string; id: string }>();
         for (const f of findings) {
           const existing = lineMap.get(f.startLine);
           if (
             !existing ||
-            (severityRank[f.severity] ?? 0) > (severityRank[existing] ?? 0)
+            (severityRank[f.severity] ?? 0) > (severityRank[existing.severity] ?? 0)
           ) {
-            lineMap.set(f.startLine, f.severity);
+            lineMap.set(f.startLine, { severity: f.severity, id: f.id });
           }
         }
         return {
@@ -69,7 +69,8 @@ export class PullsService {
               }
             : null,
           line_findings: hasReview
-            ? [...lineMap.entries()].map(([line, severity]) => ({
+            ? [...lineMap.entries()].map(([line, { severity, id }]) => ({
+                id,
                 line,
                 severity,
               }))

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Icon, Badge, Button, SectionLabel, EmptyState } from "@devdigest/ui";
 import { RunStatus } from "../RunStatus";
 import { RunHistory } from "../RunHistory/RunHistory";
@@ -70,6 +71,19 @@ export function FindingsTab({
   const handleGoToReview = useCallback((runId: string) => {
     setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1 }));
   }, []);
+
+  // Badge → Finding navigation: ?finding=<id> in URL → open owning accordion
+  const searchParams = useSearchParams();
+  const targetFindingId = searchParams.get("finding");
+  React.useEffect(() => {
+    if (!targetFindingId) return;
+    const owningRun = runs.find((r) =>
+      r.findings.some((f) => f.id === targetFindingId),
+    );
+    if (owningRun?.id) {
+      setTarget((p) => ({ runId: owningRun.id, n: (p?.n ?? 0) + 1 }));
+    }
+  }, [targetFindingId, runs]);
 
   return (
     <section>
@@ -164,6 +178,7 @@ export function FindingsTab({
             headSha={headSha}
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}
+            targetFindingId={targetFindingId}
           />
         ))
       )}

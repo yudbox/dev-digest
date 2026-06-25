@@ -366,7 +366,9 @@ export function OverviewTab({ prBody, prId }: OverviewTabProps) {
           onRecalculate={() => recalc.mutate()}
           recalculating={recalc.isPending}
         />
-        <section style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <section
+          style={{ display: "flex", flexDirection: "column", height: "100%" }}
+        >
           <SectionLabel icon="GitPullRequest">Blast Radius</SectionLabel>
           <BlastRadiusPlaceholder />
         </section>

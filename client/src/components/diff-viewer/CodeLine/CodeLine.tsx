@@ -67,7 +67,7 @@ export function CodeLine({
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
-  badge?: string;
+  badge?: { severity: string; findingId: string };
 }) {
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
@@ -95,10 +95,10 @@ export function CodeLine({
       <div
         style={{
           ...lineRowFor(ln.kind),
-          ...(badge && BADGE_BORDER[badge]
+          ...(badge && BADGE_BORDER[badge.severity]
             ? {
-                borderLeft: `3px solid ${BADGE_BORDER[badge]}`,
-                background: BADGE_BG[badge],
+                borderLeft: `3px solid ${BADGE_BORDER[badge.severity]}`,
+                background: BADGE_BG[badge.severity],
               }
             : {}),
         }}
@@ -126,10 +126,14 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
-        {badge && BADGE_STYLE[badge] && (
-          <span style={BADGE_STYLE[badge]}>
-            {BADGE_LABEL[badge] ?? badge.toLowerCase()}
-          </span>
+        {badge && BADGE_STYLE[badge.severity] && (
+          <a
+            href={`?tab=findings&finding=${badge.findingId}`}
+            onClick={(e) => e.stopPropagation()}
+            style={{ ...BADGE_STYLE[badge.severity], cursor: "pointer", textDecoration: "none" }}
+          >
+            {BADGE_LABEL[badge.severity] ?? badge.severity.toLowerCase()}
+          </a>
         )}
       </div>
 
