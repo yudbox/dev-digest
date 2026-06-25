@@ -104,10 +104,6 @@ export function SmartDiffViewer({
     <div style={s.root}>
       {/* Section header */}
       <div style={s.sectionHeader}>
-        <div style={s.sectionTitle}>
-          <span style={s.sectionIcon}>{"<>"}</span>
-          <span>REVIEWER-ORDERED DIFF</span>
-        </div>
         <div style={s.sectionStats}>
           <span style={s.statFiles}>{totalFiles} files</span>
           <span style={s.statSep}>·</span>
