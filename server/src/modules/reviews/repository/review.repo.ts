@@ -141,3 +141,54 @@ export async function setFindingDismissed(
     .returning();
   return row;
 }
+
+// ---- smart diff data -------------------------------------------------------
+
+export interface LatestReviewData {
+  findings: Array<{ file: string; title: string; severity: string; startLine: number }>;
+  reviewTokens: number | null;
+}
+
+/** Returns findings + token count from the most recent 'review' run for a PR.
+ *  Returns empty findings + null tokens when no review has run yet. */
+export async function getLatestReviewData(db: Db, prId: string): Promise<LatestReviewData> {
+  const [review] = await db
+    .select()
+    .from(t.reviews)
+    .where(and(eq(t.reviews.prId, prId), eq(t.reviews.kind, 'review')))
+    .orderBy(desc(t.reviews.createdAt))
+    .limit(1);
+
+  if (!review) return { findings: [], reviewTokens: null };
+
+  const findings = await db
+    .select({
+      file: t.findings.file,
+      title: t.findings.title,
+      severity: t.findings.severity,
+      startLine: t.findings.startLine,
+    })
+    .from(t.findings)
+    .where(eq(t.findings.reviewId, review.id));
+
+  let reviewTokens: number | null = null;
+  if (review.runId) {
+    const [run] = await db
+      .select({ tokensIn: t.agentRuns.tokensIn, tokensOut: t.agentRuns.tokensOut })
+      .from(t.agentRuns)
+      .where(eq(t.agentRuns.id, review.runId));
+    if (run) {
+      reviewTokens = (run.tokensIn ?? 0) + (run.tokensOut ?? 0);
+    }
+  }
+
+  return {
+    findings: findings.map((f) => ({
+      file: f.file,
+      title: f.title,
+      severity: f.severity,
+      startLine: f.startLine,
+    })),
+    reviewTokens,
+  };
+}

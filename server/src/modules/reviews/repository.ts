@@ -182,4 +182,10 @@ export class ReviewRepository {
   getRunTrace(runId: string): Promise<RunTrace | undefined> {
     return runRepo.getRunTrace(this.db, runId);
   }
+
+  // ---- smart diff --------------------------------------------------------
+
+  getLatestReviewData(prId: string): Promise<reviewRepo.LatestReviewData> {
+    return reviewRepo.getLatestReviewData(this.db, prId);
+  }
 }

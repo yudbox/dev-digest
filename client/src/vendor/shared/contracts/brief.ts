@@ -108,6 +108,11 @@ export const SmartDiffFile = z.object({
   additions: z.number().int(),
   deletions: z.number().int(),
   finding_lines: z.array(z.number().int()),
+  severity_counts: z.object({
+    critical: z.number().int(),
+    warning: z.number().int(),
+    suggestion: z.number().int(),
+  }).nullish(),
 });
 export type SmartDiffFile = z.infer<typeof SmartDiffFile>;
 
@@ -130,6 +135,8 @@ export const SmartDiff = z.object({
     total_lines: z.number().int(),
     proposed_splits: z.array(ProposedSplit),
   }),
+  /** Tokens used by the last Run Review. null = no review has run yet. */
+  review_tokens: z.number().int().nullable(),
 });
 export type SmartDiff = z.infer<typeof SmartDiff>;
 

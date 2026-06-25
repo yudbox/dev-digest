@@ -54,14 +54,22 @@
     "blockers": " · {count} blockers"
   },
   "smartDiff": {
-    "coreLabel": "Core",
+    "coreLabel": "Core logic",
+    "coreDesc": "The substance of the change — review closely",
     "wiringLabel": "Wiring",
+    "wiringDesc": "Hooks the core into the app",
     "boilerplateLabel": "Boilerplate",
+    "boilerplateDesc": "Generated / mechanical — skim",
     "largeTitle": "This PR is large ({lines} changed lines)",
     "largeBody": "Consider splitting it into smaller, focused PRs for easier review:",
     "filesCount": "{count} files",
     "findingLines": "{count} finding-lines",
-    "groupedByRole": "Smart Diff · grouped by role"
+    "groupedByRole": "Smart Diff · grouped by role",
+    "zeroTokens": "0 new tokens",
+    "builtOn": "built on {count} from last review",
+    "whatDoes": "What this does:",
+    "smartOrder": "Smart order",
+    "originalOrder": "Original order"
   },
   "list": {
     "breadcrumb": "Pull Requests",

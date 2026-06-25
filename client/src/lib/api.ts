@@ -72,3 +72,11 @@ export const api = {
     apiFetch<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined }),
   del: <T>(path: string) => apiFetch<T>(path, { method: "DELETE" }),
 };
+
+// ---- domain helpers -------------------------------------------------------
+
+import type { SmartDiff } from "@devdigest/shared";
+
+export function fetchSmartDiff(prId: string): Promise<SmartDiff> {
+  return api.get<SmartDiff>(`/pulls/${prId}/smart-diff`);
+}

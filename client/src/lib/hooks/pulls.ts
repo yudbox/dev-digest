@@ -2,9 +2,9 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api";
+import { api, fetchSmartDiff } from "../api";
 import type { PrMeta, PrDetail } from "../types";
-import type { Intent } from "@devdigest/shared";
+import type { Intent, SmartDiff } from "@devdigest/shared";
 
 export function usePulls(repoId: string | null | undefined) {
   return useQuery({
@@ -42,5 +42,14 @@ export function useRecalculateIntent(prId: string | null | undefined) {
   return useMutation({
     mutationFn: () => api.post<Intent>(`/pulls/${prId}/intent/recalculate`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["intent", prId] }),
+  });
+}
+
+export function useSmartDiff(prId: string | null | undefined) {
+  return useQuery<SmartDiff>({
+    queryKey: ["smart-diff", prId],
+    queryFn: () => fetchSmartDiff(prId!),
+    enabled: !!prId,
+    staleTime: 30_000,
   });
 }
