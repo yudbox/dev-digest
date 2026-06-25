@@ -16,16 +16,18 @@ interface DiffTabProps {
   files: PrFile[];
   /** Inline commenting is offered only on open PRs (GitHub rejects otherwise). */
   canComment?: boolean;
+  smartOrder: boolean;
+  onSmartOrderChange: (v: boolean) => void;
 }
 
-export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
+export function DiffTab({ prId, filesCount, files, canComment, smartOrder, onSmartOrderChange }: DiffTabProps) {
   const t = useTranslations("prReview.smartDiff");
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);
   const smartDiff = useSmartDiff(prId);
   // Comments start hidden so the diff is clean by default — toggle to reveal.
   const [showComments, setShowComments] = React.useState(false);
-  const [smartOrder, setSmartOrder] = React.useState(false);
+  const setSmartOrder = onSmartOrderChange;
 
   const commentCount = comments?.length ?? 0;
 

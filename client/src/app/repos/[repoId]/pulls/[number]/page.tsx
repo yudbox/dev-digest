@@ -74,6 +74,8 @@ export default function PRDetailPage() {
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
+  // Lifted here so switching tabs doesn't reset the Smart/Original toggle.
+  const [smartOrder, setSmartOrder] = React.useState(false);
   const setParam = (key: string, val: string | null) => {
     const sp = new URLSearchParams(search.toString());
     if (val == null) sp.delete(key);
@@ -212,6 +214,8 @@ export default function PRDetailPage() {
             filesCount={pr.files_count}
             files={pr.files}
             canComment={pr.status === "open"}
+            smartOrder={smartOrder}
+            onSmartOrderChange={setSmartOrder}
           />
         )}
       </div>
