@@ -1,15 +1,36 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * PR Brief building blocks: Intent, Blast radius, Risks, PR History,
  * Smart Diff. Composed into PrBrief.
  */
 
+// ---- Risk Areas ----
+export const RiskAreaKind = z.enum([
+  "security",
+  "dependency",
+  "performance",
+  "data",
+  "api_change",
+  "other",
+]);
+export type RiskAreaKind = z.infer<typeof RiskAreaKind>;
+
+export const RiskArea = z.object({
+  title: z.string(),
+  kind: RiskAreaKind,
+});
+export type RiskArea = z.infer<typeof RiskArea>;
+
 // ---- Intent ----
 export const Intent = z.object({
   intent: z.string(),
   in_scope: z.array(z.string()),
   out_of_scope: z.array(z.string()),
+  risk_areas: z
+    .array(RiskArea)
+    .nullish()
+    .transform((v) => v ?? []),
 });
 export type Intent = z.infer<typeof Intent>;
 
@@ -44,7 +65,7 @@ export const BlastRadius = z.object({
 export type BlastRadius = z.infer<typeof BlastRadius>;
 
 // ---- Risks ----
-export const RiskSeverity = z.enum(['high', 'medium', 'low']);
+export const RiskSeverity = z.enum(["high", "medium", "low"]);
 export type RiskSeverity = z.infer<typeof RiskSeverity>;
 
 export const Risk = z.object({
@@ -78,7 +99,7 @@ export const PrHistory = z.object({
 export type PrHistory = z.infer<typeof PrHistory>;
 
 // ---- Smart Diff ----
-export const SmartDiffRole = z.enum(['core', 'wiring', 'boilerplate']);
+export const SmartDiffRole = z.enum(["core", "wiring", "boilerplate"]);
 export type SmartDiffRole = z.infer<typeof SmartDiffRole>;
 
 export const SmartDiffFile = z.object({

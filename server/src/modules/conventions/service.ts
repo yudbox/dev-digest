@@ -1,12 +1,13 @@
 import { eq } from "drizzle-orm";
 import type { Container } from "../../platform/container.js";
-import type { ConventionCandidate, Skill } from "@devdigest/shared";
+import type { ConventionCandidate, Skill, Provider } from "@devdigest/shared";
 import * as t from "../../db/schema.js";
 import { NotFoundError, ValidationError } from "../../platform/errors.js";
 import { ConventionsRepository } from "./repository.js";
 import { extractConventions } from "./extractor.js";
 import { SkillsService } from "../skills/service.js";
 import type { ConventionRow } from "./repository.js";
+import { resolveFeatureModel } from "../settings/feature-models.js";
 
 function toDto(row: ConventionRow): ConventionCandidate {
   return {
@@ -54,13 +55,19 @@ export class ConventionsService {
       12,
     );
 
-    const llm = await this.container.llm("openai");
+    const { provider, model } = await resolveFeatureModel(
+      this.container,
+      workspaceId,
+      "conventions",
+    );
+    const llm = await this.container.llm(provider as Provider);
 
     const candidates = await extractConventions({
       clonePath: repoRow.clonePath,
       samplePaths,
       repoName: repoRow.name,
       llm,
+      model,
     });
 
     const rows = await this.repo.replaceAll(workspaceId, repoId, candidates);

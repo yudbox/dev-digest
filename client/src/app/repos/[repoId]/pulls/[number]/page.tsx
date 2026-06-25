@@ -17,8 +17,17 @@ import { DiffTab } from "./_components/DiffTab";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
 import { usePullDetail, usePulls } from "../../../../../lib/hooks";
 import { useQueryClient } from "@tanstack/react-query";
-import { usePrReviews, useCancelRun, usePrActiveRuns, usePrRuns, useDeleteRun } from "../../../../../lib/hooks/reviews";
-import { useActiveRepo, useRepoNotFound } from "../../../../../lib/contexts/repoContext";
+import {
+  usePrReviews,
+  useCancelRun,
+  usePrActiveRuns,
+  usePrRuns,
+  useDeleteRun,
+} from "../../../../../lib/hooks/reviews";
+import {
+  useActiveRepo,
+  useRepoNotFound,
+} from "../../../../../lib/contexts/repoContext";
 import { ApiError } from "../../../../../lib/api";
 import { githubPrUrl } from "../../../../../lib/utils/githubUrls";
 import type { FindingRecord } from "@devdigest/shared";
@@ -34,7 +43,13 @@ export default function PRDetailPage() {
   // uuid — resolve number → uuid via the (cached) pulls list before fetching.
   const { data: pulls, isLoading: pullsLoading } = usePulls(repoId);
   const prId = pulls?.find((p) => p.number === Number(number))?.id ?? null;
-  const { data: pr, isLoading: detailLoading, isError, error, refetch } = usePullDetail(prId);
+  const {
+    data: pr,
+    isLoading: detailLoading,
+    isError,
+    error,
+    refetch,
+  } = usePullDetail(prId);
 
   const isLoading = pullsLoading || (prId != null && detailLoading);
   const { data: reviews, refetch: refetchReviews } = usePrReviews(prId);
@@ -63,7 +78,9 @@ export default function PRDetailPage() {
     const sp = new URLSearchParams(search.toString());
     if (val == null) sp.delete(key);
     else sp.set(key, val);
-    router.replace(`/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`);
+    router.replace(
+      `/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`,
+    );
   };
   const setTab = (t: string) => setParam("tab", t);
 
@@ -73,7 +90,9 @@ export default function PRDetailPage() {
     () => runs.flatMap((r) => r.findings),
     [reviews],
   );
-  const lethalTrifecta = allFindings.filter((f) => f.kind === "lethal_trifecta");
+  const lethalTrifecta = allFindings.filter(
+    (f) => f.kind === "lethal_trifecta",
+  );
   const findingsCount = allFindings.length;
 
   const repoName = activeRepo?.full_name ?? repoId;
@@ -98,7 +117,16 @@ export default function PRDetailPage() {
   if (isLoading) {
     return (
       <AppShell crumb={crumb}>
-        <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 16, maxWidth: 1080, margin: "0 auto" }}>
+        <div
+          style={{
+            padding: "28px 32px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            maxWidth: 1080,
+            margin: "0 auto",
+          }}
+        >
           <Skeleton height={28} width={420} />
           <Skeleton height={16} width={300} />
           <Skeleton height={200} />
@@ -113,7 +141,11 @@ export default function PRDetailPage() {
         <ErrorState
           fullScreen
           title="Couldn't load this pull request"
-          body={error instanceof ApiError ? error.message : `PR #${number} could not be loaded.`}
+          body={
+            error instanceof ApiError
+              ? error.message
+              : `PR #${number} could not be loaded.`
+          }
           onRetry={() => refetch()}
         />
       </AppShell>
@@ -133,8 +165,17 @@ export default function PRDetailPage() {
         onRunsStarted={() => invalidateActiveRuns()}
       />
 
-      <div style={{ padding: "24px 32px 44px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1080, margin: "0 auto" }}>
-        {tab === "overview" && <OverviewTab prBody={pr.body} />}
+      <div
+        style={{
+          padding: "24px 32px 44px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 24,
+          maxWidth: 1080,
+          margin: "0 auto",
+        }}
+      >
+        {tab === "overview" && <OverviewTab prBody={pr.body} prId={prId} />}
 
         {tab === "findings" && (
           <FindingsTab
@@ -150,7 +191,11 @@ export default function PRDetailPage() {
             cancelMutation={cancel}
             onOpenTrace={(id) => setParam("trace", id)}
             onDelete={(id) => {
-              if (window.confirm("Delete this run from history? (its logs are removed too)"))
+              if (
+                window.confirm(
+                  "Delete this run from history? (its logs are removed too)",
+                )
+              )
                 deleteRun.mutate(id);
             }}
             onRunDone={() => {
@@ -176,7 +221,9 @@ export default function PRDetailPage() {
           runId={traceRunId}
           prNumber={pr.number}
           findings={runs.find((r) => r.run_id === traceRunId)?.findings ?? []}
-          agentName={runs.find((r) => r.run_id === traceRunId)?.agent_name ?? null}
+          agentName={
+            runs.find((r) => r.run_id === traceRunId)?.agent_name ?? null
+          }
           onClose={() => setParam("trace", null)}
         />
       )}

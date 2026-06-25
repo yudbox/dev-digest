@@ -17,6 +17,12 @@ See also: `insights/gotchas.md` for known quirks at project start.
 
 2026-06-17 — `createPortal(content, document.body)` escapes `overflow: hidden` containers. Use for any overlay/popover rendered inside a clipped container. ref: client/src/app/repos/[repoId]/pulls/_components/FindingsPopover/FindingsPopover.tsx:96
 
+2026-06-21 — Native ZIP parsing in the browser requires no library. `extractMdFromZip()` reads ZIP local file header magic bytes (0x04034b50), handles stored (method 0) and deflated (method 8) entries via the browser's built-in `DecompressionStream("deflate-raw")`. Supported in all modern browsers. Pattern: accumulate `Uint8Array` chunks from the `ReadableStream`, concat with offset copy (no `Buffer` — browser environment). ref: client/src/app/skills/_components/CreateSkillModal/CreateSkillModal.tsx:33
+
+2026-06-21 — Drag-and-drop skill reorder uses native HTML5 DnD (no library). Pattern: `draggable` + `onDragStart(e.dataTransfer.setData("skillId", id))` on the item div; `onDragOver(e.preventDefault())` + `onDrop` on drop targets; `dragOver: string | null` state for visual highlight. Mutation fires immediately on drop — no optimistic state needed when `useSetAgentSkills` completes fast. ref: client/src/app/agents/[id]/_components/AgentEditor/_components/SkillsTab/SkillsTab.tsx:57
+
+2026-06-21 — `resolveSkillThreat(skill)` in `@/lib/skill-threat.ts` is the single source of truth for threat-level display. Returns `{ isDangerous, isSuspicious, isScanning, isBlocked, badge }`. All threat-rendering components (SkillCard, SkillsTab) must use this util — do not re-derive inline or the badge/color logic will drift. ref: client/src/lib/skill-threat.ts:1
+
 ## What Doesn't Work
 
 2026-06-18 — Fixing `.js` extensions in `client/src/vendor/shared/index.ts` alone is NOT enough. The individual contract files also import each other with `.js` extensions (`eval-ci.ts`, `observability.ts`, `platform.ts`, `productionize.ts`, `review-api.ts`, `adapters.ts`). All 6 must be fixed in addition to the barrel. Grep: `from '\./.*\.js'` in `client/src/vendor/shared/` to find them all. ref: client/src/vendor/shared/contracts/eval-ci.ts:2
@@ -28,6 +34,10 @@ See also: `insights/gotchas.md` for known quirks at project start.
 2026-06-17 — `Icon.AlertCircle` does not exist in `@devdigest/ui` — runtime error "Element type is invalid: expected a string... but got undefined". Never guess icon names; check existing usages (`grep -oh "Icon\.[A-Za-z]*"`) to find what's available. ref: client/src/app/repos/[repoId]/pulls/_components/FindingsPopover/FindingsPopover.tsx:56
 
 ## Codebase Patterns
+
+2026-06-21 — Skill delete uses a custom `Modal` component, NOT `window.confirm`. `window.confirm` is blocked in production builds in some browsers and blocks the main thread. After a successful delete mutation, redirect to `/skills` — staying on `skills/:id` renders a missing resource. ref: client/src/app/skills/[id]/_components/SkillEditor/SkillEditor.tsx:1
+
+2026-06-21 — `SkillsTab` sorts the skill list as: linked skills (in user-set order) first, then unlinked skills alphabetically. The linked order comes from `agent_skills.order` returned by `useAgentSkills`. When search filter is active it applies AFTER sorting, so filtered results still maintain the linked-first ordering. ref: client/src/app/agents/[id]/_components/AgentEditor/_components/SkillsTab/SkillsTab.tsx:105
 
 2026-06-17 — `tableCard` in `styles.ts` has `overflow: hidden` — any `position: absolute` child inside the PR list table is clipped. Popovers/tooltips inside the table must use `position: fixed` + `getBoundingClientRect()` for correct placement. ref: client/src/app/repos/[repoId]/pulls/styles.ts:103
 
@@ -74,6 +84,8 @@ See also: `insights/gotchas.md` for known quirks at project start.
 2026-06-20 — pr-self-review skill audit: found 4 gaps — (1) severity-levels.md missing `< 20 lines changed` skip + `not-found.tsx` in HIGH test gate; (2) npm audit needs per-package `cd`; (3) sub-agent template unclear about Skill tool call. All 4 gaps fixed. Files: .claude/skills/pr-self-review/SKILL.md, .claude/skills/pr-self-review/rules/severity-levels.md.
 
 2026-06-20 — `pr-self-review` uses `git diff $(git merge-base origin/main HEAD)...HEAD` — this only reviews **committed** changes in a feature branch. When run on `main` with HEAD = origin/main (e.g. after a merge, with unstaged changes), the diff is empty and the skill silently reports nothing. To test the skill, changes must be committed to a branch first. ref: .claude/skills/pr-self-review/SKILL.md:49
+
+2026-06-21 — Skills Lab (client): TanStack hooks (useSkills, useSkill, useCreateSkill, useImportSkill, useImportSkillFromUrl, useUpdateSkill, useDeleteSkill, useSkillStats, useSkillVersions, useRestoreSkill, useAgentSkills, useSetAgentSkills), /skills list page, /skills/:id editor with Config/Preview/Stats/Versions tabs, Agent Skills tab with DnD reorder, Conventions page. Files: client/src/lib/hooks/skills.ts, client/src/lib/hooks/conventions.ts, client/src/app/skills/, client/src/app/conventions/, client/src/app/agents/[id]/_components/AgentEditor/_components/SkillsTab/.
 
 2026-06-20 — To invoke `pr-self-review`, just call the Skill tool (or say "review my changes") — do NOT manually run `git diff` bash commands to collect the diff first. The skill's execution algorithm runs those commands itself internally. Manually pre-collecting diff before calling the skill is redundant and was explicitly corrected by the user. ref: .claude/skills/pr-self-review/SKILL.md:1
 

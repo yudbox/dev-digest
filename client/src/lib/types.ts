@@ -8,6 +8,7 @@
  * not yet exported, add a placeholder below marked
  * `// TODO: reconcile with @devdigest/shared`.
  */
+import type { FeatureModelId } from "@devdigest/shared";
 export type {
   Settings,
   SettingsUpdate,
@@ -33,6 +34,20 @@ export type {
 
 export type { Review, Finding, Severity, Verdict } from "@devdigest/shared";
 export type { PrBrief, SmartDiff } from "@devdigest/shared";
+
+/**
+ * A single feature model entry as returned by GET /settings/feature-models.
+ * The model/provider are already resolved (workspace override or server default).
+ */
+export interface ResolvedFeatureModel {
+  id: FeatureModelId;
+  label: string;
+  description: string;
+  provider: string;
+  model: string;
+  /** true when no workspace override exists — server default is in use. */
+  isDefault: boolean;
+}
 
 /** UI-only view model for a PR list row (derives display fields from PrMeta). */
 export interface PrRowView {

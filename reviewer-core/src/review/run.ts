@@ -5,11 +5,11 @@ import type {
   Review,
   RunEventKind,
   UnifiedDiff,
-} from '@devdigest/shared';
-import { Review as ReviewSchema } from '@devdigest/shared';
-import { assemblePrompt } from '../prompt.js';
-import { groundFindings, groundingSummary } from '../grounding.js';
-import { reduceReviews, scoreFromFindings, sliceDiff } from './reduce.js';
+} from "@devdigest/shared";
+import { Review as ReviewSchema } from "@devdigest/shared";
+import { assemblePrompt } from "../prompt.js";
+import { groundFindings, groundingSummary } from "../grounding.js";
+import { reduceReviews, scoreFromFindings, sliceDiff } from "./reduce.js";
 
 /**
  * reviewPullRequest — the review engine entry point.
@@ -31,8 +31,8 @@ export const DEFAULT_MAP_THRESHOLD_LINES = 400;
 /** Default structured-output reprompt retries (matches REVIEW_MAX_RETRIES). */
 export const DEFAULT_REVIEW_MAX_RETRIES = 2;
 
-export type ReviewStrategy = 'auto' | 'single-pass' | 'map-reduce';
-export type ReviewMode = 'single-pass' | 'map-reduce';
+export type ReviewStrategy = "auto" | "single-pass" | "map-reduce";
+export type ReviewMode = "single-pass" | "map-reduce";
 
 /** Progress event emitted during a review (server → SSE bus, runner → log). */
 export interface ReviewEvent {
@@ -71,6 +71,8 @@ export interface ReviewInput {
   /** PR author's description/body (untrusted; truncated + delimiter-wrapped in
       the prompt). Empty/undefined → section omitted. */
   prDescription?: string;
+  /** Pre-formatted intent block from IntentDeriver. Passed to assemblePrompt. */
+  intent?: string;
   /** Task framing line, e.g. "Review PR #482 …". */
   task?: string;
   /** Override the structured-output retry budget. */
@@ -112,18 +114,30 @@ export interface ReviewOutcome {
   raw: string;
 }
 
-function selectMode(strategy: ReviewStrategy, diff: UnifiedDiff, threshold: number): ReviewMode {
-  if (strategy === 'single-pass') return 'single-pass';
-  if (strategy === 'map-reduce') return diff.files.length > 1 ? 'map-reduce' : 'single-pass';
+function selectMode(
+  strategy: ReviewStrategy,
+  diff: UnifiedDiff,
+  threshold: number,
+): ReviewMode {
+  if (strategy === "single-pass") return "single-pass";
+  if (strategy === "map-reduce")
+    return diff.files.length > 1 ? "map-reduce" : "single-pass";
   // auto: map-reduce only when the diff is both large AND multi-file (else 1 call).
-  const totalLines = diff.files.reduce((n, f) => n + f.additions + f.deletions, 0);
-  return totalLines > threshold && diff.files.length > 1 ? 'map-reduce' : 'single-pass';
+  const totalLines = diff.files.reduce(
+    (n, f) => n + f.additions + f.deletions,
+    0,
+  );
+  return totalLines > threshold && diff.files.length > 1
+    ? "map-reduce"
+    : "single-pass";
 }
 
-export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutcome> {
+export async function reviewPullRequest(
+  input: ReviewInput,
+): Promise<ReviewOutcome> {
   const threshold = input.mapThresholdLines ?? DEFAULT_MAP_THRESHOLD_LINES;
   const maxRetries = input.maxRetries ?? DEFAULT_REVIEW_MAX_RETRIES;
-  const mode = selectMode(input.strategy ?? 'auto', input.diff, threshold);
+  const mode = selectMode(input.strategy ?? "auto", input.diff, threshold);
   const emit = (kind: RunEventKind, msg: string, data?: unknown) =>
     input.onEvent?.({ kind, msg, data });
 
@@ -135,20 +149,27 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     callers: input.callers,
     repoMap: input.repoMap,
     prDescription: input.prDescription,
+    ...(input.intent ? { intent: input.intent } : {}),
     task: input.task,
   };
 
   // Whole-diff assembly is the trace default; overwritten below for single-pass.
-  let assembly: PromptAssembly = assemblePrompt({ ...promptParts, diff: input.diff.raw }).assembly;
+  let assembly: PromptAssembly = assemblePrompt({
+    ...promptParts,
+    diff: input.diff.raw,
+  }).assembly;
 
   const chunks =
-    mode === 'map-reduce'
-      ? input.diff.files.map((f) => ({ label: f.path, diffText: sliceDiff(input.diff, f.path) }))
-      : [{ label: 'all files', diffText: input.diff.raw }];
+    mode === "map-reduce"
+      ? input.diff.files.map((f) => ({
+          label: f.path,
+          diffText: sliceDiff(input.diff, f.path),
+        }))
+      : [{ label: "all files", diffText: input.diff.raw }];
 
   emit(
-    'info',
-    mode === 'map-reduce'
+    "info",
+    mode === "map-reduce"
       ? `Large diff → map-reduce over ${input.diff.files.length} files`
       : `Reviewing ${input.diff.files.length} changed file(s) in one pass`,
   );
@@ -165,31 +186,37 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     // 'map:' prefix only for the map-reduce path (one call per file). In
     // single-pass there is exactly one chunk (the whole diff) — don't mislabel it.
     emit(
-      'tool',
-      mode === 'map-reduce' ? `map: reviewing ${chunk.label}` : `Reviewing ${chunk.label} in one pass`,
+      "tool",
+      mode === "map-reduce"
+        ? `map: reviewing ${chunk.label}`
+        : `Reviewing ${chunk.label} in one pass`,
       { file: chunk.label },
     );
     const a = assemblePrompt({ ...promptParts, diff: chunk.diffText });
-    if (mode === 'single-pass') assembly = a.assembly;
+    if (mode === "single-pass") assembly = a.assembly;
     const res = await input.llm.completeStructured<Review>({
       model: input.model,
       schema: ReviewSchema,
-      schemaName: 'Review',
+      schemaName: "Review",
       messages: a.messages,
       maxRetries,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
     });
     tokensIn += res.tokensIn;
     tokensOut += res.tokensOut;
-    costUsd = costUsd == null || res.costUsd == null ? null : costUsd + res.costUsd;
+    costUsd =
+      costUsd == null || res.costUsd == null ? null : costUsd + res.costUsd;
     raws.push(res.raw);
     partials.push(res.data);
-    emit('result', `${chunk.label}: ${res.data.findings.length} candidate finding(s)`);
+    emit(
+      "result",
+      `${chunk.label}: ${res.data.findings.length} candidate finding(s)`,
+    );
   }
 
   const merged = reduceReviews(partials);
   emit(
-    'result',
+    "result",
     `Reduced to ${merged.findings.length} finding(s); verdict=${merged.verdict}, score=${merged.score}`,
   );
 
@@ -197,15 +224,19 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
   const ground = groundFindings(merged.findings, input.diff);
   const grounding = groundingSummary(ground);
   for (const d of ground.dropped) {
-    emit('info', `grounding dropped "${d.finding.title}": ${d.reason}`);
+    emit("info", `grounding dropped "${d.finding.title}": ${d.reason}`);
   }
-  emit('result', `Citation grounding: ${grounding}`);
+  emit("result", `Citation grounding: ${grounding}`);
 
   // Score is derived from the findings that SURVIVED grounding (not the model's
   // self-reported number, and not the pre-grounding set) so the score, the
   // findings list, and the deterministic event always agree.
   return {
-    review: { ...merged, findings: ground.kept, score: scoreFromFindings(ground.kept) },
+    review: {
+      ...merged,
+      findings: ground.kept,
+      score: scoreFromFindings(ground.kept),
+    },
     grounding,
     dropped: ground.dropped,
     mode,
@@ -214,6 +245,6 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     tokensIn,
     tokensOut,
     costUsd,
-    raw: raws.join('\n---\n'),
+    raw: raws.join("\n---\n"),
   };
 }

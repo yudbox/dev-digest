@@ -4,6 +4,7 @@ import type {
   Review,
   RunTrace,
   UnifiedDiff,
+  IssueMeta,
 } from "@devdigest/shared";
 import { reviewPullRequest, countBlockers } from "@devdigest/reviewer-core";
 import { RunLogger } from "../../platform/run-logger.js";
@@ -18,6 +19,9 @@ import type {
 import { REVIEW_STRATEGY } from "./constants.js";
 import { taskLine } from "./helpers.js";
 import { loadDiff } from "./diff-loader.js";
+import { deriveIntent } from "./intent-deriver.js";
+import { resolveFeatureModel } from "../settings/feature-models.js";
+import type { FeatureModelId } from "@devdigest/shared";
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -124,6 +128,61 @@ export class ReviewRunExecutor {
       `Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`,
     );
 
+    // Cancellation gate before intent LLM call
+    if (jobs.some((j) => this.container.runBus.isCancelled(j.runId))) {
+      await failAll("Cancelled before intent derivation");
+      return;
+    }
+
+    // Best-effort: fetch linked issue for richer intent context.
+    // Parse "Closes #N" / "Fixes #N" / "Resolves #N" from PR body.
+    let linkedIssue: IssueMeta | undefined;
+    if (pull.body) {
+      const m = pull.body.match(/(Closes|Fixes|Resolves)\s+#(\d+)/i);
+      if (m) {
+        const issueNumber = parseInt(m[2]!, 10);
+        try {
+          const gh = await this.container.github();
+          linkedIssue = await gh.getIssue(
+            { owner: repo.owner, name: repo.name },
+            issueNumber,
+          );
+          runLog.info(
+            `Intent: linked issue #${issueNumber} fetched — "${linkedIssue?.title}"`,
+          );
+        } catch {
+          runLog.info(
+            `Intent: linked issue #${issueNumber} fetch failed — skipping`,
+          );
+        }
+      }
+    }
+
+    let intentText: string | undefined;
+    try {
+      intentText = await runLog.step(
+        "Deriving PR intent",
+        () =>
+          deriveIntent(
+            this.container,
+            this.repo,
+            workspaceId,
+            pull,
+            diff,
+            runLog,
+            linkedIssue,
+          ),
+        { kind: "tool" },
+      );
+    } catch {
+      /* deriveIntent swallows; this is a safety net */
+    }
+    runLog.info(
+      intentText
+        ? "Intent derived — injecting into review prompt"
+        : "Continuing without intent (not derived or failed)",
+    );
+
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
       logger?.info(
@@ -145,6 +204,7 @@ export class ReviewRunExecutor {
           agent,
           runId,
           runLog,
+          intentText,
         );
         logger?.info(
           {
@@ -182,6 +242,7 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     runId: string,
     parentLog: RunLogger,
+    intent?: string,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -194,11 +255,29 @@ export class ReviewRunExecutor {
     );
 
     try {
+      // Resolve provider + model: Feature Models settings take priority when the
+      // agent is linked to a feature (featureModelId set). This makes Settings →
+      // Feature Models the single source of truth for those agents.
+      let provider = agent.provider as Provider;
+      let model = agent.model;
+      if (agent.featureModelId) {
+        const resolved = await resolveFeatureModel(
+          this.container,
+          agent.workspaceId,
+          agent.featureModelId as FeatureModelId,
+        );
+        provider = resolved.provider as Provider;
+        model = resolved.model;
+        runLog.info(
+          `Feature model override (${agent.featureModelId}): using ${provider}/${model} from Settings`,
+        );
+      }
+
       // Resolve the agent's LLM provider. (container.llm throws if the provider
       // key is missing — caught below and persisted as a failed run.)
       const llm = await runLog.step(
-        `Resolving ${agent.provider} provider`,
-        () => this.container.llm(agent.provider as Provider),
+        `Resolving ${provider} provider`,
+        () => this.container.llm(provider),
         { kind: "tool" },
       );
 
@@ -260,7 +339,7 @@ export class ReviewRunExecutor {
       // above, and persistence + observability below.
       const outcome = await reviewPullRequest({
         systemPrompt: agent.systemPrompt,
-        model: agent.model,
+        model,
         diff,
         llm,
         // Per-agent review strategy (configured in the Agent editor); falls back
@@ -277,6 +356,8 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // Intent derived pre-run (shared across all agents for this run).
+        ...(intent ? { intent } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
@@ -299,7 +380,7 @@ export class ReviewRunExecutor {
         verdict: outcome.review.verdict,
         summary: outcome.review.summary,
         score: outcome.review.score,
-        model: agent.model,
+        model,
       });
       const findingRows = await this.repo.insertFindings(
         review.id,
@@ -337,8 +418,8 @@ export class ReviewRunExecutor {
         config: {
           agent: agent.name,
           version: String(agent.version),
-          provider: agent.provider,
-          model: agent.model,
+          provider,
+          model,
           pr: pull.number,
           source: "local",
         },
@@ -539,6 +620,7 @@ export class ReviewRunExecutor {
         skills: null,
         memory: null,
         specs: null,
+        intent: null,
         user: "",
       },
       tool_calls: [],

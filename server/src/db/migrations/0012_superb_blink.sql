@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "feature_model_id" text;

@@ -1,7 +1,15 @@
-import type { Container } from '../../platform/container.js';
-import type { Agent, AgentSkillLink, CiFailOn, ModelInfo, Provider, ReviewStrategy } from '@devdigest/shared';
-import { AgentsRepository } from './repository.js';
-import { toAgentDto } from './helpers.js';
+import type { Container } from "../../platform/container.js";
+import type {
+  Agent,
+  AgentSkillLink,
+  CiFailOn,
+  ModelInfo,
+  Provider,
+  ReviewStrategy,
+  FeatureModelId,
+} from "@devdigest/shared";
+import { AgentsRepository } from "./repository.js";
+import { toAgentDto } from "./helpers.js";
 
 /**
  * A2 — agents service. Business logic for the Agents tab + Agent Editor.
@@ -12,7 +20,7 @@ import { toAgentDto } from './helpers.js';
  */
 
 // Re-exported for backwards compatibility; implementation lives in ./helpers.
-export { toAgentDto } from './helpers.js';
+export { toAgentDto } from "./helpers.js";
 
 export interface CreateAgentInput {
   name: string;
@@ -25,6 +33,7 @@ export interface CreateAgentInput {
   ci_fail_on?: CiFailOn;
   repo_intel?: boolean;
   enabled?: boolean;
+  feature_model_id?: FeatureModelId | null;
 }
 
 export interface UpdateAgentInput {
@@ -38,6 +47,7 @@ export interface UpdateAgentInput {
   ci_fail_on?: CiFailOn;
   repo_intel?: boolean;
   enabled?: boolean;
+  feature_model_id?: FeatureModelId | null;
 }
 
 export class AgentsService {
@@ -51,7 +61,10 @@ export class AgentsService {
     const rows = await this.repo.list(workspaceId);
     // Attach skill_count to each agent (one extra query for all agents).
     const skillCounts = await this.repo.skillCountsForWorkspace(workspaceId);
-    return rows.map((row) => ({ ...toAgentDto(row), skill_count: skillCounts.get(row.id) ?? 0 }));
+    return rows.map((row) => ({
+      ...toAgentDto(row),
+      skill_count: skillCounts.get(row.id) ?? 0,
+    }));
   }
 
   async get(workspaceId: string, id: string): Promise<Agent | undefined> {
@@ -66,7 +79,11 @@ export class AgentsService {
     return this.repo.deleteById(workspaceId, id);
   }
 
-  async create(workspaceId: string, input: CreateAgentInput, userId?: string): Promise<Agent> {
+  async create(
+    workspaceId: string,
+    input: CreateAgentInput,
+    userId?: string,
+  ): Promise<Agent> {
     const row = await this.repo.insert({
       workspaceId,
       name: input.name,
@@ -77,7 +94,12 @@ export class AgentsService {
       outputSchema: input.output_schema,
       ...(input.strategy !== undefined ? { strategy: input.strategy } : {}),
       ...(input.ci_fail_on !== undefined ? { ciFailOn: input.ci_fail_on } : {}),
-      ...(input.repo_intel !== undefined ? { repoIntel: input.repo_intel } : {}),
+      ...(input.repo_intel !== undefined
+        ? { repoIntel: input.repo_intel }
+        : {}),
+      ...(input.feature_model_id !== undefined
+        ? { featureModelId: input.feature_model_id }
+        : {}),
       enabled: input.enabled,
       createdBy: userId ?? null,
     });
@@ -91,15 +113,26 @@ export class AgentsService {
   ): Promise<Agent | undefined> {
     const row = await this.repo.update(workspaceId, id, {
       ...(patch.name !== undefined ? { name: patch.name } : {}),
-      ...(patch.description !== undefined ? { description: patch.description } : {}),
+      ...(patch.description !== undefined
+        ? { description: patch.description }
+        : {}),
       ...(patch.provider !== undefined ? { provider: patch.provider } : {}),
       ...(patch.model !== undefined ? { model: patch.model } : {}),
-      ...(patch.system_prompt !== undefined ? { systemPrompt: patch.system_prompt } : {}),
-      ...(patch.output_schema !== undefined ? { outputSchema: patch.output_schema } : {}),
+      ...(patch.system_prompt !== undefined
+        ? { systemPrompt: patch.system_prompt }
+        : {}),
+      ...(patch.output_schema !== undefined
+        ? { outputSchema: patch.output_schema }
+        : {}),
       ...(patch.strategy !== undefined ? { strategy: patch.strategy } : {}),
       ...(patch.ci_fail_on !== undefined ? { ciFailOn: patch.ci_fail_on } : {}),
-      ...(patch.repo_intel !== undefined ? { repoIntel: patch.repo_intel } : {}),
+      ...(patch.repo_intel !== undefined
+        ? { repoIntel: patch.repo_intel }
+        : {}),
       ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+      ...(patch.feature_model_id !== undefined
+        ? { featureModelId: patch.feature_model_id }
+        : {}),
     });
     return row ? toAgentDto(row) : undefined;
   }
@@ -107,7 +140,11 @@ export class AgentsService {
   /** Linked skills for an agent as AgentSkillLink[] (ordered). */
   async skillLinks(agentId: string): Promise<AgentSkillLink[]> {
     const links = await this.repo.linkedSkills(agentId);
-    return links.map((l) => ({ agent_id: agentId, skill_id: l.skill.id, order: l.order }));
+    return links.map((l) => ({
+      agent_id: agentId,
+      skill_id: l.skill.id,
+      order: l.order,
+    }));
   }
 
   /**
