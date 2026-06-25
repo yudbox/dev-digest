@@ -13,8 +13,8 @@ import type { DiffCommentApi } from "@/components/diff-viewer";
 // ── Colour palette for roles ──────────────────────────────────────────────────
 
 const ROLE_DOT: Record<string, string> = {
-  core: "#3b82f6",        // blue
-  wiring: "#f59e0b",      // amber
+  core: "#3b82f6", // blue
+  wiring: "#f59e0b", // amber
   boilerplate: "#6b7280", // gray
 };
 
@@ -69,7 +69,9 @@ function GroupSection({
               initialOpen={!isBoilerplate}
               lineBadges={
                 smartFile.line_findings
-                  ? new Map(smartFile.line_findings.map((f) => [f.line, f.severity]))
+                  ? new Map(
+                      smartFile.line_findings.map((f) => [f.line, f.severity]),
+                    )
                   : undefined
               }
             />

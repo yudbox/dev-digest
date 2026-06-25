@@ -150,6 +150,8 @@ function BlastRadiusPlaceholder() {
           display: "flex",
           flexDirection: "column",
           gap: 12,
+          height: "100%",
+          boxSizing: "border-box",
         } satisfies CSSProperties
       }
     >
@@ -354,7 +356,7 @@ export function OverviewTab({ prBody, prId }: OverviewTabProps) {
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: 16,
-            alignItems: "start",
+            alignItems: "stretch",
           } satisfies CSSProperties
         }
       >
@@ -364,7 +366,7 @@ export function OverviewTab({ prBody, prId }: OverviewTabProps) {
           onRecalculate={() => recalc.mutate()}
           recalculating={recalc.isPending}
         />
-        <section>
+        <section style={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <SectionLabel icon="GitPullRequest">Blast Radius</SectionLabel>
           <BlastRadiusPlaceholder />
         </section>

@@ -34,6 +34,8 @@ const s = {
     display: "flex",
     flexDirection: "column",
     gap: 14,
+    height: "100%",
+    boxSizing: "border-box",
   } satisfies CSSProperties,
 
   quote: {
@@ -78,18 +80,38 @@ const s = {
 
   itemIn: {
     fontSize: 13,
-    color: "var(--color-success, #4ade80)",
-    paddingLeft: 10,
-    borderLeft: "2px solid var(--color-success, #4ade80)",
+    color: "var(--text-secondary)",
+    paddingLeft: 0,
     lineHeight: 1.45,
+    listStyleType: "none",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 6,
+  } satisfies CSSProperties,
+
+  itemInDot: {
+    color: "var(--color-success, #4ade80)",
+    flexShrink: 0,
+    marginTop: 2,
+    fontSize: 14,
   } satisfies CSSProperties,
 
   itemOut: {
     fontSize: 13,
     color: "var(--text-muted)",
-    paddingLeft: 10,
-    borderLeft: "2px solid var(--border)",
+    paddingLeft: 0,
     lineHeight: 1.45,
+    listStyleType: "none",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 6,
+  } satisfies CSSProperties,
+
+  itemOutDot: {
+    color: "var(--text-muted)",
+    flexShrink: 0,
+    marginTop: 2,
+    fontSize: 14,
   } satisfies CSSProperties,
 
   recalcBtn: {
@@ -163,7 +185,7 @@ export function IntentCard({
 
   if (!intent) {
     return (
-      <section>
+      <section style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <SectionLabel icon="Target">Intent</SectionLabel>
         <div style={s.card}>
           <p style={s.emptyTitle}>{t("notRunTitle")}</p>
@@ -176,7 +198,7 @@ export function IntentCard({
   const hasScope = intent.in_scope.length > 0 || intent.out_of_scope.length > 0;
 
   return (
-    <section>
+    <section style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <SectionLabel icon="Target">Intent</SectionLabel>
       <div style={s.card}>
         {/* Quote */}
@@ -194,7 +216,8 @@ export function IntentCard({
               <ul style={s.itemList}>
                 {intent.in_scope.map((item) => (
                   <li key={item} style={s.itemIn}>
-                    {item}
+                    <span style={s.itemInDot}>·</span>
+                    <span>{item}</span>
                   </li>
                 ))}
               </ul>
@@ -209,7 +232,8 @@ export function IntentCard({
               <ul style={s.itemList}>
                 {intent.out_of_scope.map((item) => (
                   <li key={item} style={s.itemOut}>
-                    {item}
+                    <span style={s.itemOutDot}>·</span>
+                    <span>{item}</span>
                   </li>
                 ))}
               </ul>
