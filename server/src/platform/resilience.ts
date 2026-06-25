@@ -51,9 +51,6 @@ function defaultIsRetryable(err: unknown): boolean {
         msg.includes("billing") ||
         msg.includes("exceeded your current");
       if (isQuotaExceeded) {
-        console.error(
-          "[resilience] 429 quota-exceeded — not retrying. Check OpenAI billing at https://platform.openai.com/usage",
-        );
         return false;
       }
       return true; // rate-limit 429 — retryable

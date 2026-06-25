@@ -115,6 +115,10 @@ export const SmartDiffFile = z.object({
       suggestion: z.number().int(),
     })
     .nullish(),
+  /** Per-line findings for inline badges. null = no review has run yet. */
+  line_findings: z
+    .array(z.object({ line: z.number().int(), severity: z.string() }))
+    .nullish(),
 });
 export type SmartDiffFile = z.infer<typeof SmartDiffFile>;
 

@@ -32,11 +32,20 @@ export class PullsService {
     const hasReview =
       latestReview.findings.length > 0 || latestReview.reviewTokens !== null;
 
-    // Enrich each file with finding_lines + severity_counts from latest review.
+    // Enrich each file with finding_lines + severity_counts + line_findings from latest review.
     const enrichedGroups = base.groups.map((group) => ({
       ...group,
       files: group.files.map((file) => {
         const findings = findingsByFile.get(file.path) ?? [];
+        // Pick the most severe badge per line (critical > warning > suggestion).
+        const severityRank: Record<string, number> = { CRITICAL: 3, WARNING: 2, SUGGESTION: 1 };
+        const lineMap = new Map<number, string>();
+        for (const f of findings) {
+          const existing = lineMap.get(f.startLine);
+          if (!existing || (severityRank[f.severity] ?? 0) > (severityRank[existing] ?? 0)) {
+            lineMap.set(f.startLine, f.severity);
+          }
+        }
         return {
           ...file,
           finding_lines: [...new Set(findings.map((f) => f.startLine))].sort(
@@ -44,13 +53,13 @@ export class PullsService {
           ),
           severity_counts: hasReview
             ? {
-                critical: findings.filter((f) => f.severity === "CRITICAL")
-                  .length,
-                warning: findings.filter((f) => f.severity === "WARNING")
-                  .length,
-                suggestion: findings.filter((f) => f.severity === "SUGGESTION")
-                  .length,
+                critical: findings.filter((f) => f.severity === "CRITICAL").length,
+                warning: findings.filter((f) => f.severity === "WARNING").length,
+                suggestion: findings.filter((f) => f.severity === "SUGGESTION").length,
               }
+            : null,
+          line_findings: hasReview
+            ? [...lineMap.entries()].map(([line, severity]) => ({ line, severity }))
             : null,
         };
       }),

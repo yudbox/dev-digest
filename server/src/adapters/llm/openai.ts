@@ -71,22 +71,12 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async complete(req: CompletionRequest): Promise<CompletionResult> {
-    return withRetry(
-      () => withTimeout(this.doComplete(req), req.timeoutMs ?? DEFAULT_TIMEOUT),
-      {
-        onRetry: (attempt, err) => {
-          console.warn(
-            `[openai] retry attempt=${attempt} model=${req.model} error=${(err as Error).message}`,
-          );
-        },
-      },
+    return withRetry(() =>
+      withTimeout(this.doComplete(req), req.timeoutMs ?? DEFAULT_TIMEOUT),
     );
   }
 
   private async doComplete(req: CompletionRequest): Promise<CompletionResult> {
-    console.log(
-      `[openai] complete model=${req.model} maxTokens=${req.maxTokens ?? "default"} msgs=${req.messages.length}`,
-    );
     const res = await this.client.chat.completions.create({
       model: req.model,
       messages: req.messages,
@@ -114,9 +104,6 @@ export class OpenAIProvider implements LLMProvider {
     let tokensOut = 0;
     let lastRaw = "";
 
-    console.log(
-      `[openai] completeStructured model=${req.model} maxTokens=${req.maxTokens ?? "default"} msgs=${req.messages.length}`,
-    );
     for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
       const res = await withRetry(() =>
         withTimeout(

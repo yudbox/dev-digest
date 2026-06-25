@@ -14,16 +14,29 @@ import { s, lineRowFor, lineSignFor } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
 
+const BADGE_STYLE: Record<string, React.CSSProperties> = {
+  CRITICAL:   { color: '#ef4444', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', paddingLeft: 8, userSelect: 'none' },
+  WARNING:    { color: '#f97316', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', paddingLeft: 8, userSelect: 'none' },
+  SUGGESTION: { color: '#3b82f6', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', paddingLeft: 8, userSelect: 'none' },
+};
+const BADGE_LABEL: Record<string, string> = {
+  CRITICAL: '⊘ blocker',
+  WARNING: '△ warning',
+  SUGGESTION: '◇ suggestion',
+};
+
 export function CodeLine({
   ln,
   path,
   threads,
   commenting,
+  badge,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
+  badge?: string;
 }) {
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
@@ -72,6 +85,11 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
+        {badge && BADGE_STYLE[badge] && (
+          <span style={BADGE_STYLE[badge]}>
+            {BADGE_LABEL[badge] ?? badge.toLowerCase()}
+          </span>
+        )}
       </div>
 
       {commenting &&

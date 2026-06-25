@@ -37,10 +37,12 @@ export function FileCard({
   file,
   commenting,
   initialOpen,
+  lineBadges,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
   initialOpen?: boolean;
+  lineBadges?: Map<number, string>;
 }) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
@@ -107,6 +109,7 @@ export function FileCard({
                 path={file.path}
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
+                badge={lineBadges?.get(ln.newNo ?? ln.oldNo ?? -1)}
               />
             ))
           )}

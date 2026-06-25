@@ -13,75 +13,12 @@ import type { DiffCommentApi } from "@/components/diff-viewer";
 // ── Colour palette for roles ──────────────────────────────────────────────────
 
 const ROLE_DOT: Record<string, string> = {
-  core: "#3b82f6", // blue
-  wiring: "#f59e0b", // amber
+  core: "#3b82f6",        // blue
+  wiring: "#f59e0b",      // amber
   boilerplate: "#6b7280", // gray
 };
 
-const SEVERITY_COLOUR: Record<string, string> = {
-  critical: "#ef4444",
-  warning: "#f97316",
-  suggestion: "#3b82f6",
-};
-
-// ── Badge scroll helper ───────────────────────────────────────────────────────
-
-function scrollToLine(path: string, line: number) {
-  const el = document.querySelector<HTMLElement>(
-    `[data-path="${CSS.escape(path)}"][data-line="${line}"]`,
-  );
-  el?.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-function FindingBadges({
-  filePath,
-  severityCounts,
-  findingLines,
-}: {
-  filePath: string;
-  severityCounts: NonNullable<
-    SmartDiff["groups"][0]["files"][0]["severity_counts"]
-  >;
-  findingLines: number[];
-}) {
-  const badges = [
-    { key: "critical", label: "blocker", count: severityCounts.critical },
-    { key: "warning", label: "warning", count: severityCounts.warning },
-    {
-      key: "suggestion",
-      label: "suggestion",
-      count: severityCounts.suggestion,
-    },
-  ].filter((b) => b.count > 0);
-
-  if (badges.length === 0) return null;
-
-  // For each severity, pick the first finding line matching that severity group.
-  const lineIdx = { critical: 0, warning: 0, suggestion: 0 };
-
-  return (
-    <div style={s.badges}>
-      {badges.map((b) => (
-        <button
-          key={b.key}
-          type="button"
-          style={{ ...s.badge, color: SEVERITY_COLOUR[b.key] }}
-          onClick={() => {
-            const line =
-              findingLines[lineIdx[b.key as keyof typeof lineIdx]] ??
-              findingLines[0];
-            if (line != null) scrollToLine(filePath, line);
-          }}
-          title={`${b.count} ${b.label}(s) — click to scroll`}
-        >
-          ⊘ {b.label} · {b.count}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function GroupSection({
   group,
@@ -126,17 +63,15 @@ function GroupSection({
                 {smartFile.pseudocode_summary}
               </div>
             )}
-            {smartFile.severity_counts && (
-              <FindingBadges
-                filePath={smartFile.path}
-                severityCounts={smartFile.severity_counts}
-                findingLines={smartFile.finding_lines}
-              />
-            )}
             <FileCard
               file={prFile}
               commenting={commenting}
               initialOpen={!isBoilerplate}
+              lineBadges={
+                smartFile.line_findings
+                  ? new Map(smartFile.line_findings.map((f) => [f.line, f.severity]))
+                  : undefined
+              }
             />
           </div>
         );
