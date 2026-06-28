@@ -26,6 +26,7 @@ import { s } from "./styles";
 export function FindingCard({
   f,
   focused,
+  targeted,
   defaultExpanded,
   onAction,
   pending,
@@ -34,6 +35,7 @@ export function FindingCard({
 }: {
   f: FindingRecord;
   focused?: boolean;
+  targeted?: boolean;
   defaultExpanded?: boolean;
   onAction?: (action: FindingActionKind, reply?: string) => void;
   pending?: boolean;
@@ -51,8 +53,15 @@ export function FindingCard({
   const dismissed = !!f.dismissed_at;
   const muted = accepted || dismissed;
 
+  React.useEffect(() => {
+    if (targeted) setExpanded(true);
+  }, [targeted]);
+
   return (
-    <div data-finding-id={f.id} style={s.card(!!focused, sevColor, muted)}>
+    <div
+      data-finding-id={f.id}
+      style={s.card(!!focused || !!targeted, sevColor, muted)}
+    >
       <div onClick={() => setExpanded((e) => !e)} style={s.header}>
         <div style={s.badgeWrap}>
           <SeverityBadge severity={f.severity as Severity} compact />
@@ -61,8 +70,12 @@ export function FindingCard({
           <div style={s.titleRow}>
             <span style={s.title(muted, dismissed)}>{f.title}</span>
             <CategoryTag category={f.category as Category} />
-            {accepted && <span style={s.acceptedTag}>{t("finding.accepted")}</span>}
-            {dismissed && <span style={s.dismissedTag}>{t("finding.dismissed")}</span>}
+            {accepted && (
+              <span style={s.acceptedTag}>{t("finding.accepted")}</span>
+            )}
+            {dismissed && (
+              <span style={s.dismissedTag}>{t("finding.dismissed")}</span>
+            )}
           </div>
           <div style={s.metaRow}>
             <MonoLink href={fileHref}>

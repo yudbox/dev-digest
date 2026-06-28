@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Run trace. The ENTIRE trace of one run is persisted as a SINGLE
@@ -6,7 +6,7 @@ import { z } from 'zod';
  * during the run; the full log is written once on completion.
  */
 
-export const RunEventKind = z.enum(['info', 'tool', 'result', 'error']);
+export const RunEventKind = z.enum(["info", "tool", "result", "error"]);
 export type RunEventKind = z.infer<typeof RunEventKind>;
 
 /** A single live-log line. `t` = elapsed timestamp string (e.g. "00.31"). */
@@ -47,6 +47,8 @@ export const PromptAssembly = z.object({
   repo_map: z.string().nullish(),
   /** PR author's description/body (truncated); null when absent. */
   pr_description: z.string().nullish(),
+  /** Derived PR intent + scope block; null when not derived. */
+  intent: z.string().nullish(),
   user: z.string(),
 });
 export type PromptAssembly = z.infer<typeof PromptAssembly>;
@@ -75,7 +77,7 @@ export const RunTrace = z.object({
     provider: z.string().nullish(),
     model: z.string(),
     pr: z.number().int().nullish(),
-    source: z.enum(['local', 'ci']).default('local'),
+    source: z.enum(["local", "ci"]).default("local"),
   }),
   stats: RunStats,
   prompt_assembly: PromptAssembly,

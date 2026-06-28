@@ -11,15 +11,5 @@
         ]
       }
     ]
-    // "Stop": [
-    //   {
-    //     "hooks": [
-    //       {
-    //         "type": "prompt",
-    //         "prompt": "Invoke the engineering-insights skill exactly once now. Do not check whether it was already invoked earlier in the session — just invoke it. The skill itself handles deduplication and the quality filter. Do not repeat this after future messages."
-    //       }
-    //     ]
-    //   }
-    // ]
   }
 }

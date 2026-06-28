@@ -207,6 +207,8 @@ export const Agent = z.object({
   // agent's review prompt. Default on; gated again by the global flag.
   repo_intel: z.boolean().default(true),
   skill_count: z.number().int().optional(),
+  // When set, provider+model come from Settings → Feature Models (single source of truth).
+  feature_model_id: z.string().nullish(),
 });
 export type Agent = z.infer<typeof Agent>;
 

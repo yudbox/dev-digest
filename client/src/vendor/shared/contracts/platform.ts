@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { Provider } from './knowledge';
+import { z } from "zod";
+import { Provider } from "./knowledge";
 
 /**
  * Platform / scaffolding DTOs owned by F1:
@@ -12,11 +12,11 @@ import { Provider } from './knowledge';
 // ---- Feature → model selection ----
 /** System LLM features whose model is selectable in Settings (per-workspace). */
 export const FeatureModelId = z.enum([
-  'onboarding',
-  'review_intent',
-  'risk_brief',
-  'conformance',
-  'conventions',
+  "onboarding",
+  "review_intent",
+  "risk_brief",
+  "conformance",
+  "conventions",
 ]);
 export type FeatureModelId = z.infer<typeof FeatureModelId>;
 
@@ -42,39 +42,39 @@ export interface FeatureModelDef {
 }
 export const FEATURE_MODELS: FeatureModelDef[] = [
   {
-    id: 'onboarding',
-    label: 'Onboarding Tour',
-    description: 'Writes the per-repo onboarding tour.',
-    defaultProvider: 'openrouter',
-    defaultModel: 'deepseek/deepseek-v4-flash',
+    id: "onboarding",
+    label: "Onboarding Tour",
+    description: "Writes the per-repo onboarding tour.",
+    defaultProvider: "openrouter",
+    defaultModel: "deepseek/deepseek-v4-flash",
   },
   {
-    id: 'review_intent',
-    label: 'PR Review · Intent',
-    description: 'Derives a PR’s intent and scope before review.',
-    defaultProvider: 'openai',
-    defaultModel: 'gpt-4.1',
+    id: "review_intent",
+    label: "PR Review · Intent",
+    description: "Derives a PR’s intent and scope before review.",
+    defaultProvider: "openrouter",
+    defaultModel: "deepseek/deepseek-v4-flash",
   },
   {
-    id: 'risk_brief',
-    label: 'Risk Brief',
-    description: 'Assesses merge risks for a pull request.',
-    defaultProvider: 'openai',
-    defaultModel: 'gpt-4.1',
+    id: "risk_brief",
+    label: "Risk Brief",
+    description: "Assesses merge risks for a pull request.",
+    defaultProvider: "openai",
+    defaultModel: "gpt-4.1",
   },
   {
-    id: 'conformance',
-    label: 'Conformance',
-    description: 'Checks a PR against the project spec.',
-    defaultProvider: 'openai',
-    defaultModel: 'gpt-4.1',
+    id: "conformance",
+    label: "Conformance",
+    description: "Checks a PR against the project spec.",
+    defaultProvider: "openai",
+    defaultModel: "gpt-4.1",
   },
   {
-    id: 'conventions',
-    label: 'Conventions',
-    description: 'Extracts coding conventions from the repo.',
-    defaultProvider: 'openai',
-    defaultModel: 'gpt-5.4',
+    id: "conventions",
+    label: "Conventions",
+    description: "Extracts coding conventions from the repo.",
+    defaultProvider: "openai",
+    defaultModel: "gpt-5.4",
   },
 ];
 
@@ -86,8 +86,8 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
  */
 export const SettingsKnown = z.object({
   polling_interval_min: z.number().int().min(1).default(5),
-  theme: z.enum(['dark', 'light']).default('dark'),
-  density: z.enum(['regular', 'compact']).default('regular'),
+  theme: z.enum(["dark", "light"]).default("dark"),
+  density: z.enum(["regular", "compact"]).default("regular"),
   sync_to_folder: z.boolean().default(true),
   automatic_reviews: z.boolean().default(false),
   /** Per-feature model overrides (provider+model), keyed by FeatureModelId. */
@@ -103,7 +103,12 @@ export const SettingsUpdate = Settings.partial();
 export type SettingsUpdate = z.infer<typeof SettingsUpdate>;
 
 // ---- Connection test ----
-export const ConnTestProvider = z.enum(['openai', 'anthropic', 'openrouter', 'github']);
+export const ConnTestProvider = z.enum([
+  "openai",
+  "anthropic",
+  "openrouter",
+  "github",
+]);
 export type ConnTestProvider = z.infer<typeof ConnTestProvider>;
 
 export const ConnTestRequest = z.object({
@@ -151,7 +156,14 @@ export const Repo = z.object({
 export type Repo = z.infer<typeof Repo>;
 
 // ---- Pull requests ----
-export const PrStatus = z.enum(['needs_review', 'reviewed', 'stale', 'open', 'closed', 'merged']);
+export const PrStatus = z.enum([
+  "needs_review",
+  "reviewed",
+  "stale",
+  "open",
+  "closed",
+  "merged",
+]);
 export type PrStatus = z.infer<typeof PrStatus>;
 
 export const PrMeta = z.object({
@@ -221,7 +233,7 @@ export const PrReviewComment = z.object({
   path: z.string(),
   line: z.number().int().nullable(),
   original_line: z.number().int().nullable(),
-  side: z.enum(['LEFT', 'RIGHT']),
+  side: z.enum(["LEFT", "RIGHT"]),
   body: z.string(),
   user: z.string(),
   created_at: z.string(),
@@ -236,7 +248,7 @@ export type PrReviewComment = z.infer<typeof PrReviewComment>;
 export const PrCommentInput = z.object({
   path: z.string().min(1),
   line: z.number().int().positive(),
-  side: z.enum(['LEFT', 'RIGHT']).optional(),
+  side: z.enum(["LEFT", "RIGHT"]).optional(),
   body: z.string().min(1),
   /** Reply to an existing review comment thread (its comment id). */
   in_reply_to: z.number().int().optional(),
@@ -253,7 +265,7 @@ export const SpecFile = z.object({
 export type SpecFile = z.infer<typeof SpecFile>;
 
 export const IndexStatus = z.object({
-  status: z.enum(['idle', 'cloning', 'parsing', 'embedding', 'done', 'error']),
+  status: z.enum(["idle", "cloning", "parsing", "embedding", "done", "error"]),
   pct: z.number().min(0).max(100),
   message: z.string().nullish(),
   chunks_indexed: z.number().int().nullish(),

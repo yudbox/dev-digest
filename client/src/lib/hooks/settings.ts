@@ -3,7 +3,14 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
-import type { Settings, SettingsUpdate, ConnTestProvider, ConnTestResult, SecretsStatus } from "../types";
+import type {
+  Settings,
+  SettingsUpdate,
+  ConnTestProvider,
+  ConnTestResult,
+  SecretsStatus,
+  ResolvedFeatureModel,
+} from "../types";
 
 export function useSettings() {
   return useQuery({
@@ -12,18 +19,33 @@ export function useSettings() {
   });
 }
 
+/** Returns all feature models with resolved provider+model (workspace override or server default). */
+export function useFeatureModels() {
+  return useQuery({
+    queryKey: ["feature-models"],
+    queryFn: () => api.get<ResolvedFeatureModel[]>("/settings/feature-models"),
+  });
+}
+
 export function useUpdateSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (patch: SettingsUpdate) => api.put<Settings>("/settings", patch),
-    onSuccess: (data) => qc.setQueryData(["settings"], data),
+    mutationFn: (patch: SettingsUpdate) =>
+      api.put<Settings>("/settings", patch),
+    onSuccess: (data) => {
+      qc.setQueryData(["settings"], data);
+      // Any settings change can affect resolved feature models — refetch.
+      void qc.invalidateQueries({ queryKey: ["feature-models"] });
+    },
   });
 }
 
 export function useTestConnection() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: ConnTestProvider | { provider: ConnTestProvider; key?: string }) => {
+    mutationFn: (
+      input: ConnTestProvider | { provider: ConnTestProvider; key?: string },
+    ) => {
       const body = typeof input === "string" ? { provider: input } : input;
       return api.post<ConnTestResult>("/settings/test-connection", body);
     },

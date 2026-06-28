@@ -1,12 +1,18 @@
 "use client";
 
 import React, { useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Icon, Badge, Button, SectionLabel, EmptyState } from "@devdigest/ui";
 import { RunStatus } from "../RunStatus";
 import { RunHistory } from "../RunHistory/RunHistory";
 import { ReviewRunAccordion } from "../ReviewRunAccordion";
 import { s } from "./styles";
-import type { FindingRecord, ReviewRecord, RunSummary, PrCommit } from "@devdigest/shared";
+import type {
+  FindingRecord,
+  ReviewRecord,
+  RunSummary,
+  PrCommit,
+} from "@devdigest/shared";
 import type { UseMutationResult } from "@tanstack/react-query";
 
 interface FindingsTabProps {
@@ -66,10 +72,26 @@ export function FindingsTab({
   // Timeline → Review-runs navigation: clicking an agent name in the timeline
   // opens + scrolls to that run's accordion below. The nonce re-triggers the
   // scroll even when the same run is clicked twice.
-  const [target, setTarget] = React.useState<{ runId: string; n: number } | null>(null);
+  const [target, setTarget] = React.useState<{
+    runId: string;
+    n: number;
+  } | null>(null);
   const handleGoToReview = useCallback((runId: string) => {
     setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1 }));
   }, []);
+
+  // Badge → Finding navigation: ?finding=<id> in URL → open owning accordion
+  const searchParams = useSearchParams();
+  const targetFindingId = searchParams.get("finding");
+  React.useEffect(() => {
+    if (!targetFindingId) return;
+    const owningRun = runs.find((r) =>
+      r.findings.some((f) => f.id === targetFindingId),
+    );
+    if (owningRun?.id) {
+      setTarget((p) => ({ runId: owningRun.id, n: (p?.n ?? 0) + 1 }));
+    }
+  }, [targetFindingId, runs]);
 
   return (
     <section>
@@ -88,7 +110,12 @@ export function FindingsTab({
                 >
                   Cancel
                 </Button>
-                <Button kind="ghost" size="sm" icon="FileText" onClick={handleOpenFirstTrace}>
+                <Button
+                  kind="ghost"
+                  size="sm"
+                  icon="FileText"
+                  onClick={handleOpenFirstTrace}
+                >
                   Open run trace
                 </Button>
               </div>
@@ -102,10 +129,17 @@ export function FindingsTab({
 
       {reviewRunning && (
         <div style={s.reviewInProgress}>
-          <Icon.RefreshCw size={16} style={{ color: "var(--accent)", animation: "ddspin 1s linear infinite" }} />
+          <Icon.RefreshCw
+            size={16}
+            style={{
+              color: "var(--accent)",
+              animation: "ddspin 1s linear infinite",
+            }}
+          />
           <span style={s.reviewInProgressText}>Review in progress…</span>
           <span style={s.reviewInProgressSub}>
-            the agent is analyzing the diff — this can take a while on large PRs.
+            the agent is analyzing the diff — this can take a while on large
+            PRs.
           </span>
         </div>
       )}
@@ -124,7 +158,11 @@ export function FindingsTab({
         <div style={s.timelineSection}>
           <SectionLabel
             icon="Activity"
-            right={<span style={{ fontSize: 12, color: "var(--text-muted)" }}>runs &amp; commits · newest first</span>}
+            right={
+              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                runs &amp; commits · newest first
+              </span>
+            }
           >
             Timeline
           </SectionLabel>
@@ -140,7 +178,11 @@ export function FindingsTab({
 
       <SectionLabel
         icon="AlertOctagon"
-        right={<span style={{ fontSize: 12, color: "var(--text-muted)" }}>grouped by run · newest first</span>}
+        right={
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            grouped by run · newest first
+          </span>
+        }
       >
         Review runs
       </SectionLabel>
@@ -164,6 +206,7 @@ export function FindingsTab({
             headSha={headSha}
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}
+            targetFindingId={targetFindingId}
           />
         ))
       )}
