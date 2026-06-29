@@ -25,6 +25,10 @@ See also: `insights/gotchas.md` for known quirks at project start.
 
 2026-06-21 — `SkillsRepository.update()` only bumps `version` when `body` actually changes (new value !== existing). Metadata changes (name, description, enabled, type) are NOT versioned. A body change also resets `threat_level` to `"unknown"` so the synchronous re-scan on `PUT /skills/:id` starts from a clean slate. ref: server/src/modules/skills/repository.ts:154
 
+2026-06-29 — A new module's service must NOT do direct Drizzle queries (`container.db.select()`) — all DB access belongs in a dedicated `repository.ts`. This is an Onion Architecture enforcement: Application layer (service.ts) must not depend on Infrastructure (Drizzle). Pattern: `this.repo = new BlastRepository(container.db)` in the service constructor; all `db.*` calls live in `repository.ts`. Architecture reviewer catches this as a HIGH violation. ref: server/src/modules/blast/service.ts:1
+
+2026-06-29 — Two parallel type hierarchies exist for blast radius data: `server/src/modules/repo-intel/types.ts` has internal types (`ChangedSymbol`, `BlastCaller`) used within repo-intel; `server/src/vendor/shared/contracts/brief.ts` has the HTTP contract types (`BlastChangedSymbol`, `BlastCallerRow`, `BlastRadiusResult`). These are structurally compatible but distinct — the prefix `Blast` was added to shared types to avoid name collision. Never merge them; the internal types can evolve independently of the HTTP contract. ref: server/src/vendor/shared/contracts/brief.ts:1
+
 2026-06-21 — Scan strategy differs by route: `PUT /skills/:id` runs regex + LLM scan **synchronously** so the response body contains the final `threat_level`. `POST /skills/import-url` runs regex synchronously (result goes into DB immediately) then fires LLM scan **in background** after `reply.status(201)` is sent — the background result upgrades the DB row asynchronously. ref: server/src/modules/skills/routes.ts:140
 
 2026-06-21 — Threat level is never downgraded from `"dangerous"`. LLM scan result is applied via a severity map `{ safe:0, unknown:1, suspicious:2, dangerous:3 }` — it replaces the current level only when its numeric rank is strictly higher. A `DANGEROUS` regex result cannot be softened by a `safe` LLM result. ref: server/src/modules/skills/routes.ts:272
@@ -51,6 +55,8 @@ See also: `insights/gotchas.md` for known quirks at project start.
 
 2026-06-17 — Drizzle `selectDistinctOn([col])` requires the first `orderBy()` column to match the DISTINCT ON column. For "latest row per group": `.selectDistinctOn([t.agentRuns.prId], {...}).orderBy(t.agentRuns.prId, desc(t.agentRuns.ranAt))`. Without the matching prId in orderBy, Postgres throws "SELECT DISTINCT ON expressions must match initial ORDER BY expressions". ref: server/src/modules/pulls/routes.ts:1
 
+2026-06-29 — MCP tool functions in `mcp/src/server.ts` are registered as `(args) => toolFn(args)` stubs — all tool functions require `client` as their first argument. The pattern must be `(args) => toolFn(client, args)`. Missing `client` causes the tool to call `client.request()` on undefined and throw at runtime. The bug is invisible at typecheck because the closure captures `client` from outer scope only when passed correctly. ref: mcp/src/server.ts:69
+
 ## Recurring Errors & Fixes
 
 2026-06-18 — `POST /settings/test-connection` with provider `anthropic` calls `llm.listModels()` → `GET https://api.anthropic.com/v1/models`. If a student tests their key with `curl .../v1/messages` and it works, but test-connection returns "Invalid response body... Premature close", the issue is a network/VPN/ISP block on the `/v1/models` endpoint specifically — not an invalid key. Fix: reproduce with `curl https://api.anthropic.com/v1/models -H "x-api-key: KEY" -H "anthropic-version: 2023-06-01"` to confirm, then disable VPN or switch to mobile hotspot. ref: server/src/modules/settings/routes.ts:92
@@ -68,5 +74,7 @@ See also: `insights/gotchas.md` for known quirks at project start.
 2026-06-17 — COST column showed '–' for PRs with a trailing errored run → replaced `selectDistinctOn` with `sql\`sum\`` + `groupBy`. Root cause: DISTINCT ON returns the newest row even when its cost is null. Files: server/src/modules/pulls/routes.ts.
 
 2026-06-17 — Run Cost Badge: added `last_run_cost_usd` to PR list response. Used `selectDistinctOn` subquery to get most recent agent run cost per PR in a single query (no N+1). No migration needed — `agent_runs.cost_usd` column already existed in the schema. Files: server/src/modules/pulls/routes.ts, server/src/vendor/shared/contracts/platform.ts.
+
+2026-06-29 — Blast Radius server: BlastService, BlastRepository, GET /pulls/:id/blast. BlastRepository wraps all Drizzle queries (resolvePrAndRepo, getChangedFilePaths, findPriorPrsTouchingSameFiles). Architecture review caught BlastService doing direct db.select() — fix: extract to repository.ts. Files: server/src/modules/blast/service.ts, server/src/modules/blast/repository.ts, server/src/modules/blast/routes.ts, server/src/vendor/shared/contracts/brief.ts.
 
 ## Open Questions

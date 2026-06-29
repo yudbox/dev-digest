@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "devdigest": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "tsx",
+        "/Users/oleksandr_yudaiev/Coding/Projects/Rituals/ai-harness-engineering/dev-digest/mcp/src/index.ts"
+      ],
+      "env": {
+        "DEVDIGEST_API_URL": "http://localhost:3001",
+        "ENABLE_TOOL_SEARCH": "true"
+      },
+      "timeout": 150000
+    }
+  }
+}

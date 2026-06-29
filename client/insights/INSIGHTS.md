@@ -23,6 +23,8 @@ See also: `insights/gotchas.md` for known quirks at project start.
 
 2026-06-21 — `resolveSkillThreat(skill)` in `@/lib/skill-threat.ts` is the single source of truth for threat-level display. Returns `{ isDangerous, isSuspicious, isScanning, isBlocked, badge }`. All threat-rendering components (SkillCard, SkillsTab) must use this util — do not re-derive inline or the badge/color logic will drift. ref: client/src/lib/skill-threat.ts:1
 
+2026-06-29 — `createPortal(content, document.body)` in a `"use client"` component is safe without a `mounted` guard because Next.js App Router never SSR-renders Client Components — they are hydrated in the browser only. The `mounted` guard pattern (`const [mounted, setMounted] = useState(false); useEffect(() => setMounted(true), [])`) is needed only for Server Components or pages with `export const ssr = true`. ref: client/src/app/repos/[repoId]/pulls/[number]/_components/BlastRadiusCard/BlastGraphLightbox.tsx:1
+
 ## What Doesn't Work
 
 2026-06-18 — Fixing `.js` extensions in `client/src/vendor/shared/index.ts` alone is NOT enough. The individual contract files also import each other with `.js` extensions (`eval-ci.ts`, `observability.ts`, `platform.ts`, `productionize.ts`, `review-api.ts`, `adapters.ts`). All 6 must be fixed in addition to the barrel. Grep: `from '\./.*\.js'` in `client/src/vendor/shared/` to find them all. ref: client/src/vendor/shared/contracts/eval-ci.ts:2
@@ -32,6 +34,10 @@ See also: `insights/gotchas.md` for known quirks at project start.
 2026-06-18 — `SeverityChip` with "N dots total" (render exactly N circles) is visually wrong — it gives no sense of scale. The correct model is always 12 slots: first `min(count, 12)` render as a single merged solid segment (height=2px), the remaining (12-N) render as faded separate dots. Width of merged segment = `N * SLOT_W + (N-1) * GAP`. ref: client/src/components/SeverityChip/SeverityChip.tsx:1
 
 2026-06-17 — `Icon.AlertCircle` does not exist in `@devdigest/ui` — runtime error "Element type is invalid: expected a string... but got undefined". Never guess icon names; check existing usages (`grep -oh "Icon\.[A-Za-z]*"`) to find what's available. ref: client/src/app/repos/[repoId]/pulls/_components/FindingsPopover/FindingsPopover.tsx:56
+
+2026-06-29 — `{count && <Component />}` renders the literal number `0` in the DOM when `count === 0`. React renders falsy numbers (0, -0, NaN) as text nodes. Always use `{count > 0 && <Component />}` for numeric guards. The pattern `{!!count && ...}` also works but is less readable. ref: client/src/app/repos/[repoId]/pulls/[number]/_components/BlastRadiusCard/SummaryBar.tsx:1
+
+2026-06-29 — d3 force simulation must be mounted/unmounted (not toggled via CSS `display:none`). When the container is hidden via CSS, `getBoundingClientRect()` returns 0 for width/height and the simulation places all nodes at origin. The correct pattern: conditionally render the graph component (`{graphOpen && <BlastGraph />}`) so it mounts with real dimensions. ref: client/src/app/repos/[repoId]/pulls/[number]/_components/BlastRadiusCard/BlastGraph.tsx:1
 
 ## Codebase Patterns
 
@@ -50,6 +56,10 @@ See also: `insights/gotchas.md` for known quirks at project start.
 2026-06-20 — `src/lib/` is structured into three groups: `hooks/` (React Query hooks by domain: settings, repos, pulls, context-files, agents, reviews, trace, repo-intel), `contexts/` (React providers: RepoProvider/useActiveRepo, ThemeProvider/useTheme, ToastProvider/useToast/notify, Providers composite), and `utils/` (pure functions with no React deps: githubUrls, modelLabel, featureModels). Each group has an `index.ts` barrel. `api.ts` and `types.ts` stay at `lib/` root as core infrastructure. ref: client/src/lib/contexts/index.ts:1
 
 2026-06-20 — Team convention: use `@/` path alias for any import going 3+ levels up (`../../../`). Short relative paths (1–2 levels, same feature) are fine. The `@/` alias maps to `src/` via `client/tsconfig.json`. Deep relative paths like `../../../../../lib/hooks/reviews` are explicitly rejected — write `@/lib/hooks/reviews` instead. This is a preference, not a TS enforcement — the compiler accepts both. ref: client/tsconfig.json:1
+
+2026-06-29 — Business logic (data derivation) in JSX is a code smell in this codebase. All non-trivial derivations live in `helpers.ts` at module level (not inside the component body): `buildCronSet()`, `buildSymbolRows()`, `endpointPillClass()`. Calling them inside JSX creates untestable logic and makes the template harder to read. The rule: if a derivation requires more than a single expression, move it to `helpers.ts`. ref: client/src/app/repos/[repoId]/pulls/[number]/_components/BlastRadiusCard/helpers.ts:1
+
+2026-06-29 — BlastRadiusCard factsByFile fallback bug: `helpers.ts buildSymbolRows()` checks `if (blastRadius.factsByFile)` to attribute endpoints/crons per symbol. But when `factsByFile` exists as an empty object `{}`, the loop yields nothing and `impactedEndpoints` is never used as a fallback — endpoints column appears empty. Fix: after the factsByFile loop, add `if (endpoints.size === 0) { blastRadius.impactedEndpoints.forEach(e => endpoints.add(e)); }`. ref: client/src/app/repos/[repoId]/pulls/[number]/_components/BlastRadiusCard/helpers.ts:32
 
 ## Tool & Library Notes
 
@@ -88,5 +98,7 @@ See also: `insights/gotchas.md` for known quirks at project start.
 2026-06-21 — Skills Lab (client): TanStack hooks (useSkills, useSkill, useCreateSkill, useImportSkill, useImportSkillFromUrl, useUpdateSkill, useDeleteSkill, useSkillStats, useSkillVersions, useRestoreSkill, useAgentSkills, useSetAgentSkills), /skills list page, /skills/:id editor with Config/Preview/Stats/Versions tabs, Agent Skills tab with DnD reorder, Conventions page. Files: client/src/lib/hooks/skills.ts, client/src/lib/hooks/conventions.ts, client/src/app/skills/, client/src/app/conventions/, client/src/app/agents/[id]/_components/AgentEditor/_components/SkillsTab/.
 
 2026-06-20 — To invoke `pr-self-review`, just call the Skill tool (or say "review my changes") — do NOT manually run `git diff` bash commands to collect the diff first. The skill's execution algorithm runs those commands itself internally. Manually pre-collecting diff before calling the skill is redundant and was explicitly corrected by the user. ref: .claude/skills/pr-self-review/SKILL.md:1
+
+2026-06-29 — Blast Radius full stack (client): useBlastRadius hook (staleTime 5min, no 404 retry), BlastRadiusCard with SummaryBar/SymbolList/PriorPrsAccordion sub-components, helpers.ts module-level pure functions, BlastGraph d3 force simulation, BlastGraphLightbox via createPortal. OverviewTab BlastRadiusPlaceholder removed, replaced with ErrorBoundary+BlastRadiusCard. Files: client/src/lib/hooks/pulls.ts, client/src/app/repos/[repoId]/pulls/[number]/_components/BlastRadiusCard/, client/src/app/repos/[repoId]/pulls/[number]/_components/OverviewTab/OverviewTab.tsx.
 
 ## Open Questions

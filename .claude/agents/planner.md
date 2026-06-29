@@ -5,7 +5,7 @@ description: >
   an implementation plan before writing code.
   Triggers: "спланируй", "составь план", "что нужно сделать для X",
   "plan this feature", "make a plan for", "как добавить X".
-  Produces: specs/PLAN-<name>.md artifact with tasks, owned paths, and
+  Produces: plans/PLAN-<name>.md artifact with tasks, owned paths, and
   acceptance criteria — consumed by implementer agents.
   Does NOT write code. Does NOT edit existing source files.
 
@@ -147,7 +147,7 @@ Review what researcher returned. If critical files are missing or findings are a
 
 ### STEP 3 — Write the plan
 
-Write the plan to `specs/PLAN-<kebab-case-name>.md`. Use the exact format below.
+Write the plan to `plans/PLAN-<kebab-case-name>.md`. Use the exact format below.
 
 ---
 
@@ -238,6 +238,6 @@ Write the plan to `specs/PLAN-<kebab-case-name>.md`. Use the exact format below.
 
 - NEVER write code. Write steps that reference exact file paths and function names.
 - NEVER invent file paths. If a file does not exist, state it explicitly.
-- NEVER write outside `specs/`. The only permitted Write target is `specs/PLAN-*.md`.
+- NEVER write outside `specs/`. The only permitted Write target is `plans/PLAN-*.md`.
 - ALWAYS delegate codebase survey to researcher — do not Grep/Glob yourself.
 - **Owned paths between parallel TASKs MUST NOT overlap.** If two tasks need the same file — merge them into one task. Parallel implementers share a working tree with no isolation.
