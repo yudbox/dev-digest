@@ -1,0 +1,24 @@
+{
+  "name": "@devdigest/mcp",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "devdigest-mcp": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "tsx --env-file=.env src/index.ts",
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "on": "bash ../scripts/mcp-on.sh",
+    "off": "bash ../scripts/mcp-off.sh"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "tsx": "^4.0.0",
+    "typescript": "^5.4.0"
+  }
+}

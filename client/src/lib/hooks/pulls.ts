@@ -4,7 +4,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, fetchSmartDiff } from "../api";
 import type { PrMeta, PrDetail } from "../types";
-import type { Intent, SmartDiff } from "@devdigest/shared";
+import type { Intent, SmartDiff, BlastRadiusResult } from "@devdigest/shared";
 
 export function usePulls(repoId: string | null | undefined) {
   return useQuery({
@@ -51,5 +51,16 @@ export function useSmartDiff(prId: string | null | undefined) {
     queryFn: () => fetchSmartDiff(prId!),
     enabled: !!prId,
     staleTime: 30_000,
+  });
+}
+
+export function useBlastRadius(prId: string | null | undefined) {
+  return useQuery<BlastRadiusResult>({
+    queryKey: ["blast-radius", prId],
+    queryFn: () => api.get<BlastRadiusResult>(`/pulls/${prId}/blast`),
+    enabled: prId != null,
+    staleTime: 5 * 60 * 1000,
+    retry: (count, err: unknown) =>
+      (err as { status?: number })?.status === 404 ? false : count < 2,
   });
 }

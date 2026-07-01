@@ -1,6 +1,6 @@
 ---
 name: engineering-insights
-description: "Recording non-obvious discoveries, dead ends, and working patterns found during development into {module}/insights/INSIGHTS.md. Use when you encounter unexpected behavior, work around a library quirk, discover why something failed, make an architectural decision with tradeoffs, or wrap up a substantive session (30+ min with a concrete problem and outcome). Covers client/, server/, reviewer-core/, e2e/. Trigger phrases: learned, discovered, realized, unexpected, gotcha, workaround, turns out, figured out, session wrap-up, engineering notes, non-obvious."
+description: "Recording non-obvious discoveries, dead ends, and working patterns found during development into {module}/insights/INSIGHTS.md. Use when you encounter unexpected behavior, work around a library quirk, discover why something failed, make an architectural decision with tradeoffs, or wrap up a substantive session (30+ min with a concrete problem and outcome). Covers client/, server/, reviewer-core/, e2e/, mcp/. Trigger phrases: learned, discovered, realized, unexpected, gotcha, workaround, turns out, figured out, session wrap-up, engineering notes, non-obvious."
 ---
 
 # Engineering Insights Recorder
@@ -37,6 +37,7 @@ Identify modules touched this session by file paths read or modified:
 | `server/` | server | `server/insights/INSIGHTS.md` |
 | `reviewer-core/` | reviewer-core | `reviewer-core/insights/INSIGHTS.md` |
 | `e2e/` | e2e | `e2e/insights/INSIGHTS.md` |
+| `mcp/` | mcp | `mcp/insights/INSIGHTS.md` |
 
 Write to each module meaningfully touched. Root-only changes (scripts/, docker-compose) → attribute to most affected module.
 
