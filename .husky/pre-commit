@@ -7,6 +7,6 @@ echo "▶ pre-commit: server unit tests..."
 (cd "$ROOT/server" && npx vitest run --exclude '**/*.it.test.ts') || { echo "✖ server unit tests failed"; exit 1; }
 
 echo "▶ pre-commit: server integration tests..."
-(cd "$ROOT/server" && npx vitest run '**/*.it.test.ts') || { echo "✖ server integration tests failed"; exit 1; }
+(cd "$ROOT/server" && npx vitest run it.test) || { echo "✖ server integration tests failed"; exit 1; }
 
 echo "✔ all tests passed"
