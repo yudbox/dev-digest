@@ -69,6 +69,13 @@ export const NAV: NavGroup[] = [
         href: "/conventions",
         gKey: "v",
       },
+      {
+        key: "eval",
+        label: "Eval Dashboard",
+        icon: "BarChart",
+        href: "/eval",
+        gKey: "e",
+      },
     ],
   },
 ];

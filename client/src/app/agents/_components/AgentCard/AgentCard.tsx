@@ -41,7 +41,12 @@ export function AgentCard({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (window.confirm(`Delete agent "${ag.name}"? This cannot be undone.`)) del.mutate(ag.id);
+            if (
+              window.confirm(
+                `Delete agent "${ag.name}"? This cannot be undone.`,
+              )
+            )
+              del.mutate(ag.id);
           }}
           disabled={del.isPending}
           title="Delete agent"
@@ -55,10 +60,19 @@ export function AgentCard({
             padding: 4,
           }}
         >
-          <Icon.Trash size={14} style={del.isPending ? { animation: "ddspin 1s linear infinite" } : undefined} />
+          <Icon.Trash
+            size={14}
+            style={
+              del.isPending
+                ? { animation: "ddspin 1s linear infinite" }
+                : undefined
+            }
+          />
         </button>
       </div>
-      <div style={s.description}>{ag.description || t("card.noDescription")}</div>
+      <div style={s.description}>
+        {ag.description || t("card.noDescription")}
+      </div>
       <div style={s.metaRow}>
         <span className="mono" style={s.modelChip(color)}>
           {ag.model}
@@ -69,6 +83,35 @@ export function AgentCard({
           </Badge>
         )}
       </div>
+      {ag.runs_count != null && (
+        <div style={s.statsRow}>
+          {ag.runs_count} {t("card.runs")}
+          {ag.accept_rate_pct != null && (
+            <>
+              {" · "}
+              <span
+                style={{
+                  color:
+                    ag.accept_rate_pct >= 80
+                      ? "var(--ok)"
+                      : ag.accept_rate_pct >= 40
+                        ? "var(--warn)"
+                        : "var(--crit)",
+                  fontWeight: 600,
+                }}
+              >
+                {ag.accept_rate_pct.toFixed(0)}% {t("card.accept")}
+              </span>
+            </>
+          )}
+          {ag.avg_cost_usd != null && (
+            <>
+              {" "}
+              · ${ag.avg_cost_usd.toFixed(3)} {t("card.avgCost")}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

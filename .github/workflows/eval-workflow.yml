@@ -1,0 +1,95 @@
+# eval-workflow — systemic tier (@devdigest/evals, workflow/**).
+# Asserts the REAL on-disk harness (CLAUDE.md routing, subagent dispatch, skill activation)
+# behaves as documented. Triggers on exactly the same conditions evals/scripts/ci-detect.mjs uses
+# to decide "run_workflow": CLAUDE.md, any agent definition, the workflow cases themselves, or the
+# eval engine (evals/src/**) changing — any of these can change what the harness actually does.
+#
+# Needs the LiteLLM proxy (the Agent SDK speaks the Anthropic wire protocol only). NON-BLOCKING:
+# `activation` cases are inherently indicative (not blocking) on non-Anthropic models — a capable
+# model may perform the underlying action directly instead of invoking the Skill tool.
+#
+# Model: OpenRouter, default google/gemini-2.5-flash — openai/gpt-4o-mini was tried first and
+# rejected after local repro: it doesn't just skip dispatching architecture-reviewer, it fabricates
+# a plausible "completed" response for a subagent call that never ran, and separately performs the
+# engineering-insights capture itself by editing the wrong file instead of invoking the Skill tool.
+# See evals/README.md "Which cheap model — verified". Override via workflow_dispatch inputs
+# (Actions tab → Run workflow), no code change needed.
+name: eval-workflow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'CLAUDE.md'
+      - '.claude/CLAUDE.md'
+      - '.claude/agents/**'
+      - 'evals/workflow/**'
+      - 'evals/src/**'
+      - '.github/workflows/eval-workflow.yml'
+  pull_request:
+    paths:
+      - 'CLAUDE.md'
+      - '.claude/CLAUDE.md'
+      - '.claude/agents/**'
+      - 'evals/workflow/**'
+      - 'evals/src/**'
+      - '.github/workflows/eval-workflow.yml'
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'EVAL_MODEL override (OpenRouter slug, e.g. google/gemini-2.5-flash)'
+        required: false
+        type: string
+      judge_model:
+        description: 'EVAL_JUDGE_MODEL override (OpenRouter slug)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-workflow-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EVAL_BACKEND: openrouter
+  EVAL_MODEL: ${{ inputs.model || 'google/gemini-2.5-flash' }}
+  EVAL_JUDGE_MODEL: ${{ inputs.judge_model || 'google/gemini-2.5-flash' }}
+  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+  OPENROUTER_BASE_URL: http://localhost:4000
+
+jobs:
+  # No separate "changes" job here — unlike skills/agents (which run a per-name matrix), the
+  # workflow tier is a single suite (pnpm eval:workflow), and the path filter above already IS
+  # the run_workflow condition from ci-detect.mjs, so there's nothing further to compute.
+  workflow-tier:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: evals
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: evals/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: docker compose -f proxy/docker-compose.yml up -d
+      - run: pnpm proxy:wait
+      # continue-on-error HERE (not just at job level) so this check shows green in the PR —
+      # the run still executes for real and its pass/fail is visible in this step's own log,
+      # it just doesn't turn the job/check red on a model-capability miss (see header comment).
+      # Use steps.run_tests.outcome (pre-continue-on-error) below, not failure() — failure()
+      # reads the post-override conclusion, which continue-on-error already forced to success.
+      - id: run_tests
+        continue-on-error: true
+        run: pnpm eval:workflow
+      - if: steps.run_tests.outcome == 'failure'
+        run: docker compose -f proxy/docker-compose.yml logs --tail 100
+      - if: always()
+        run: docker compose -f proxy/docker-compose.yml down

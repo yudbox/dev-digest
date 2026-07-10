@@ -1,0 +1,100 @@
+# eval-skills — content tier (@devdigest/evals, skills/**).
+# Runs only the skills actually touched by this PR (via evals/scripts/ci-detect.mjs), and only if
+# that skill has a written evals/skills/<name>/*.eval.ts. Content tier talks to OpenRouter
+# directly — no proxy needed — so this is cheap, fast, and BLOCKING. See evals/README.md.
+#
+# Model: OpenRouter, default openai/gpt-4o-mini — override via workflow_dispatch inputs
+# (Actions tab → Run workflow), no code change needed.
+name: eval-skills
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.claude/skills/**'
+      - 'evals/skills/**'
+      - 'evals/src/**'
+      - '.github/workflows/eval-skills.yml'
+  pull_request:
+    paths:
+      - '.claude/skills/**'
+      - 'evals/skills/**'
+      - 'evals/src/**'
+      - '.github/workflows/eval-skills.yml'
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'EVAL_MODEL override (OpenRouter slug)'
+        required: false
+        type: string
+      judge_model:
+        description: 'EVAL_JUDGE_MODEL override (OpenRouter slug)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-skills-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EVAL_BACKEND: openrouter
+  EVAL_MODEL: ${{ inputs.model || 'openai/gpt-4o-mini' }}
+  EVAL_JUDGE_MODEL: ${{ inputs.judge_model || 'openai/gpt-4o-mini' }}
+  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      skills: ${{ steps.detect.outputs.skills }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute changed files vs base
+        id: diff
+        run: |
+          BASE="${{ github.event.pull_request.base.ref || 'main' }}"
+          git fetch origin "$BASE" --depth=50
+          {
+            echo 'files<<EOF'
+            git diff --name-only "origin/$BASE...HEAD"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Detect affected skill evals
+        id: detect
+        env:
+          CHANGED_FILES: ${{ steps.diff.outputs.files }}
+        run: node evals/scripts/ci-detect.mjs
+
+  skills:
+    needs: changes
+    if: needs.changes.outputs.skills != '[]'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: evals
+    strategy:
+      fail-fast: false
+      matrix:
+        skill: ${{ fromJson(needs.changes.outputs.skills) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: evals/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run skills/${{ matrix.skill }}/${{ matrix.skill }}.eval.ts

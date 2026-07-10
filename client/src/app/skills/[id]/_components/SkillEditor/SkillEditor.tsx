@@ -2,6 +2,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Tabs, Icon, Badge, Toggle } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
 import { useUpdateSkill } from "@/lib/hooks/skills";
@@ -11,11 +12,16 @@ import { PreviewTab } from "./_components/PreviewTab/PreviewTab";
 import { StatsTab } from "./_components/StatsTab/StatsTab";
 import { VersionsTab } from "./_components/VersionsTab/VersionsTab";
 import { SkillContextTab } from "./_components/SkillContextTab/SkillContextTab";
+import { EvalsTab } from "@/components/evals/EvalsTab";
 import { TABS } from "./constants";
 
 const VALID_TABS = TABS as readonly string[];
 
-const TAB_DEFS = [
+// NOTE: labels below are hardcoded English (pre-existing i18n-rule violation
+// in this file). The new "evals" tab uses useTranslations() instead — see
+// the `t("evalsTabLabel")` lookup below — rather than compounding the
+// existing inconsistency; the other tabs are left as-is (out of scope here).
+const TAB_DEFS_STATIC = [
   { key: "config", label: "Config", icon: "Settings" as const },
   { key: "preview", label: "Preview", icon: "Eye" as const },
   { key: "stats", label: "Stats", icon: "BarChart" as const },
@@ -32,10 +38,16 @@ export function SkillEditor({
   tab: string;
   onTab: (t: string) => void;
 }) {
+  const t = useTranslations("eval.evalsTab");
   const update = useUpdateSkill();
   const activeTab = VALID_TABS.includes(tab) ? tab : "config";
   const { isDangerous, isSuspicious, isScanning, isBlocked, badge } =
     resolveSkillThreat(skill);
+
+  const TAB_DEFS = [
+    ...TAB_DEFS_STATIC,
+    { key: "evals", label: t("tabLabel"), icon: "FlaskConical" as const },
+  ];
 
   const bannerConfig = isDangerous
     ? {
@@ -170,6 +182,13 @@ export function SkillEditor({
         {activeTab === "stats" && <StatsTab skillId={skill.id} />}
         {activeTab === "versions" && <VersionsTab skill={skill} />}
         {activeTab === "context" && <SkillContextTab skill={skill} />}
+        {activeTab === "evals" && (
+          <EvalsTab
+            ownerKind="skill"
+            ownerId={skill.id}
+            skillType={skill.type}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Review / Findings contracts.
@@ -8,28 +8,34 @@ import { z } from 'zod';
  *  - shared web↔api types.
  */
 
-export const Severity = z.enum(['CRITICAL', 'WARNING', 'SUGGESTION']);
+export const Severity = z.enum(["CRITICAL", "WARNING", "SUGGESTION"]);
 export type Severity = z.infer<typeof Severity>;
 
-export const FindingCategory = z.enum(['bug', 'security', 'perf', 'style', 'test']);
+export const FindingCategory = z.enum([
+  "bug",
+  "security",
+  "perf",
+  "style",
+  "test",
+]);
 export type FindingCategory = z.infer<typeof FindingCategory>;
 
 export const FindingKind = z.enum([
-  'finding',
-  'secret_leak',
-  'lethal_trifecta',
-  'phantom',
-  'hook',
+  "finding",
+  "secret_leak",
+  "lethal_trifecta",
+  "phantom",
+  "hook",
 ]);
 export type FindingKind = z.infer<typeof FindingKind>;
 
-export const Verdict = z.enum(['request_changes', 'approve', 'comment']);
+export const Verdict = z.enum(["request_changes", "approve", "comment"]);
 export type Verdict = z.infer<typeof Verdict>;
 
 export const TrifectaComponent = z.enum([
-  'private_data_access',
-  'untrusted_input',
-  'exfil_path',
+  "private_data_access",
+  "untrusted_input",
+  "exfil_path",
 ]);
 export type TrifectaComponent = z.infer<typeof TrifectaComponent>;
 
@@ -72,14 +78,20 @@ export const Review = z.object({
     .min(0)
     .max(100)
     .describe(
-      'Overall PR quality from 0 to 100, where HIGHER is better. 90–100 = no or only trivial issues (approve); 60–89 = minor suggestions; 30–59 = warnings worth addressing; 0–29 = critical problems. Must be consistent with `findings`: if there are no findings, the score is 90 or above.',
+      "Overall PR quality from 0 to 100, where HIGHER is better. 90–100 = no or only trivial issues (approve); 60–89 = minor suggestions; 30–59 = warnings worth addressing; 0–29 = critical problems. Must be consistent with `findings`: if there are no findings, the score is 90 or above.",
     ),
   findings: z.array(Finding),
 });
 export type Review = z.infer<typeof Review>;
 
 /** Action taken on a finding (accept/dismiss/learn/reply). */
-export const FindingActionKind = z.enum(['accept', 'dismiss', 'learn', 'reply']);
+export const FindingActionKind = z.enum([
+  "accept",
+  "dismiss",
+  "undo",
+  "learn",
+  "reply",
+]);
 export type FindingActionKind = z.infer<typeof FindingActionKind>;
 
 export const FindingAction = z.object({

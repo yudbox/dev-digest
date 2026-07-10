@@ -212,6 +212,10 @@ export const Skill = z.object({
   threat_level: SkillThreatLevel.optional(),
   /** Ordered list of project-context doc paths attached to this skill. */
   context_doc_paths: z.array(z.string()).default([]),
+  // Bonus list-stats (AC-31) — additive-optional.
+  agent_count: z.number().int().optional(),
+  pull_frequency_pct: z.number().optional(),
+  accept_rate_pct: z.number().optional(),
 });
 export type Skill = z.infer<typeof Skill>;
 
@@ -270,6 +274,10 @@ export const Agent = z.object({
   feature_model_id: z.string().nullish(),
   /** Ordered list of project-context doc paths attached to this agent. */
   context_doc_paths: z.array(z.string()).default([]),
+  // Bonus list-stats (AC-30) — additive-optional.
+  runs_count: z.number().int().optional(),
+  accept_rate_pct: z.number().optional(),
+  avg_cost_usd: z.number().nullish(),
 });
 export type Agent = z.infer<typeof Agent>;
 
@@ -279,3 +287,16 @@ export const AgentSkillLink = z.object({
   order: z.number().int(),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
+
+/**
+ * One historical `agent_versions` snapshot — mirrors `GET /skills/:id/versions`'s
+ * existing pattern (Q9). Used by `CompareRunsModal`'s prompt diff (AC-20): the
+ * old `system_prompt` text for a given `agent_version` isn't exposed anywhere
+ * else.
+ */
+export const AgentVersionSummary = z.object({
+  version: z.number().int(),
+  system_prompt: z.string(),
+  created_at: z.string(),
+});
+export type AgentVersionSummary = z.infer<typeof AgentVersionSummary>;

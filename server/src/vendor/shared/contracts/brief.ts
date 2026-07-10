@@ -143,8 +143,8 @@ export const SmartDiff = z.object({
     total_lines: z.number().int(),
     proposed_splits: z.array(ProposedSplit),
   }),
-  /** Tokens used by the last Run Review. null = no review has run yet. */
-  review_tokens: z.number().int().nullable(),
+  /** Tokens used by the last Run Review. null/undefined = no review has run yet. */
+  review_tokens: z.number().int().nullish(),
 });
 export type SmartDiff = z.infer<typeof SmartDiff>;
 

@@ -1,0 +1,77 @@
+{
+  "description": "Planted, uncommented violations across 6 fixtures — used to compare with_skill vs without_skill (or old vs new skill version) runs of onion-architecture. No fixture contains hints or comments revealing the issue; each maps to exactly one Core Principle in SKILL.md.",
+  "findings": [
+    {
+      "fixture": "fixture-1-notifications",
+      "file": "routes.ts",
+      "rule": "thin-routes",
+      "corePrinciple": 5,
+      "severity": "high",
+      "description": "Route handler does role-based visibility filtering (`items.filter(...)` on `user.role`) and unread filtering inline instead of delegating to a service — business logic living in the presentation layer."
+    },
+    {
+      "fixture": "fixture-1-notifications",
+      "file": "routes.ts",
+      "rule": "composition-root-only",
+      "corePrinciple": 3,
+      "severity": "high",
+      "description": "`new NotificationsRepository(app.container.db)` instantiated directly inside the route handler instead of being pulled from `container`."
+    },
+    {
+      "fixture": "fixture-2-labels",
+      "file": "service.ts",
+      "rule": "drizzle-infra-only",
+      "corePrinciple": 4,
+      "severity": "high",
+      "description": "Service imports the Drizzle `labels` schema and runs `container.db.select().from(labels)` directly, bypassing `LabelsRepository` (which exists in the same fixture but is never used) — Drizzle query building leaking into the application layer."
+    },
+    {
+      "fixture": "fixture-3-webhooks",
+      "file": "repository.ts",
+      "rule": "inward-only-dependencies",
+      "corePrinciple": 1,
+      "severity": "critical",
+      "description": "`repository.ts` (infrastructure) imports `normalizeDeliveryStatus` from `service.ts` (application) — a backward, outward-pointing import. Infrastructure must never depend on application code."
+    },
+    {
+      "fixture": "fixture-3-webhooks",
+      "file": "repository.ts",
+      "rule": "composition-root-only",
+      "corePrinciple": 3,
+      "severity": "medium",
+      "description": "`WebhooksRepository` instantiates `new ReposRepository(db)` itself in its constructor instead of receiving it via the container — a repository composing another repository outside `container.ts`."
+    },
+    {
+      "fixture": "fixture-4-exports",
+      "file": "service.ts",
+      "rule": "composition-root-only",
+      "corePrinciple": 3,
+      "severity": "high",
+      "description": "`ExportsService` constructor does `new S3StorageAdapter(container.config.s3Bucket)` — adapter instantiated inside a service instead of in `container.ts`."
+    },
+    {
+      "fixture": "fixture-4-exports",
+      "file": "service.ts",
+      "rule": "inward-only-dependencies",
+      "corePrinciple": 1,
+      "severity": "medium",
+      "description": "`import type { FastifyReply } from 'fastify'` in the application layer — a framework type leaking past the presentation layer into a service."
+    },
+    {
+      "fixture": "fixture-5-rate-limits",
+      "file": "repository.ts",
+      "rule": "config-container-only",
+      "corePrinciple": 7,
+      "severity": "high",
+      "description": "`process.env.RATE_LIMIT_ENABLED` and `process.env.RATE_LIMIT_MAX` read directly inside the repository instead of via `container.config`. Deliberately planted to test the new Core Principle 7 rule in isolation — no `new ConcreteClass()` adapter-instantiation confound present in this fixture."
+    },
+    {
+      "fixture": "fixture-6-review-summaries",
+      "file": "service.ts",
+      "rule": "no-n-plus-one",
+      "corePrinciple": 8,
+      "severity": "high",
+      "description": "`summarizeRecent` loops over `ids` calling `findById` + `countRunsForPr` once per id (two single-item repository calls inside the loop) instead of adding batched `findByIds`/`countRunsForPrs` methods. Deliberately planted to test the new Core Principle 8 rule."
+    }
+  ]
+}

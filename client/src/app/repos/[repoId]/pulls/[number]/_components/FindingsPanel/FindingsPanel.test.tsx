@@ -1,11 +1,29 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { FindingRecord } from "@devdigest/shared";
+import type { FindingRecord, EvalCaseInput } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
+import evalMessages from "../../../../../../../../messages/en/eval.json";
 
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("../../../../../../../lib/hooks/reviews", () => ({
   useFindingAction: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+const prefillMutate = vi.fn();
+vi.mock("@/lib/hooks/evals", () => ({
+  usePrefillEvalCase: () => ({ mutate: prefillMutate, isPending: false }),
+}));
+
+// Mock at the component boundary (per client/insights/INSIGHTS.md) — the real
+// EvalCaseModal pulls in useCreateEvalCase/useUpdateEvalCase/useRunEvalCase,
+// which this test file doesn't need to exercise.
+vi.mock("@/components/evals/EvalCaseModal", () => ({
+  EvalCaseModal: ({ prefill }: { prefill: EvalCaseInput | null }) => (
+    <div data-testid="eval-case-modal">{prefill?.name}</div>
+  ),
 }));
 
 import { FindingsPanel } from "./FindingsPanel";
@@ -35,7 +53,10 @@ const FINDINGS: FindingRecord[] = [
 
 function renderWithIntl(ui: React.ReactElement) {
   return render(
-    <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
+    <NextIntlClientProvider
+      locale="en"
+      messages={{ prReview: messages, eval: evalMessages }}
+    >
       {ui}
     </NextIntlClientProvider>,
   );
@@ -74,5 +95,31 @@ describe("FindingsPanel (smoke)", () => {
     // Click again → reset
     fireEvent.click(screen.getByRole("button", { name: /critical/i }));
     expect(screen.getByText("Warn finding")).toBeInTheDocument();
+  });
+
+  it("opens EvalCaseModal prefilled from a resolved finding (AC-9)", () => {
+    const accepted: FindingRecord = { ...FINDINGS[0]!, accepted_at: "2026-01-01T00:00:00Z" };
+    const prefillResult: EvalCaseInput = {
+      owner_kind: "agent",
+      owner_id: "a1",
+      name: "Hardcoded secret",
+      input_diff: "",
+      input_files: null,
+      input_meta: null,
+      expected_output: [{ file: "src/config.ts", start_line: 11, end_line: 11 }],
+      notes: null,
+    };
+    prefillMutate.mockImplementation(
+      (_id: string, opts: { onSuccess: (v: EvalCaseInput) => void }) =>
+        opts.onSuccess(prefillResult),
+    );
+
+    renderWithIntl(<FindingsPanel findings={[accepted]} prId="pr1" />);
+    fireEvent.click(screen.getByText("Turn into eval case"));
+
+    expect(prefillMutate).toHaveBeenCalledWith("f1", expect.any(Object));
+    expect(screen.getByTestId("eval-case-modal")).toHaveTextContent(
+      "Hardcoded secret",
+    );
   });
 });

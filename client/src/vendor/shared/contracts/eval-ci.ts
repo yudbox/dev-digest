@@ -1,6 +1,6 @@
-import { z } from 'zod';
-import { Verdict, Finding } from './findings';
-import { EvalRun, EvalOwnerKind, Conformance } from './knowledge';
+import { z } from "zod";
+import { Verdict, Finding, Severity, FindingCategory } from "./findings";
+import { EvalRun, EvalOwnerKind, Conformance } from "./knowledge";
 
 /**
  * A4 — Eval / CI / Compose / Conformance API contracts (L06).
@@ -21,13 +21,43 @@ export const EvalCaseInput = z.object({
   owner_kind: EvalOwnerKind,
   owner_id: z.string(),
   name: z.string().min(1),
-  input_diff: z.string().default(''),
+  input_diff: z.string().default(""),
   input_files: z.unknown().nullish(),
   input_meta: z.unknown().nullish(),
   expected_output: z.unknown(),
   notes: z.string().nullish(),
 });
 export type EvalCaseInput = z.infer<typeof EvalCaseInput>;
+
+/**
+ * A safely-typed shape for `eval_cases.expected_output` (stored as
+ * `z.unknown()` in `EvalCase`/`EvalCaseInput` — this is the parsed-out DTO
+ * used by the scoring engine and the findings-prefill endpoint).
+ */
+export const ExpectedFinding = z.object({
+  file: z.string(),
+  start_line: z.number().int(),
+  end_line: z.number().int(),
+  severity: Severity.optional(),
+  category: FindingCategory.optional(),
+  title: z.string().optional(),
+});
+export type ExpectedFinding = z.infer<typeof ExpectedFinding>;
+
+/**
+ * The holistic-assessment shape used by `rubric`-type skill eval cases (e.g.
+ * `pr-quality-rubric`) — scored by dimension-name match, not file/line
+ * overlap like `ExpectedFinding`. Mirrors
+ * `server/src/vendor/shared/contracts/eval-ci.ts` `RubricAssessment` — kept
+ * in sync manually (client vendor copy, same discipline as the rest of this
+ * file).
+ */
+export const RubricAssessment = z.object({
+  dimension: z.string(),
+  score: z.number(),
+  reason: z.string(),
+});
+export type RubricAssessment = z.infer<typeof RubricAssessment>;
 
 /** A persisted eval run row (one execution of a case), returned by the API. */
 export const EvalRunRecord = z.object({
@@ -42,6 +72,11 @@ export const EvalRunRecord = z.object({
   citation_accuracy: z.number().nullable(),
   duration_ms: z.number().int().nullable(),
   cost_usd: z.number().nullable(),
+  /** Groups runs from the same "Run all evals" / skill-eval batch. Null for
+   *  legacy rows created before this field existed. */
+  batch_id: z.string().nullable(),
+  /** Snapshot of the agent's version at run time; null for skill-owned cases. */
+  agent_version: z.number().int().nullable(),
 });
 export type EvalRunRecord = z.infer<typeof EvalRunRecord>;
 
@@ -88,6 +123,41 @@ export const EvalDashboard = z.object({
 });
 export type EvalDashboard = z.infer<typeof EvalDashboard>;
 
+/**
+ * Aggregate summary for one batch run (one "Run all evals" invocation, or one
+ * single-case run via `POST /eval-cases/:id/run`) — the row shape for
+ * `GET /eval-dashboard`'s workspace-wide `recent_runs` list (per-batch, NOT
+ * per-case, unlike `EvalDashboard.recent_runs: EvalRunRecord[]` above).
+ */
+export const EvalBatchSummary = z.object({
+  batch_id: z.string(),
+  agent_id: z.string(),
+  agent_version: z.number().int().nullable(),
+  ran_at: z.string(),
+  cases_total: z.number().int(),
+  recall: z.number(),
+  precision: z.number(),
+  citation_accuracy: z.number(),
+  traces_passed: z.number().int(),
+  cost_usd: z.number().nullable(),
+  /** Populated only for single-case batches; null for multi-case "Run all" batches. */
+  case_name: z.string().nullish(),
+});
+export type EvalBatchSummary = z.infer<typeof EvalBatchSummary>;
+
+/**
+ * Response of `GET /eval-dashboard` — the landing-page aggregate: one
+ * `EvalDashboard` per workspace agent (incl. 0-case/0-run agents), plus a flat
+ * cross-agent `recent_runs` list of the most recent batches. Deliberately a
+ * NEW wrapper contract rather than reusing `EvalDashboard.recent_runs` (which
+ * stays per-owner raw run history at a different nesting level).
+ */
+export const EvalDashboardOverview = z.object({
+  agents: z.array(EvalDashboard),
+  recent_runs: z.array(EvalBatchSummary),
+});
+export type EvalDashboardOverview = z.infer<typeof EvalDashboardOverview>;
+
 // ===========================================================================
 // Compose Review
 // ===========================================================================
@@ -97,7 +167,7 @@ export const ComposeReviewInput = z.object({
   finding_ids: z.array(z.string()).default([]),
   /** Editable markdown body. If omitted, the server composes one from findings. */
   body: z.string().nullish(),
-  verdict: Verdict.default('comment'),
+  verdict: Verdict.default("comment"),
   /** When true, attach selected findings as inline comments (path+line+body). */
   inline_comments: z.boolean().default(false),
 });
@@ -130,7 +200,7 @@ export type ComposeReviewPreview = z.infer<typeof ComposeReviewPreview>;
 // Export-to-CI + CI Runs
 // ===========================================================================
 
-export const CiTarget = z.enum(['gha', 'circle', 'jenkins', 'cli']);
+export const CiTarget = z.enum(["gha", "circle", "jenkins", "cli"]);
 export type CiTarget = z.infer<typeof CiTarget>;
 
 /** One generated file in the CI bundle (path + editable contents). */
@@ -144,12 +214,14 @@ export type CiFile = z.infer<typeof CiFile>;
 /** Request body for `POST /agents/:id/export-ci`. */
 export const CiExportInput = z.object({
   repo: z.string().min(1), // "owner/name"
-  target: CiTarget.default('gha'),
+  target: CiTarget.default("gha"),
   /** "open_pr" opens a PR with the files; "files" just returns/persists them. */
-  action: z.enum(['open_pr', 'files']).default('open_pr'),
-  post_as: z.enum(['github_review', 'pr_comment', 'none']).default('github_review'),
-  triggers: z.array(z.string()).default(['opened', 'synchronize', 'reopened']),
-  base: z.string().default('main'),
+  action: z.enum(["open_pr", "files"]).default("open_pr"),
+  post_as: z
+    .enum(["github_review", "pr_comment", "none"])
+    .default("github_review"),
+  triggers: z.array(z.string()).default(["opened", "synchronize", "reopened"]),
+  base: z.string().default("main"),
 });
 export type CiExportInput = z.infer<typeof CiExportInput>;
 /** Caller-facing input type — `.default()` fields stay optional (web hooks). */
@@ -173,7 +245,12 @@ export const CiExport = z.object({
 });
 export type CiExport = z.infer<typeof CiExport>;
 
-export const CiRunStatus = z.enum(['succeeded', 'failed', 'no_findings', 'running']);
+export const CiRunStatus = z.enum([
+  "succeeded",
+  "failed",
+  "no_findings",
+  "running",
+]);
 export type CiRunStatus = z.infer<typeof CiRunStatus>;
 
 /** A CI run row (mirrors `ci_runs`) — ingested from GitHub Actions artifacts. */
@@ -217,7 +294,7 @@ export type CiResultArtifact = z.infer<typeof CiResultArtifact>;
 export const ConformanceInput = z.object({
   /** Spec path/id to compare against; if omitted, the first available spec. */
   spec: z.string().nullish(),
-  provider: z.enum(['openai', 'anthropic']).nullish(),
+  provider: z.enum(["openai", "anthropic"]).nullish(),
   model: z.string().nullish(),
 });
 export type ConformanceInput = z.infer<typeof ConformanceInput>;
@@ -234,7 +311,7 @@ export type ConformanceReport = z.infer<typeof ConformanceReport>;
 // Hooks (Secret-Leak + Phantom-API detectors) — emit grounding-exempt findings
 // ===========================================================================
 
-export const HookKind = z.enum(['secret_leak', 'phantom']);
+export const HookKind = z.enum(["secret_leak", "phantom"]);
 export type HookKind = z.infer<typeof HookKind>;
 
 /** Result of running the built-in detectors over a PR. */

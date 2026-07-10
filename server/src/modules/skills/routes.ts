@@ -142,8 +142,10 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
     "/skills/import-url",
     { schema: { body: ImportUrlBody } },
     async (req, reply) => {
-      const { workspaceId } = await getContext(app.container, req);
+      // SSRF validation runs before any DB access so that invalid/unsafe URLs
+      // are rejected even when no workspace context is available (e.g. tests).
       const body = await safeFetchSkillUrl(req.body.url);
+      const { workspaceId } = await getContext(app.container, req);
 
       // Layer 1: instant regex scan — blocks obvious injection immediately.
       const regexResult = regexScan(body);

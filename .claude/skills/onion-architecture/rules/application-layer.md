@@ -120,6 +120,31 @@ Rules for fire-and-forget:
 
 ---
 
+## N+1 Query Pattern
+
+When a service needs data for multiple ids, it must ask the repository for all of them in one call — never loop over ids calling a single-item repository method per iteration.
+
+```typescript
+// ❌ N+1 — one DB round-trip per id
+async summarizeRecent(workspaceId: string, ids: string[]) {
+  const summaries = [];
+  for (const id of ids) {
+    const pull = await this.repo.findById(workspaceId, id);   // BAD — N+1
+    summaries.push(pull);
+  }
+  return summaries;
+}
+
+// ✅ Batched — one DB round-trip for all ids
+async summarizeRecent(workspaceId: string, ids: string[]) {
+  return this.repo.findByIds(workspaceId, ids);
+}
+```
+
+If the repository doesn't have a batched method yet, add one (`findByIds(workspaceId, ids)`, using Drizzle's `inArray()`) rather than looping the single-item method from the service. This applies to *every* per-item repository call inside the same loop — a second lookup per id (e.g. a count or related-record fetch) is the same violation repeated, not a separate lesser issue.
+
+---
+
 ## Cross-Service Orchestration
 
 Services may call other services when workflows span modules:

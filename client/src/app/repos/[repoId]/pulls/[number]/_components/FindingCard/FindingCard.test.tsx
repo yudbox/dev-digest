@@ -3,6 +3,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
+import evalMessages from "../../../../../../../../messages/en/eval.json";
 import { FindingCard } from "./FindingCard";
 
 afterEach(cleanup);
@@ -28,7 +29,10 @@ const FINDING: FindingRecord = {
 
 function renderWithIntl(ui: React.ReactElement) {
   return render(
-    <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
+    <NextIntlClientProvider
+      locale="en"
+      messages={{ prReview: messages, eval: evalMessages }}
+    >
       {ui}
     </NextIntlClientProvider>,
   );
@@ -56,5 +60,38 @@ describe("FindingCard (smoke, both themes)", () => {
     expect(onAction).toHaveBeenCalledWith("accept");
     fireEvent.click(screen.getByText("Dismiss"));
     expect(onAction).toHaveBeenCalledWith("dismiss");
+  });
+
+  it("disables 'Turn into eval case' until the finding is resolved, then fires it (AC-8/9)", () => {
+    const onCreateEvalCase = vi.fn();
+    const { rerender } = renderWithIntl(
+      <FindingCard
+        f={FINDING}
+        defaultExpanded
+        onAction={() => {}}
+        onCreateEvalCase={onCreateEvalCase}
+      />,
+    );
+    const button = screen.getByText("Turn into eval case").closest("button")!;
+    expect(button).toBeDisabled();
+
+    const accepted: FindingRecord = { ...FINDING, accepted_at: "2026-01-01T00:00:00Z" };
+    rerender(
+      <NextIntlClientProvider
+        locale="en"
+        messages={{ prReview: messages, eval: evalMessages }}
+      >
+        <FindingCard
+          f={accepted}
+          defaultExpanded
+          onAction={() => {}}
+          onCreateEvalCase={onCreateEvalCase}
+        />
+      </NextIntlClientProvider>,
+    );
+    const enabledButton = screen.getByText("Turn into eval case").closest("button")!;
+    expect(enabledButton).toBeEnabled();
+    fireEvent.click(enabledButton);
+    expect(onCreateEvalCase).toHaveBeenCalledWith(accepted);
   });
 });

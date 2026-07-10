@@ -70,6 +70,32 @@ If a service needs a new dependency, add it to `Container`, then pull it via `th
 
 ---
 
+## Config/Env Access — Container Only
+
+`process.env` may be read in exactly one place: `LocalSecretsProvider` (`platform/secrets.ts`) for secrets, and `AppConfig` (`platform/config.ts`) for everything else. Every other file — repository, service, route, no matter how small the check — must go through `container.secrets` or `container.config`.
+
+```typescript
+// ❌ WRONG — repository reads process.env directly for a feature flag
+export class RateLimitsRepository {
+  async isEnabled(): Promise<boolean> {
+    return process.env.RATE_LIMIT_ENABLED === 'true';  // BAD
+  }
+}
+
+// ✅ CORRECT — value comes from the container's AppConfig
+export class RateLimitsRepository {
+  constructor(private db: Database, private config: AppConfig) {}
+
+  async isEnabled(): Promise<boolean> {
+    return this.config.rateLimitEnabled;
+  }
+}
+```
+
+This is a distinct violation from "adapter instantiated in service" (Core Principle 3) — even code that never calls `new` on anything is still wrong if it reads `process.env` inline instead of through `container.config`/`container.secrets`.
+
+---
+
 ## How Services Use the Container
 
 Services receive `Container` in their constructor and pull what they need:

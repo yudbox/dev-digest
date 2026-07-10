@@ -1,7 +1,10 @@
 {
   "card": {
     "noDescription": "No description",
-    "skillCount": "{count} skills"
+    "skillCount": "{count} skills",
+    "runs": "runs",
+    "accept": "accept",
+    "avgCost": "avg"
   },
   "list": {
     "breadcrumbLab": "Skills Lab",

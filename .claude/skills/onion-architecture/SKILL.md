@@ -115,6 +115,10 @@ modules/<name>/
 
 6. **Validation is a stack** — every layer validates what it owns. See [validation-stack](rules/validation-stack.md). Never duplicate validation across layers.
 
+7. **Config/secrets flow through the Container only** — reading `process.env.*` directly is forbidden everywhere except `LocalSecretsProvider` (`platform/secrets.ts`) and `AppConfig` (`platform/config.ts`). This applies even to a single flag check in a repository, service, or route — not just adapter instantiation. Everywhere else must read `container.secrets` / `container.config`. See [di-container](rules/di-container.md#configenv-access-container-only).
+
+8. **No N+1 repository calls from services** — if a service needs data for multiple ids, it calls one batched repository method (e.g. `findByIds()`), never a single-item method (`findById()`) looped per id. This applies to every per-item repository call inside a loop, not just the primary fetch. See [application-layer](rules/application-layer.md#n1-query-pattern).
+
 ---
 
 ## Rules Reference

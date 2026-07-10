@@ -142,6 +142,10 @@ export class ReviewRepository {
     return reviewRepo.setFindingDismissed(this.db, findingId, at);
   }
 
+  clearFindingAction(findingId: string): Promise<FindingRow | undefined> {
+    return reviewRepo.setFindingAccepted(this.db, findingId, null);
+  }
+
   // ---- intent -------------------------------------------------------------
 
   upsertIntent(prId: string, intent: Intent): Promise<void> {

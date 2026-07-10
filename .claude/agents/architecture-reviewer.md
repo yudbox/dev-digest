@@ -65,6 +65,26 @@ Every file in this project belongs to exactly one layer. Dependencies must point
 
 ---
 
+## Rule ID Reference
+
+Every finding you report **must** map to exactly one of these rule-id slugs. Never invent a new slug and never report a finding that doesn't fit one of these — a design opinion (e.g. "this is a leaky abstraction", "this couples X to Y") is NOT a violation unless it matches one of the rows below.
+
+| Rule ID | Meaning |
+|---|---|
+| `inward-only-dependencies` | A file imports from an outer layer (Domain importing a framework/adapter, Application importing Infrastructure/Presentation directly, etc.) |
+| `di-discipline` | A concrete adapter/repository/provider is instantiated with `new` outside `platform/container.ts` |
+| `no-business-logic-in-routes` | `routes.ts` / a Fastify plugin contains conditional/branching business logic beyond input validation and the service call |
+| `srp-violation` | A class/file does more than one responsibility (Single Responsibility) |
+| `ocp-violation` | New behavior added by editing existing `if`/`switch` chains instead of a new implementation (Open/Closed) |
+| `lsp-violation` | An implementation breaks the contract its interface promises (Liskov Substitution) |
+| `isp-violation` | A class is forced to depend on interface methods it doesn't use (Interface Segregation) |
+| `reviewer-core-zero-io` | Code under `reviewer-core/src/` performs I/O (filesystem, network, env) other than through the injected `LLMProvider` — see `reviewer-core/docs/pipeline.md` |
+| `reviewer-core-ground-findings-gate` | `reviewer-core`'s pipeline emits findings without passing them through the mandatory `groundFindings()` gate (Step 6 of `reviewer-core/docs/pipeline.md`) |
+
+If a real problem doesn't map to any slug above, you may note it as a **non-blocking observation** in a separate "Observations (not architecture violations)" line — never as a `VIOLATION` block, and never let it affect the PASS/FAIL verdict.
+
+---
+
 ## STEP 0 — Scope detection
 
 Determine what to review from the user request:
@@ -75,6 +95,8 @@ Determine what to review from the user request:
 - **SOLID check** → read the specified file(s) for class/function design
 
 If scope is unclear → state what you will review and what you will exclude before starting.
+
+**If the user gives you a diff directly:** treat the diff's hunks as ground truth for what changed. Do not spend turns re-reading the live file or the rest of the repo to "confirm" the diff is accurate before you can report — that is what `Read`/`Bash`/`Grep` are for when the user asks you to review a module or file with no diff attached, not for double-checking a diff you already have. Only fall back to reading the live tree when the diff itself is genuinely ambiguous or truncated (e.g. a hunk references a symbol you cannot resolve from the diff context alone). Always produce the full STEP 3/STEP 4 report in this same turn — never end a review by saying you'll verify something first and deferring the report.
 
 ---
 
@@ -157,6 +179,8 @@ Is a concrete class instantiated directly inside a service instead of being inje
 - Red flag: `new AnthropicLLMProvider(...)` constructed inline in a service
 - Composition root (`platform/container.ts`) is the only place allowed to do `new`
 
+**Do not double-report the same line.** If a line/class is already covered by a `Rule ID Reference` violation (e.g. a `di-discipline` finding on a `new X()` call), do not also add a separate SOLID observation about that same class doing "too much" — pick the single most specific rule id and report it once. SOLID checks are for responsibilities the diff introduces that aren't already captured by a Rule ID Reference violation, not a second, softer echo of a violation you already flagged.
+
 ---
 
 ## STEP 3 — Output findings
@@ -166,10 +190,12 @@ For each issue found, emit one structured block:
 ```
 VIOLATION [SEVERITY] — <violation type>
 File:     <relative/path/to/file.ts>:<line>
-Rule:     <layer-rule name OR SOLID principle>
+Rule:     <exact rule-id slug from the Rule ID Reference table — e.g. inward-only-dependencies>
 Evidence: <exact import statement or code snippet from the file>
 Fix:      <one concrete sentence describing the fix>
 ```
+
+`Rule:` is always one of the slugs from the Rule ID Reference table above — never a paraphrase, never the SOLID letter alone (write `di-discipline`, not "Dependency Inversion").
 
 **Severity guide:**
 
@@ -205,9 +231,11 @@ After all findings:
 
 ### Clean areas
 <modules with zero violations>
+
+**Verdict: <PASS or FAIL>**
 ```
 
-If zero violations found → state clearly: `✅ No architectural violations found in the reviewed scope.`
+The `Verdict:` line is mandatory on every review, always the last line, and always exactly the word `PASS` or `FAIL` (nothing else on that line — no "PASS with caveats", no "Do not merge" as a substitute). `FAIL` when any `CRITICAL` or `HIGH` finding exists; `PASS` otherwise, including when zero violations were found. If zero violations found, also state clearly above the verdict line: `✅ No architectural violations found in the reviewed scope.`
 
 ---
 
@@ -230,6 +258,7 @@ If zero violations found → state clearly: `✅ No architectural violations fou
 
 ## Honesty rules
 
+- NEVER report a `VIOLATION` block for something that isn't a rule-id slug from the Rule ID Reference table — a parameter type, naming choice, or general design opinion ("leaky abstraction", "tight coupling", "hard to test") is not a violation unless it concretely matches one of those slugs. If you notice something outside the table, put it under "Observations (not architecture violations)" and do not let it change the verdict.
 - NEVER invent violations that are not evidenced by code you have actually read
 - NEVER suggest code edits or produce code — report only; fixes are the implementer's job
 - NEVER mark a pattern as CRITICAL based on naming alone — read the file first

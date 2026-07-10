@@ -21,6 +21,7 @@
     },
     "table": {
       "ranAt": "Ran at",
+      "version": "Version",
       "recall": "Recall",
       "precision": "Precision",
       "citation": "Citation",
@@ -33,8 +34,12 @@
   "caseEditor": {
     "newCase": "New eval case",
     "caseTitle": "Eval case · {name}",
+    "seededFromFinding": "Seeded from an accepted finding · assert the expected output",
     "runCase": "Run case",
     "running": "Running…",
+    "runOnSave": "Run on save",
+    "findingSkeleton": "Finding skeleton",
+    "dimensionSkeleton": "Dimension skeleton",
     "save": "Save",
     "saving": "Saving…",
     "nameLabel": "Name",
@@ -42,7 +47,9 @@
     "inputLabel": "Input",
     "tabs": {
       "diff": "Diff",
-      "prMeta": "PR meta"
+      "files": "Files",
+      "prMeta": "PR meta",
+      "code": "Code"
     },
     "diffPlaceholder": "--- a/src/config.ts\n+++ b/src/config.ts\n@@ -10,6 +10,7 @@\n+  stripeKey: \"sk_live_...\"",
     "titleLabel": "Title",
@@ -51,27 +58,86 @@
     "bodyPlaceholder": "Wire up payments via Stripe SDK.",
     "preview": "Preview",
     "expectedOutput": "Expected output",
+    "actualOutput": "Actual output",
+    "neverRunYet": "Never run yet",
     "validJson": "valid JSON",
     "invalidJson": "invalid JSON",
+    "invalidSchema": "invalid schema",
     "lastRunPassed": "Last run passed",
     "lastRunFailed": "Last run failed",
-    "resultSummary": "recall {recall}% · precision {precision}% · citation {citation}% · {duration}s"
+    "resultSummary": "recall {recall}% · precision {precision}% · citation {citation}% · {duration}s",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Why this case matters…",
+    "positiveBanner": "POSITIVE — asserts findings the agent SHOULD report",
+    "negativeBanner": "NEGATIVE — asserts the agent should NOT flag anything here",
+    "codeMode": {
+      "newFile": "New file",
+      "modifiedFile": "Modified file"
+    },
+    "codeBefore": "Before",
+    "codeAfter": "After",
+    "previewGeneratedDiff": "Preview generated diff"
   },
   "evalsTab": {
     "metricsTitle": "Eval metrics",
     "metricsSubtitle": "Recall / Precision / Citation for this agent's eval cases",
+    "tracesPassed": "Traces passed",
+    "scoringHint": "Scoring is mechanical — a finding counts when file matches and line ranges overlap. No model call in the scorer.",
     "casesHeading": "Eval cases",
-    "newCase": "New case",
+    "newCase": "New eval case",
+    "runAll": "Run all evals",
     "loadingCases": "Loading cases…",
     "emptyCases": "No eval cases yet. Create one to assert this agent's expected findings on a sample diff.",
     "neverRun": "never run",
+    "mustFind": "Must find",
+    "mustNotFlag": "Must not flag",
+    "expectedGot": "expected {expected} finding, got {got}",
     "passed": "passed",
     "failed": "failed",
     "recallSuffix": " · recall {recall}%",
     "run": "Run",
     "running": "Running…",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "viewDashboard": "View full dashboard →",
+    "withSkill": "With skill",
+    "withoutSkill": "Without skill",
+    "tabLabel": "Evals",
+    "dimension": "Dimension"
+  },
+  "findingCard": {
+    "turnIntoEvalCase": "Turn into eval case",
+    "turnIntoEvalCaseHint": "Resolve this finding (accept or dismiss) first"
+  },
+  "compare": {
+    "title": "Compare runs",
+    "subtitle": "Metric deltas and prompt diff on the gold set",
+    "promote": "Promote v{version}",
+    "close": "Close",
+    "diffHeader": "SYSTEM PROMPT DIFF",
+    "alreadyCurrent": "Already the current prompt",
+    "noVersionData": "Prompt version data unavailable for this run",
+    "deltas": {
+      "recall": "Recall",
+      "precision": "Precision",
+      "citation_accuracy": "Citation",
+      "cost_usd": "Cost"
+    }
+  },
+  "landing": {
+    "title": "Eval Dashboard",
+    "runAllAgents": "Run all agents",
+    "running": "Running…",
+    "recentRuns": "Recent runs",
+    "noRecentRuns": "No eval runs yet across the workspace."
+  },
+  "detail": {
+    "runAllEvals": "Run all evals",
+    "running": "Running…",
+    "compareSelected": "Compare selected",
+    "metricTrend": "Metric trend",
+    "runHistory": "Run history",
+    "loadError": "Couldn't load this agent's eval dashboard"
   },
   "page": {
     "crumbSkillsLab": "Skills Lab",

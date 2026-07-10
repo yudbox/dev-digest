@@ -33,15 +33,17 @@ export function SettingsModels() {
   const noModels = models !== undefined && models.length === 0;
 
   const setModel = (feature: ResolvedFeatureModel, model: string) => {
-    // Build the full overrides object: keep existing non-default overrides, set the new one.
-    const existingOverrides = Object.fromEntries(
-      (featureModels ?? [])
-        .filter((f) => !f.isDefault)
-        .map((f) => [f.id, { provider: f.provider, model: f.model }]),
+    // Build the full overrides object: persist ALL current values (including defaults)
+    // so that the DB always reflects what the UI shows — no silent "default" gaps.
+    const allCurrentOverrides = Object.fromEntries(
+      (featureModels ?? []).map((f) => [
+        f.id,
+        { provider: f.provider, model: f.model },
+      ]),
     );
     update.mutate({
       feature_models: {
-        ...existingOverrides,
+        ...allCurrentOverrides,
         [feature.id]: { provider: "openrouter", model },
       },
     });

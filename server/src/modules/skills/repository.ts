@@ -21,6 +21,9 @@ export type { SkillRow };
 
 export interface InsertSkill {
   workspaceId: string;
+  /** Optional for the same pre-existing reason as InsertAgent.repoId — see
+   * agents/repository.ts comment. The DB column is NOT NULL (migration 0015). */
+  repoId?: string;
   name: string;
   description: string;
   type: string;
@@ -76,7 +79,33 @@ export class SkillsRepository {
       .where(eq(t.skills.workspaceId, workspaceId));
   }
 
-  /** List skills with denormalized agent_count. pull_frequency_pct / accept_rate_pct are stubbed 0 for MVP. */
+  /**
+   * agent_count per skill for a workspace, in one query. Extracted out of
+   * `listWithStats` so it can be reused/tested independently — mirrors
+   * `AgentsRepository.skillCountsForWorkspace()`'s naming.
+   */
+  async agentCountsForWorkspace(
+    workspaceId: string,
+    skillIds: string[],
+  ): Promise<Map<string, number>> {
+    if (skillIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({
+        skillId: t.agentSkills.skillId,
+        n: count(t.agentSkills.agentId),
+      })
+      .from(t.agentSkills)
+      .where(inArray(t.agentSkills.skillId, skillIds))
+      .groupBy(t.agentSkills.skillId);
+    return new Map(rows.map((r) => [r.skillId, r.n]));
+  }
+
+  /**
+   * List skills with REAL, batched `agent_count`/`pull_frequency_pct`/`accept_rate_pct`
+   * — same formulas as the existing singular `stats()` method (verdict-based
+   * accept rate, PR-coverage-based pull frequency), computed for ALL workspace
+   * skills in a fixed small number of queries (not one per skill).
+   */
   async listWithStats(workspaceId: string): Promise<SkillWithStats[]> {
     const rows = await this.db
       .select()
@@ -86,27 +115,56 @@ export class SkillsRepository {
     if (rows.length === 0) return [];
 
     const skillIds = rows.map((r) => r.id);
+    const countMap = await this.agentCountsForWorkspace(workspaceId, skillIds);
 
-    // agent_count per skill via subquery
-    const agentCounts = await this.db
+    // Per-skill: total runs / approved-verdict runs / distinct covered PRs,
+    // across ALL of that skill's linked agents (agent_skills → agent_runs →
+    // reviews) — same relation `stats()` walks for a single skill, here
+    // grouped by skill_id for every skill in one query.
+    const runAgg = await this.db
       .select({
         skillId: t.agentSkills.skillId,
-        count: count(t.agentSkills.agentId),
+        total: count(t.agentRuns.id),
+        approved: count(
+          sql`CASE WHEN ${t.reviews.verdict} = 'approved' THEN 1 END`,
+        ),
+        coveredPrs: countDistinct(t.agentRuns.prId),
       })
       .from(t.agentSkills)
+      .innerJoin(
+        t.agents,
+        and(
+          eq(t.agents.id, t.agentSkills.agentId),
+          eq(t.agents.workspaceId, workspaceId),
+        ),
+      )
+      .innerJoin(t.agentRuns, eq(t.agentRuns.agentId, t.agentSkills.agentId))
+      .leftJoin(t.reviews, eq(t.reviews.runId, t.agentRuns.id))
       .where(inArray(t.agentSkills.skillId, skillIds))
       .groupBy(t.agentSkills.skillId);
+    const runAggMap = new Map(runAgg.map((r) => [r.skillId, r]));
 
-    const countMap = new Map<string, number>(
-      agentCounts.map((r) => [r.skillId, r.count]),
-    );
+    const [totalPrRow] = await this.db
+      .select({ total: count(t.pullRequests.id) })
+      .from(t.pullRequests)
+      .where(eq(t.pullRequests.workspaceId, workspaceId));
+    const totalPrCount = totalPrRow?.total ?? 0;
 
-    return rows.map((skill) => ({
-      skill,
-      agent_count: countMap.get(skill.id) ?? 0,
-      pull_frequency_pct: 0,
-      accept_rate_pct: 0,
-    }));
+    return rows.map((skill) => {
+      const agg = runAggMap.get(skill.id);
+      return {
+        skill,
+        agent_count: countMap.get(skill.id) ?? 0,
+        pull_frequency_pct:
+          agg && totalPrCount > 0
+            ? Math.round((agg.coveredPrs / totalPrCount) * 100)
+            : 0,
+        accept_rate_pct:
+          agg && agg.total > 0
+            ? Math.round((agg.approved / agg.total) * 100)
+            : 0,
+      };
+    });
   }
 
   async getById(
@@ -126,6 +184,8 @@ export class SkillsRepository {
       .insert(t.skills)
       .values({
         workspaceId: values.workspaceId,
+        // repoId: see InsertSkill comment above.
+        repoId: values.repoId!,
         name: values.name,
         description: values.description,
         type: values.type as "rubric" | "convention" | "security" | "custom",

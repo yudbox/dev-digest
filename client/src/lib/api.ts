@@ -99,6 +99,14 @@ import type {
   Agent,
   Skill,
   Brief,
+  EvalCase,
+  EvalCaseInput,
+  EvalRunResult,
+  EvalDashboard,
+  EvalDashboardOverview,
+  EvalBatchSummary,
+  EvalOwnerKind,
+  AgentVersionSummary,
 } from "@devdigest/shared";
 
 export function fetchSmartDiff(prId: string): Promise<SmartDiff> {
@@ -159,4 +167,90 @@ export function getOnboarding(
   repoId: string,
 ): Promise<import('@devdigest/shared').Onboarding> {
   return api.get<import('@devdigest/shared').Onboarding>(`/repos/${repoId}/onboarding`);
+}
+
+// ---- Evals -------------------------------------------------------------
+
+export function fetchEvalCases(
+  ownerKind: EvalOwnerKind,
+  ownerId: string,
+): Promise<EvalCase[]> {
+  return api.get<EvalCase[]>(
+    `/eval-cases?owner_kind=${encodeURIComponent(ownerKind)}&owner_id=${encodeURIComponent(ownerId)}`,
+  );
+}
+
+export function fetchEvalCase(id: string): Promise<EvalCase> {
+  return api.get<EvalCase>(`/eval-cases/${id}`);
+}
+
+export function createEvalCase(input: EvalCaseInput): Promise<EvalCase> {
+  return api.post<EvalCase>("/eval-cases", input);
+}
+
+export function updateEvalCase(
+  id: string,
+  patch: Partial<EvalCaseInput>,
+): Promise<EvalCase> {
+  return api.patch<EvalCase>(`/eval-cases/${id}`, patch);
+}
+
+export function deleteEvalCase(id: string): Promise<void> {
+  return api.del<void>(`/eval-cases/${id}`);
+}
+
+export function runEvalCase(id: string): Promise<EvalRunResult> {
+  return api.post<EvalRunResult>(`/eval-cases/${id}/run`);
+}
+
+export interface EvalBatchRunResponse {
+  summary: EvalBatchSummary;
+  runs: EvalRunResult[];
+}
+
+export function runAgentEvals(agentId: string): Promise<EvalBatchRunResponse> {
+  return api.post<EvalBatchRunResponse>(`/agents/${agentId}/eval-runs`);
+}
+
+/** Unlike `runAgentEvals`, the skill batch-run route has no `EvalBatchSummary`
+ *  to return (skills have no `agent_version`-style aggregate row) — just the
+ *  per-case results. */
+export function runSkillEvals(skillId: string): Promise<{ runs: EvalRunResult[] }> {
+  return api.post<{ runs: EvalRunResult[] }>(`/skills/${skillId}/eval-runs`);
+}
+
+export function runAllEvalsForWorkspace(): Promise<EvalBatchSummary[]> {
+  return api.post<EvalBatchSummary[]>("/eval-runs/all");
+}
+
+export function fetchEvalDashboard(
+  ownerKind: EvalOwnerKind,
+  ownerId: string,
+): Promise<EvalDashboard> {
+  return api.get<EvalDashboard>(`/${ownerKind}s/${ownerId}/eval-dashboard`);
+}
+
+export function fetchEvalDashboardOverview(): Promise<EvalDashboardOverview> {
+  return api.get<EvalDashboardOverview>("/eval-dashboard");
+}
+
+export function prefillEvalCaseFromFinding(
+  findingId: string,
+): Promise<EvalCaseInput> {
+  return api.post<EvalCaseInput>(`/findings/${findingId}/eval-case`);
+}
+
+/** Thin wrapper over the existing `PUT /agents/:id` — Promote only ever
+ *  touches `system_prompt` (there is no separate PATCH route, per Q8). */
+export function promoteAgentPrompt(
+  agentId: string,
+  systemPrompt: string,
+): Promise<Agent> {
+  return api.put<Agent>(`/agents/${agentId}`, { system_prompt: systemPrompt });
+}
+
+export function fetchAgentVersions(
+  agentId: string,
+): Promise<AgentVersionSummary[]> {
+  return api.get<AgentVersionSummary[]>(`/agents/${agentId}/versions`);
 }

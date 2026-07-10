@@ -88,3 +88,25 @@ export function groundingSummary(result: GroundingResult): string {
   const total = result.kept.length + result.dropped.length;
   return `${result.kept.length}/${total} passed`;
 }
+
+/**
+ * Genuine two-range overlap primitive: true iff [aStart,aEnd] and
+ * [bStart,bEnd] share at least one line (inclusive on both sides; each range
+ * is normalized so start/end order doesn't matter). Distinct from the
+ * private `rangeIntersects` above (range-vs-line-index, used internally by
+ * `groundFindings`) — this is a standalone range-vs-range check for the eval
+ * scoring engine (`scoreCase`'s "same file AND overlapping line range" match
+ * rule). Does not change `groundFindings`'s existing behavior.
+ */
+export function rangesOverlap(
+  aStart: number,
+  aEnd: number,
+  bStart: number,
+  bEnd: number,
+): boolean {
+  const aLo = Math.min(aStart, aEnd);
+  const aHi = Math.max(aStart, aEnd);
+  const bLo = Math.min(bStart, bEnd);
+  const bHi = Math.max(bStart, bEnd);
+  return aLo <= bHi && bLo <= aHi;
+}

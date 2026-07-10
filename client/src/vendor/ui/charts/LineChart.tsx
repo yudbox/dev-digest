@@ -17,7 +17,7 @@ export interface ChartSeries {
 
 export function LineChart({
   series,
-  w = 620,
+  w,
   h = 200,
   yMin = 0.6,
   yMax = 1.0,
@@ -37,7 +37,7 @@ export function LineChart({
     return row;
   });
   return (
-    <div style={{ width: "100%", maxWidth: w, height: h }}>
+    <div style={{ width: "100%", ...(w != null ? { maxWidth: w } : {}), height: h }}>
       <ResponsiveContainer width="100%" height="100%">
         <RLineChart data={rows} margin={{ top: 14, right: 14, bottom: 8, left: -10 }}>
           <CartesianGrid stroke="var(--border)" vertical={false} />

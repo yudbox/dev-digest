@@ -6,6 +6,7 @@ import { getContext } from "../_shared/context.js";
 import { IdParams } from "../_shared/schemas.js";
 import { NotFoundError } from "../../platform/errors.js";
 import { ReviewService } from "./service.js";
+import { EvalsService } from "../evals/service.js";
 
 /**
  * reviews module.
@@ -14,12 +15,14 @@ import { ReviewService } from "./service.js";
  *   GET    /runs/:id/trace                             → the single-document RunTrace
  *   GET    /pulls/:id/reviews                          → persisted reviews + findings for a PR
  *   POST   /findings/:id/(accept|dismiss)              → finding actions
+ *   POST   /findings/:id/eval-case                     → prefill an EvalCaseInput (A6, no DB insert)
  */
 const FINDING_ACTIONS = ["accept", "dismiss"] as const;
 export default async function reviewsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
   const service = new ReviewService(container);
+  const evalsService = new EvalsService(app.container);
 
   // ---- Run a review (manual trigger) -------------------------------
   // Tight per-route limit: each call can fan out to expensive LLM runs.
@@ -156,8 +159,8 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
     return { ok: true };
   });
 
-  // ---- Finding actions (accept / dismiss) ---------------------------------
-  for (const action of FINDING_ACTIONS) {
+  // ---- Finding actions (accept / dismiss / undo) -------------------------
+  for (const action of [...FINDING_ACTIONS, "undo"] as const) {
     app.post(
       `/findings/:id/${action}`,
       { schema: { params: IdParams } },
@@ -172,6 +175,16 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
       },
     );
   }
+
+  // ---- Turn a resolved finding into an eval-case prefill (no DB insert) ----
+  app.post(
+    "/findings/:id/eval-case",
+    { schema: { params: IdParams } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return evalsService.prefillFromFinding(workspaceId, req.params.id);
+    },
+  );
 
   // ---- Intent: read + recalculate -----------------------------------------
 

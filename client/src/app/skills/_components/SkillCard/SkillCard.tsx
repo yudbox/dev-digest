@@ -124,7 +124,10 @@ export function SkillCard({
           />
         </div>
         <button
-          onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setConfirming(true);
+          }}
           disabled={del.isPending}
           title="Delete skill"
           aria-label="Delete skill"
@@ -139,7 +142,11 @@ export function SkillCard({
         >
           <Icon.Trash
             size={14}
-            style={del.isPending ? { animation: "ddspin 1s linear infinite" } : undefined}
+            style={
+              del.isPending
+                ? { animation: "ddspin 1s linear infinite" }
+                : undefined
+            }
           />
         </button>
       </div>
@@ -147,27 +154,35 @@ export function SkillCard({
       {confirming && (
         // Stop click from bubbling to SkillCard's onClick (which would navigate to the skill)
         <div onClick={(e) => e.stopPropagation()}>
-        <Modal
-          width={380}
-          title="Delete skill"
-          subtitle={`"${skill.name}" will be permanently removed. This cannot be undone.`}
-          onClose={() => setConfirming(false)}
-          footer={
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <Button kind="ghost" size="sm" onClick={() => setConfirming(false)}>Cancel</Button>
-              <Button
-                kind="danger"
-                size="sm"
-                onClick={() => {
-                  setConfirming(false);
-                  del.mutate(skill.id, { onSuccess: () => onDeleted?.() });
-                }}
+          <Modal
+            width={380}
+            title="Delete skill"
+            subtitle={`"${skill.name}" will be permanently removed. This cannot be undone.`}
+            onClose={() => setConfirming(false)}
+            footer={
+              <div
+                style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}
               >
-                Delete
-              </Button>
-            </div>
-          }
-        />
+                <Button
+                  kind="ghost"
+                  size="sm"
+                  onClick={() => setConfirming(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  kind="danger"
+                  size="sm"
+                  onClick={() => {
+                    setConfirming(false);
+                    del.mutate(skill.id, { onSuccess: () => onDeleted?.() });
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
+            }
+          />
         </div>
       )}
       {skill.description && (
@@ -220,6 +235,32 @@ export function SkillCard({
           </>
         )}
       </div>
+      {(skill.agent_count != null ||
+        skill.pull_frequency_pct != null ||
+        skill.accept_rate_pct != null) && (
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--text-muted)",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            flexWrap: "wrap",
+          }}
+        >
+          {skill.agent_count != null && (
+            <Badge color="var(--text-secondary)" icon="Cpu">
+              {skill.agent_count} {skill.agent_count === 1 ? "agent" : "agents"}
+            </Badge>
+          )}
+          {skill.pull_frequency_pct != null && (
+            <span>{skill.pull_frequency_pct.toFixed(0)}% pull freq</span>
+          )}
+          {skill.accept_rate_pct != null && (
+            <span>{skill.accept_rate_pct.toFixed(0)}% accept</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

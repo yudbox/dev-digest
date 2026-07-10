@@ -17,6 +17,7 @@ export const FeatureModelId = z.enum([
   "risk_brief",
   "conformance",
   "conventions",
+  "eval",
 ]);
 export type FeatureModelId = z.infer<typeof FeatureModelId>;
 
@@ -68,6 +69,13 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
     description: "Checks a PR against the project spec.",
     defaultProvider: "openai",
     defaultModel: "gpt-4.1",
+  },
+  {
+    id: "eval",
+    label: "Eval Reference Agent",
+    description: "Runs skill eval cases with/without the skill attached.",
+    defaultProvider: "openrouter",
+    defaultModel: "deepseek/deepseek-v4-flash",
   },
   {
     id: "conventions",

@@ -1,4 +1,14 @@
-import { pgTable, uuid, text, integer, boolean, jsonb, timestamp, doublePrecision } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  uuid,
+  text,
+  integer,
+  boolean,
+  jsonb,
+  timestamp,
+  doublePrecision,
+  index,
+} from 'drizzle-orm/pg-core';
 import { workspaces } from './core';
 import { pullRequests } from './pulls';
 
@@ -19,20 +29,33 @@ export const evalCases = pgTable('eval_cases', {
   notes: text('notes'),
 });
 
-export const evalRuns = pgTable('eval_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  caseId: uuid('case_id')
-    .notNull()
-    .references(() => evalCases.id, { onDelete: 'cascade' }),
-  ranAt: timestamp('ran_at', { withTimezone: true }).defaultNow().notNull(),
-  actualOutput: jsonb('actual_output'),
-  pass: boolean('pass'),
-  recall: doublePrecision('recall'),
-  precision: doublePrecision('precision'),
-  citationAccuracy: doublePrecision('citation_accuracy'),
-  durationMs: integer('duration_ms'),
-  costUsd: doublePrecision('cost_usd'),
-});
+export const evalRuns = pgTable(
+  'eval_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    caseId: uuid('case_id')
+      .notNull()
+      .references(() => evalCases.id, { onDelete: 'cascade' }),
+    ranAt: timestamp('ran_at', { withTimezone: true }).defaultNow().notNull(),
+    actualOutput: jsonb('actual_output'),
+    pass: boolean('pass'),
+    recall: doublePrecision('recall'),
+    precision: doublePrecision('precision'),
+    citationAccuracy: doublePrecision('citation_accuracy'),
+    durationMs: integer('duration_ms'),
+    costUsd: doublePrecision('cost_usd'),
+    // Groups all runs from one "Run all evals" / skill-eval invocation together
+    // (one shared batch_id per batch) — nullable because single-case runs via
+    // POST /eval-cases/:id/run also get their own (single-run) batch_id.
+    batchId: uuid('batch_id'),
+    // Snapshot of agents.version at run time (agent-owned cases only; null for
+    // skill-owned cases, which have no version concept).
+    agentVersion: integer('agent_version'),
+  },
+  (t) => ({
+    batchIdIdx: index('eval_runs_batch_id_idx').on(t.batchId),
+  }),
+);
 
 export const conformanceChecks = pgTable('conformance_checks', {
   id: uuid('id').primaryKey().defaultRandom(),

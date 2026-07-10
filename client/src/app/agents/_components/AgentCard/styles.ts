@@ -11,7 +11,11 @@ export const s = {
     opacity: enabled ? 1 : 0.6,
     marginBottom: 10,
   }),
-  headerRow: { display: "flex", alignItems: "center", gap: 10 } satisfies CSSProperties,
+  headerRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+  } satisfies CSSProperties,
   iconBox: {
     width: 26,
     height: 26,
@@ -39,7 +43,11 @@ export const s = {
     overflow: "hidden",
     textOverflow: "ellipsis",
   } satisfies CSSProperties,
-  metaRow: { display: "flex", alignItems: "center", gap: 8 } satisfies CSSProperties,
+  metaRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+  } satisfies CSSProperties,
   modelChip: (color: string): CSSProperties => ({
     fontSize: 12,
     fontWeight: 600,
@@ -48,4 +56,9 @@ export const s = {
     padding: "1px 8px",
     borderRadius: 4,
   }),
+  statsRow: {
+    fontSize: 11,
+    color: "var(--text-muted)",
+    marginTop: 4,
+  } satisfies CSSProperties,
 } as const;
