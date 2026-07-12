@@ -29,8 +29,14 @@ export function WhereAgentsDisagree({
 
   const displayedConflicts = showOnlyConflicts
     ? conflicts.filter((c) => {
+        // AC-32: true conflict = agents disagree on severity (not just presence).
+        // At least one flagged + at least one ignored, OR flaggers have different severities.
         const flaggers = c.takes.filter((t) => t.verdict !== "ignored");
-        return flaggers.length >= 2;
+        const ignored = c.takes.filter((t) => t.verdict === "ignored");
+        const hasPresenceConflict = flaggers.length > 0 && ignored.length > 0;
+        const severities = new Set(flaggers.map((t) => t.verdict));
+        const hasSeverityConflict = severities.size > 1;
+        return hasPresenceConflict || hasSeverityConflict;
       })
     : conflicts;
 

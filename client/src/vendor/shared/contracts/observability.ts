@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Severity } from "./findings";
+import { FindingRecord } from "./review-api";
 
 /**
  * A5 — Observability / Multi-agent contracts (L07).
@@ -19,17 +20,12 @@ import { Severity } from "./findings";
 // Multi-Agent Review
 // ---------------------------------------------------------------------------
 
-/** A finding as surfaced in a multi-agent column (subset of FindingRecord). */
-export const AgentColumnFinding = z.object({
-  id: z.string(),
-  severity: Severity,
-  category: z.string(),
-  title: z.string(),
-  file: z.string(),
-  start_line: z.number().int(),
-  kind: z.string().nullish(),
-});
-export type AgentColumnFinding = z.infer<typeof AgentColumnFinding>;
+/**
+ * A finding in a multi-agent column — extends the full FindingRecord so the
+ * Tabs view can reuse FindingCard without a separate API call (AC-34).
+ */
+export const AgentColumnFinding = FindingRecord;
+export type AgentColumnFinding = FindingRecord;
 
 /** One agent's result column in the multi-agent review. */
 export const AgentColumn = z.object({

@@ -405,6 +405,8 @@ export class ReviewRunExecutor {
             runLog.info(
               `Memory: ${hits.length} relevant learning(s) retrieved`,
             );
+            // AC-40: stamp last_used_at so stale memories surface in curator
+            await this.repo.bumpMemoryLastUsedAt(memoryIds);
           }
         }
       } catch {

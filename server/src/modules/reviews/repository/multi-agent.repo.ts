@@ -129,12 +129,21 @@ export async function getMultiAgentRunById(
 
     const columnFindings: AgentColumnFinding[] = findings.map((f) => ({
       id: f.id,
+      review_id: review!.id,
       severity: f.severity as AgentColumnFinding["severity"],
-      category: f.category,
+      category: f.category as AgentColumnFinding["category"],
       title: f.title,
       file: f.file,
       start_line: f.startLine,
-      kind: f.kind,
+      end_line: f.endLine,
+      rationale: f.rationale,
+      suggestion: f.suggestion,
+      confidence: f.confidence,
+      kind: f.kind as AgentColumnFinding["kind"],
+      trifecta_components: null,
+      evidence: null,
+      accepted_at: f.acceptedAt?.toISOString() ?? null,
+      dismissed_at: f.dismissedAt?.toISOString() ?? null,
     }));
 
     return {

@@ -8,10 +8,11 @@ import { Icon } from "@devdigest/ui";
 import { Checkbox } from "@devdigest/ui";
 import { useAgents } from "../../../lib/hooks/agents";
 import { useRunMultiAgentReview } from "../../../lib/hooks/reviews";
+import { useRepos } from "../../../lib/hooks/repos";
+import { api } from "../../../lib/api";
 import { SelectAllClearAllControl } from "../../../components/agent-picker/SelectAllClearAllControl";
 import { agentIcon } from "../agentIconMap";
 import type { Agent } from "@devdigest/shared";
-import { api } from "../../../lib/api";
 
 interface PrOption {
   id: string;
@@ -19,15 +20,42 @@ interface PrOption {
   title: string;
 }
 
-function usePrsForWorkspace() {
+/** Aggregates PRs across all repos using real API endpoints. */
+function usePrsForWorkspace(): { prs: PrOption[]; isLoading: boolean } {
+  const repos = useRepos();
+  const repoIds = repos.data?.map((r) => r.id) ?? [];
+  // We pull PRs for each repo individually (existing API) and merge them.
+  // Hook count is stable because repoIds stabilises after first load.
   const [prs, setPrs] = React.useState<PrOption[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
   React.useEffect(() => {
-    api
-      .get<{ id: string; number: number; title: string }[]>("/pulls")
-      .then(setPrs)
-      .catch(() => {});
-  }, []);
-  return prs;
+    if (repos.isLoading) return;
+    if (repoIds.length === 0) { setLoading(false); return; }
+
+    let cancelled = false;
+    Promise.allSettled(
+      repoIds.map((id) =>
+        api
+          .get<{ id: string; number: number; title: string }[]>(`/repos/${id}/pulls`)
+          .catch(() => [] as { id: string; number: number; title: string }[]),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      const merged: PrOption[] = results.flatMap((r) =>
+        r.status === "fulfilled"
+          ? (r.value as { id: string; number: number; title: string }[]).map(
+              (p) => ({ id: p.id, number: p.number, title: p.title }),
+            )
+          : [],
+      );
+      setPrs(merged);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [repoIds.join(","), repos.isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { prs, isLoading: loading };
 }
 
 export default function ConfigureRunPage() {
@@ -40,7 +68,7 @@ export default function ConfigureRunPage() {
   const [prOpen, setPrOpen] = React.useState(false);
 
   const allAgents: Agent[] = useAgents().data ?? [];
-  const prs = usePrsForWorkspace();
+  const { prs, isLoading: prsLoading } = usePrsForWorkspace();
   const [checked, setChecked] = React.useState<Set<string>>(new Set());
   const runMutation = useRunMultiAgentReview();
 
@@ -168,9 +196,11 @@ export default function ConfigureRunPage() {
           >
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Icon.GitPullRequest size={14} />
-              {selectedPr
-                ? `#${selectedPr.number} · ${selectedPr.title}`
-                : "Select a pull request…"}
+              {prsLoading
+                ? "Loading pull requests…"
+                : selectedPr
+                  ? `#${selectedPr.number} · ${selectedPr.title}`
+                  : "Select a pull request…"}
             </span>
             <Icon.ChevronDown size={14} />
           </button>

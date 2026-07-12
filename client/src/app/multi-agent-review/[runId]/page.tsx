@@ -3,13 +3,15 @@
 
 import React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useMultiAgentRun } from "../../../lib/hooks/reviews";
+import { useMultiAgentRun, useFindingAction, useCreatePrComment } from "../../../lib/hooks/reviews";
+import { usePullDetail } from "../../../lib/hooks/pulls";
 import type { AgentColumn } from "@devdigest/shared";
 import { Icon } from "@devdigest/ui";
 import { AgentColumnCard } from "./_components/AgentColumnCard";
 import { WhereAgentsDisagree } from "./_components/WhereAgentsDisagree";
 import RunTraceDrawer from "../../repos/[repoId]/pulls/[number]/_components/RunTraceDrawer";
 import { VerdictBanner } from "../../repos/[repoId]/pulls/[number]/_components/VerdictBanner";
+import { FindingCard } from "../../repos/[repoId]/pulls/[number]/_components/FindingCard";
 
 type ViewMode = "columns" | "tabs";
 
@@ -19,6 +21,13 @@ export default function MultiAgentRunDetailPage() {
   const runId = params.runId;
 
   const { data: run, isLoading } = useMultiAgentRun(runId);
+  const findingAction = useFindingAction();
+  const postComment = useCreatePrComment(run?.pr_id ?? null);
+
+  // head_sha for file:line GitHub links (AC-34); repoFullName not available
+  // from multi-agent run context — links will omit blob URL gracefully.
+  const { data: prDetail } = usePullDetail(run?.pr_id ?? null);
+  const headSha = prDetail?.head_sha ?? null;
 
   const [view, setView] = React.useState<ViewMode>("columns");
   const [selectedTab, setSelectedTab] = React.useState<string | null>(null);
@@ -62,11 +71,21 @@ export default function MultiAgentRunDetailPage() {
     ? `$${run.total_cost_usd.toFixed(3)}`
     : null;
 
+  const SEV_RANK: Record<string, number> = { CRITICAL: 3, WARNING: 2, SUGGESTION: 1 };
+
   // Tabs mode: show the selected agent tab or first by default
   const activeTabAgent: AgentColumn | undefined =
     view === "tabs"
       ? (run.columns.find((c) => c.agent_id === selectedTab) ?? run.columns[0])
       : undefined;
+
+  // AC-20: sort findings by severity descending so most severe is first (defaultExpanded)
+  const tabFindings = React.useMemo(() => {
+    if (!activeTabAgent) return [];
+    return [...activeTabAgent.findings].sort(
+      (a, b) => (SEV_RANK[b.severity] ?? 0) - (SEV_RANK[a.severity] ?? 0),
+    );
+  }, [activeTabAgent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFindingClick = (agentId: string, _runId: string) => {
     setView("tabs");
@@ -358,51 +377,7 @@ export default function MultiAgentRunDetailPage() {
                   gap: 8,
                 }}
               >
-                {activeTabAgent.findings.map((finding) => (
-                  <div
-                    key={finding.id}
-                    style={{
-                      padding: "10px 14px",
-                      borderRadius: 8,
-                      border: "1px solid var(--border)",
-                      background: "var(--surface-raised)",
-                      fontSize: 13,
-                    }}
-                  >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
-                    >
-                      <span
-                        style={{
-                          width: 7,
-                          height: 7,
-                          borderRadius: "50%",
-                          flexShrink: 0,
-                          background:
-                            finding.severity === "CRITICAL"
-                              ? "var(--critical, #f87171)"
-                              : finding.severity === "WARNING"
-                                ? "var(--warning, #fb923c)"
-                                : "var(--suggestion, #60a5fa)",
-                        }}
-                      />
-                      <span style={{ fontWeight: 600, color: "var(--text)" }}>
-                        {finding.title}
-                      </span>
-                      <span
-                        style={{
-                          marginLeft: "auto",
-                          fontSize: 11,
-                          fontFamily: "monospace",
-                          color: "var(--text-muted)",
-                        }}
-                      >
-                        {finding.file}:{finding.start_line}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {activeTabAgent.findings.length === 0 && (
+                {activeTabAgent.findings.length === 0 ? (
                   <div
                     style={{
                       fontSize: 13,
@@ -412,6 +387,36 @@ export default function MultiAgentRunDetailPage() {
                   >
                     No findings
                   </div>
+                ) : (
+                  tabFindings.map((finding, i) => (
+                    <FindingCard
+                      key={finding.id}
+                      f={finding}
+                      defaultExpanded={i === 0}
+                      repoFullName={null}
+                      headSha={headSha}
+                      pending={
+                        findingAction.isPending &&
+                        findingAction.variables?.findingId === finding.id
+                      }
+                      onAction={(act, extra) => {
+                        findingAction.mutate({
+                          findingId: finding.id,
+                          action: act,
+                          prId: run.pr_id,
+                          note: extra?.note,
+                          reply: extra?.reply,
+                        });
+                        if (act === "reply" && extra?.reply) {
+                          postComment.mutate({
+                            path: finding.file,
+                            line: finding.start_line,
+                            body: extra.reply,
+                          });
+                        }
+                      }}
+                    />
+                  ))
                 )}
               </div>
             </div>
