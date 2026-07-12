@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { Severity } from './findings';
+import { z } from "zod";
+import { Severity } from "./findings";
 
 /**
  * A5 — Observability / Multi-agent contracts (L07).
@@ -38,7 +38,7 @@ export const AgentColumn = z.object({
   agent_name: z.string(),
   provider: z.string().nullable(),
   model: z.string().nullable(),
-  status: z.enum(['done', 'failed', 'running']),
+  status: z.enum(["done", "failed", "running"]),
   verdict: z.string().nullable(),
   score: z.number().int().nullable(),
   summary: z.string().nullable(),
@@ -53,7 +53,7 @@ export const ConflictTake = z.object({
   agent_id: z.string(),
   persona: z.string(),
   /** Severity if the agent flagged it, or 'ignored' when it did not. */
-  verdict: z.union([Severity, z.literal('ignored')]),
+  verdict: z.union([Severity, z.literal("ignored")]),
   note: z.string(),
 });
 export type ConflictTake = z.infer<typeof ConflictTake>;
@@ -71,11 +71,12 @@ export const Conflict = z.object({
 });
 export type Conflict = z.infer<typeof Conflict>;
 
-/** Response of POST /pulls/:id/multi-agent-run and GET /pulls/:id/multi-agent. */
+/** Response of POST /pulls/:id/multi-agent-run and GET /multi-agent-runs/:id. */
 export const MultiAgentRun = z.object({
   id: z.string(),
   pr_id: z.string(),
   pr_number: z.number().int().nullish(),
+  pr_title: z.string(),
   ran_at: z.string(),
   agent_count: z.number().int(),
   total_duration_ms: z.number().int(),
@@ -84,6 +85,20 @@ export const MultiAgentRun = z.object({
   conflicts: z.array(Conflict),
 });
 export type MultiAgentRun = z.infer<typeof MultiAgentRun>;
+
+/** Lean summary for the GET /multi-agent-runs list page (not the full detail). */
+export const MultiAgentRunSummary = z.object({
+  id: z.string(),
+  pr_id: z.string(),
+  pr_number: z.number().int().nullish(),
+  pr_title: z.string(),
+  agent_count: z.number().int(),
+  total_duration_ms: z.number().int().nullable(),
+  total_cost_usd: z.number().nullable(),
+  ran_at: z.string(),
+  status: z.enum(["running", "failed", "done"]),
+});
+export type MultiAgentRunSummary = z.infer<typeof MultiAgentRunSummary>;
 
 // ---------------------------------------------------------------------------
 // Per-agent Stats (GET /agents/:id/stats)

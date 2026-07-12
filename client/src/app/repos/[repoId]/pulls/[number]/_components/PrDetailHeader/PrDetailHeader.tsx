@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React from "react";
 import { Icon, Avatar, Badge, Button, Tabs } from "@devdigest/ui";
 import { RunReviewDropdown } from "../RunReviewDropdown";
 import { s } from "./styles";
@@ -14,8 +14,7 @@ interface PrDetailHeaderProps {
   /** github.com PR URL; null when the repo's full_name isn't known yet. */
   githubUrl?: string | null;
   onSetTab: (tab: string) => void;
-  onRunStart: () => void;
-  onRunsStarted: () => void;
+  onRunsStarted?: (runIds: string[]) => void;
 }
 
 export function PrDetailHeader({
@@ -25,17 +24,8 @@ export function PrDetailHeader({
   findingsCount,
   githubUrl,
   onSetTab,
-  onRunStart,
   onRunsStarted,
 }: PrDetailHeaderProps) {
-  const handleRunStart = useCallback(() => {
-    onRunStart();
-  }, [onRunStart]);
-
-  const handleRunsStarted = useCallback(() => {
-    onRunsStarted();
-  }, [onRunsStarted]);
-
   const statusColor =
     pr.status === "merged"
       ? "var(--ok)"
@@ -59,7 +49,10 @@ export function PrDetailHeader({
               {pr.author}
             </span>
             <span style={s.branchChip}>
-              <Icon.GitBranch size={13} style={{ color: "var(--text-muted)" }} />
+              <Icon.GitBranch
+                size={13}
+                style={{ color: "var(--text-muted)" }}
+              />
               <span className="mono" style={s.branchMono}>
                 {pr.branch}
               </span>
@@ -69,8 +62,12 @@ export function PrDetailHeader({
               </span>
             </span>
             <span className="mono tnum">
-              <span style={{ color: "var(--code-add-text)" }}>+{pr.additions}</span>{" "}
-              <span style={{ color: "var(--code-del-text)" }}>−{pr.deletions}</span>
+              <span style={{ color: "var(--code-add-text)" }}>
+                +{pr.additions}
+              </span>{" "}
+              <span style={{ color: "var(--code-del-text)" }}>
+                −{pr.deletions}
+              </span>
             </span>
             <Badge dot bg="transparent" color={statusColor}>
               {pr.status}
@@ -84,7 +81,8 @@ export function PrDetailHeader({
             icon="ExternalLink"
             disabled={!githubUrl}
             onClick={() =>
-              githubUrl && window.open(githubUrl, "_blank", "noopener,noreferrer")
+              githubUrl &&
+              window.open(githubUrl, "_blank", "noopener,noreferrer")
             }
           >
             View on GitHub
@@ -93,18 +91,20 @@ export function PrDetailHeader({
             <RunReviewDropdown
               prId={prId}
               warnMerged={pr.status === "merged" || pr.status === "closed"}
-              onRunStart={handleRunStart}
-              onRunsStarted={handleRunsStarted}
+              onRunsStarted={onRunsStarted}
             />
           )}
         </div>
       </div>
       {(pr.status === "merged" || pr.status === "closed") && (
         <div style={s.staleBanner}>
-          <Icon.AlertTriangle size={13} style={{ color: "var(--warn)", flexShrink: 0 }} />
+          <Icon.AlertTriangle
+            size={13}
+            style={{ color: "var(--warn)", flexShrink: 0 }}
+          />
           <span>
-            This PR is already {pr.status} — running a review is informational and won't affect the
-            merged code.
+            This PR is already {pr.status} — running a review is informational
+            and won't affect the merged code.
           </span>
         </div>
       )}
@@ -114,8 +114,18 @@ export function PrDetailHeader({
         pad="0"
         tabs={[
           { key: "overview", label: "Overview", icon: "FileText" },
-          { key: "findings", label: "Agent runs", icon: "AlertOctagon", count: findingsCount || undefined },
-          { key: "diff", label: "Files changed", icon: "Code", count: pr.files_count },
+          {
+            key: "findings",
+            label: "Agent runs",
+            icon: "AlertOctagon",
+            count: findingsCount || undefined,
+          },
+          {
+            key: "diff",
+            label: "Files changed",
+            icon: "Code",
+            count: pr.files_count,
+          },
         ]}
       />
     </div>

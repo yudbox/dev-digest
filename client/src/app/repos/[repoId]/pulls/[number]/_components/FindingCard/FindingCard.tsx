@@ -38,9 +38,11 @@ export function FindingCard({
   focused?: boolean;
   targeted?: boolean;
   defaultExpanded?: boolean;
-  onAction?: (action: FindingActionKind, reply?: string) => void;
-  /** "Turn into eval case" (AC-8/9) — separate from onAction since it never
-   *  mutates the finding itself, only prefills a new eval case. */
+  onAction?: (
+    action: FindingActionKind,
+    extra?: { note?: string; reply?: string },
+  ) => void;
+  /** "Turn into eval case" — separate from onAction. */
   onCreateEvalCase?: (f: FindingRecord) => void;
   pending?: boolean;
   repoFullName?: string | null;
@@ -49,6 +51,10 @@ export function FindingCard({
   const t = useTranslations("prReview");
   const tEval = useTranslations("eval.findingCard");
   const [expanded, setExpanded] = React.useState(defaultExpanded ?? false);
+  const [composer, setComposer] = React.useState<"learn" | "reply" | null>(
+    null,
+  );
+  const [composerText, setComposerText] = React.useState("");
   const sevColor = SEV_COLOR[f.severity] ?? SEV_COLOR_FALLBACK;
   const fileHref =
     repoFullName && headSha
@@ -62,6 +68,21 @@ export function FindingCard({
     if (targeted) setExpanded(true);
   }, [targeted]);
 
+  const openComposer = (kind: "learn" | "reply") => {
+    setComposerText(kind === "learn" ? f.title : "");
+    setComposer(kind);
+  };
+
+  const submitComposer = () => {
+    if (!composer || !composerText.trim()) return;
+    if (composer === "learn") {
+      onAction?.("learn", { note: composerText.trim() });
+    } else {
+      onAction?.("reply", { reply: composerText.trim() });
+    }
+    setComposer(null);
+    setComposerText("");
+  };
   return (
     <div
       data-finding-id={f.id}
@@ -215,7 +236,123 @@ export function FindingCard({
                 {tEval("turnIntoEvalCase")}
               </Button>
             )}
+
+            {/* Learn button — embeds note as a memory row */}
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => openComposer("learn")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "4px 10px",
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: "pointer",
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: "var(--text-secondary)",
+                transition: "all 0.15s",
+              }}
+            >
+              <Icon.Brain size={12} />
+              Learn
+            </button>
+
+            {/* Reply button — sets findings.repliedAt + posts GH comment */}
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => openComposer("reply")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "4px 10px",
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: "pointer",
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: "var(--text-secondary)",
+                transition: "all 0.15s",
+              }}
+            >
+              <Icon.MessageSquare size={12} />
+              Reply to author
+            </button>
           </div>
+
+          {/* Inline composer for Learn / Reply */}
+          {composer && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: "10px 12px",
+                background: "var(--surface)",
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)", marginBottom: 6 }}>
+                {composer === "learn" ? "What did you learn? (pre-filled from title)" : "Reply to author"}
+              </div>
+              <textarea
+                value={composerText}
+                onChange={(e) => setComposerText(e.target.value)}
+                rows={3}
+                style={{
+                  width: "100%",
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface-raised)",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  padding: "6px 8px",
+                  resize: "vertical",
+                  fontFamily: "inherit",
+                }}
+              />
+              <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => setComposer(null)}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    border: "1px solid var(--border)",
+                    background: "transparent",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!composerText.trim() || pending}
+                  onClick={submitComposer}
+                  style={{
+                    padding: "4px 12px",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: composerText.trim() ? "pointer" : "not-allowed",
+                    border: "none",
+                    background: composerText.trim() ? "var(--accent, #4f9cf9)" : "var(--surface)",
+                    color: composerText.trim() ? "#fff" : "var(--text-muted)",
+                  }}
+                >
+                  {composer === "learn" ? "Learn" : "Send reply"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

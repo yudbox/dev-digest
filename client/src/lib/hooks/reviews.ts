@@ -8,6 +8,8 @@ import { api, API_BASE } from "../api";
 import { notify } from "../contexts/toast";
 import type {
   FindingActionKind,
+  MultiAgentRun,
+  MultiAgentRunSummary,
   PrReviewComment,
   ReviewRecord,
   ReviewRunResponse,
@@ -30,7 +32,8 @@ export function usePrActiveRuns(prId: string | null | undefined) {
     queryKey: ["pr-active-runs", prId],
     queryFn: () => api.get<ActiveRun[]>(`/pulls/${prId}/runs/active`),
     enabled: !!prId,
-    refetchInterval: (query) => ((query.state.data?.length ?? 0) > 0 ? 4000 : false),
+    refetchInterval: (query) =>
+      (query.state.data?.length ?? 0) > 0 ? 4000 : false,
   });
 }
 
@@ -43,7 +46,9 @@ export function usePrRuns(prId: string | null | undefined) {
     queryFn: () => api.get<RunSummary[]>(`/pulls/${prId}/runs`),
     enabled: !!prId,
     refetchInterval: (query) =>
-      (query.state.data ?? []).some((r) => r.status === "running") ? 4000 : false,
+      (query.state.data ?? []).some((r) => r.status === "running")
+        ? 4000
+        : false,
   });
 }
 
@@ -69,7 +74,8 @@ export function useDeleteRun(prId: string | null | undefined) {
 /** Request cancellation of an in-flight run (takes effect at the next step). */
 export function useCancelRun() {
   return useMutation({
-    mutationFn: (runId: string) => api.post<{ ok: boolean }>(`/runs/${runId}/cancel`),
+    mutationFn: (runId: string) =>
+      api.post<{ ok: boolean }>(`/runs/${runId}/cancel`),
   });
 }
 
@@ -77,7 +83,8 @@ export function useCancelRun() {
 export function useDeleteReview(prId: string | null | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (reviewId: string) => api.del<{ ok: boolean }>(`/reviews/${reviewId}`),
+    mutationFn: (reviewId: string) =>
+      api.del<{ ok: boolean }>(`/reviews/${reviewId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["reviews", prId] }),
   });
 }
@@ -131,24 +138,29 @@ export function useRunReview() {
   });
 }
 
-// ---- Finding actions (accept/dismiss) ----
+// ---- Finding actions (accept/dismiss/undo/learn/reply) ----
 export function useFindingAction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
       findingId,
       action,
+      note,
       reply,
       prId: _prId,
     }: {
       findingId: string;
       action: FindingActionKind;
+      note?: string;
       reply?: string;
       prId?: string;
     }) =>
-      api.post<{ finding: ReviewRecord["findings"][number]; memoryId?: string }>(
+      api.post<{
+        finding: ReviewRecord["findings"][number];
+        memoryId?: string;
+      }>(
         `/findings/${findingId}/${action}`,
-        reply ? { reply } : undefined,
+        note ? { note } : reply ? { reply } : undefined,
       ),
     onSuccess: (_d, { prId }) => {
       if (prId) qc.invalidateQueries({ queryKey: ["reviews", prId] });
@@ -209,4 +221,71 @@ export function useRunEvents(runIds: string[]) {
   }, [key]);
 
   return { events, running };
+}
+
+// ---- Multi-Agent Review: mutations + queries ----
+
+export interface RunMultiAgentInput {
+  prId: string;
+  agentIds: string[];
+}
+
+export interface RunMultiAgentResponse {
+  multi_agent_run_id: string;
+  pr_id: string;
+  runs: { run_id: string; agent_id: string; agent_name: string }[];
+}
+
+/** POST /pulls/:id/multi-agent-run — always creates a multi_agent_runs row. */
+export function useRunMultiAgentReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ prId, agentIds }: RunMultiAgentInput) =>
+      api.post<RunMultiAgentResponse>(`/pulls/${prId}/multi-agent-run`, { agentIds }),
+    onSuccess: (_d, { prId }) => {
+      qc.invalidateQueries({ queryKey: ["multi-agent-runs"] });
+      qc.invalidateQueries({ queryKey: ["pr-runs", prId] });
+    },
+  });
+}
+
+export interface MultiAgentRunsParams {
+  limit?: number;
+  cursor?: string;
+  status?: "running" | "failed" | "done";
+  q?: string;
+}
+
+/** GET /multi-agent-runs — paginated list for the /multi-agent-review list page. */
+export function useMultiAgentRuns(params?: MultiAgentRunsParams) {
+  const search = new URLSearchParams();
+  if (params?.limit) search.set("limit", String(params.limit));
+  if (params?.cursor) search.set("cursor", params.cursor);
+  if (params?.status) search.set("status", params.status);
+  if (params?.q) search.set("q", params.q);
+  const qs = search.toString();
+
+  return useQuery({
+    queryKey: ["multi-agent-runs", params],
+    queryFn: () =>
+      api.get<{ items: MultiAgentRunSummary[]; next_cursor: string | null }>(
+        `/multi-agent-runs${qs ? `?${qs}` : ""}`,
+      ),
+    staleTime: 15_000,
+  });
+}
+
+/** GET /multi-agent-runs/:id — full detail with columns + conflicts. */
+export function useMultiAgentRun(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ["multi-agent-run", id],
+    queryFn: () => api.get<MultiAgentRun>(`/multi-agent-runs/${id}`),
+    enabled: !!id,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return false;
+      // Poll while any column is still running
+      return data.columns.some((c) => c.status === "running") ? 3000 : false;
+    },
+  });
 }

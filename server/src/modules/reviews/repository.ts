@@ -1,6 +1,6 @@
 import type { Db } from "../../db/client.js";
 import * as t from "../../db/schema.js";
-import type { Finding, Intent, RunSummary, RunTrace } from "@devdigest/shared";
+import type { Finding, Intent, MultiAgentRun, MultiAgentRunSummary, RunSummary, RunTrace } from "@devdigest/shared";
 
 /**
  * A2 — review data-access. The ONLY layer touching the DB for the review
@@ -21,6 +21,8 @@ export type ReviewRow = typeof t.reviews.$inferSelect;
 import * as reviewRepo from "./repository/review.repo.js";
 import * as runRepo from "./repository/run.repo.js";
 import * as pullRepo from "./repository/pull.repo.js";
+import * as multiAgentRepo from "./repository/multi-agent.repo.js";
+import * as memoryRepo from "./repository/memory.repo.js";
 
 export class ReviewRepository {
   constructor(private db: Db) {}
@@ -142,6 +144,13 @@ export class ReviewRepository {
     return reviewRepo.setFindingDismissed(this.db, findingId, at);
   }
 
+  setFindingReplied(
+    findingId: string,
+    at: Date | null,
+  ): Promise<FindingRow | undefined> {
+    return reviewRepo.setFindingReplied(this.db, findingId, at);
+  }
+
   clearFindingAction(findingId: string): Promise<FindingRow | undefined> {
     return reviewRepo.setFindingAccepted(this.db, findingId, null);
   }
@@ -206,7 +215,56 @@ export class ReviewRepository {
 
   // ---- smart diff --------------------------------------------------------
 
-  getLatestReviewData(prId: string): Promise<reviewRepo.LatestReviewData> {
+  getLatestReviewData(prId: string): Promise<reviewRepo.LatestReviewData[]> {
     return reviewRepo.getLatestReviewData(this.db, prId);
+  }
+
+  // ---- multi-agent runs --------------------------------------------------
+
+  createMultiAgentRun(values: {
+    workspaceId: string;
+    prId: string;
+    agentRunIds: string[];
+  }): Promise<typeof t.multiAgentRuns.$inferSelect> {
+    return multiAgentRepo.createMultiAgentRun(this.db, values);
+  }
+
+  getMultiAgentRunById(id: string): Promise<MultiAgentRun | null> {
+    return multiAgentRepo.getMultiAgentRunById(this.db, id);
+  }
+
+  listMultiAgentRuns(params: {
+    workspaceId: string;
+    limit?: number;
+    cursor?: string;
+    status?: string;
+    q?: string;
+  }): Promise<{ items: MultiAgentRunSummary[]; next_cursor: string | null }> {
+    return multiAgentRepo.listMultiAgentRuns(this.db, params);
+  }
+
+  // ---- memory (pgvector) -------------------------------------------------
+
+  insertMemory(values: {
+    workspaceId: string;
+    repoId: string | null;
+    content: string;
+    embedding: number[];
+    sources: Record<string, string | null | undefined>;
+  }): Promise<void> {
+    return memoryRepo.insertMemory(this.db, values);
+  }
+
+  searchMemory(values: {
+    workspaceId: string;
+    repoId: string | null;
+    embedding: number[];
+    limit: number;
+  }): Promise<{ id: string; content: string }[]> {
+    return memoryRepo.searchMemory(this.db, values);
+  }
+
+  bumpMemoryLastUsedAt(ids: string[]): Promise<void> {
+    return memoryRepo.bumpLastUsedAt(this.db, ids);
   }
 }

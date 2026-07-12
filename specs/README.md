@@ -104,5 +104,6 @@ Vague language ("should work", "handle errors") is not allowed in ACs.
 | SPEC-2026-07-04-context-root-scan | [Context Root Scan](SPEC-2026-07-04-context-root-scan.md) | server, client | draft |
 | SPEC-2026-07-04-onboarding-generator | [Onboarding Generator (Onboarding Tour)](SPEC-2026-07-04-onboarding-generator.md) | server, client | draft |
 | SPEC-2026-07-06-eval-pipeline | [Eval Pipeline](SPEC-2026-07-06-eval-pipeline.md) | server, client | draft |
+| SPEC-2026-07-12-multi-agent-review | [Multi-Agent Review](SPEC-2026-07-12-multi-agent-review.md) | server, client | draft |
 
 _This table is updated by `spec-creator` each time a cross-module spec is added._

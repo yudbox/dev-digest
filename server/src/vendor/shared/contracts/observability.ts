@@ -71,11 +71,12 @@ export const Conflict = z.object({
 });
 export type Conflict = z.infer<typeof Conflict>;
 
-/** Response of POST /pulls/:id/multi-agent-run and GET /pulls/:id/multi-agent. */
+/** Response of POST /pulls/:id/multi-agent-run and GET /multi-agent-runs/:id. */
 export const MultiAgentRun = z.object({
   id: z.string(),
   pr_id: z.string(),
   pr_number: z.number().int().nullish(),
+  pr_title: z.string(),
   ran_at: z.string(),
   agent_count: z.number().int(),
   total_duration_ms: z.number().int(),
@@ -84,6 +85,20 @@ export const MultiAgentRun = z.object({
   conflicts: z.array(Conflict),
 });
 export type MultiAgentRun = z.infer<typeof MultiAgentRun>;
+
+/** Lean summary for the GET /multi-agent-runs list page (not the full detail). */
+export const MultiAgentRunSummary = z.object({
+  id: z.string(),
+  pr_id: z.string(),
+  pr_number: z.number().int().nullish(),
+  pr_title: z.string(),
+  agent_count: z.number().int(),
+  total_duration_ms: z.number().int().nullable(),
+  total_cost_usd: z.number().nullable(),
+  ran_at: z.string(),
+  status: z.enum(['running', 'failed', 'done']),
+});
+export type MultiAgentRunSummary = z.infer<typeof MultiAgentRunSummary>;
 
 // ---------------------------------------------------------------------------
 // Per-agent Stats (GET /agents/:id/stats)

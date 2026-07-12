@@ -10,7 +10,7 @@ export class PullsService {
   constructor(private reviewRepo: ReviewRepository) {}
 
   async buildSmartDiff(workspaceId: string, prId: string): Promise<SmartDiff> {
-    const [pr, prFiles, latestReview] = await Promise.all([
+    const [pr, prFiles, latestReviewData] = await Promise.all([
       this.reviewRepo.getPull(workspaceId, prId),
       this.reviewRepo.getPrFiles(prId),
       this.reviewRepo.getLatestReviewData(prId),
@@ -21,16 +21,21 @@ export class PullsService {
     // Group files by classifier role (no DB, pure CPU).
     const base = buildSmartDiff(prFiles);
 
+    // Union findings across all latest-per-agent results (AC-52/53).
+    const allFindings = latestReviewData.flatMap((r) => r.findings);
+    const reviewTokens =
+      latestReviewData.find((r) => r.reviewTokens !== null)?.reviewTokens ??
+      null;
+
     // Build per-file index from review findings.
-    const findingsByFile = new Map<string, typeof latestReview.findings>();
-    for (const f of latestReview.findings) {
+    const findingsByFile = new Map<string, typeof allFindings>();
+    for (const f of allFindings) {
       const list = findingsByFile.get(f.file) ?? [];
       list.push(f);
       findingsByFile.set(f.file, list);
     }
 
-    const hasReview =
-      latestReview.findings.length > 0 || latestReview.reviewTokens !== null;
+    const hasReview = allFindings.length > 0 || reviewTokens !== null;
 
     // Enrich each file with finding_lines + severity_counts + line_findings from latest review.
     const enrichedGroups = base.groups.map((group) => ({
@@ -83,7 +88,7 @@ export class PullsService {
     return {
       ...base,
       groups: enrichedGroups,
-      review_tokens: latestReview.reviewTokens,
+      review_tokens: reviewTokens,
     };
   }
 }
