@@ -266,3 +266,4 @@ Relevant to AI content generation features (Gemini API):
 **Level 2 (Sensitive)**: + MFA for sensitive ops, crypto key management, comprehensive security logging, schema-based input validation, CSRF protection
 
 **Level 3 (Critical)**: + HSM key storage, documented threat model, anomaly detection, penetration testing, supply chain verification
+
