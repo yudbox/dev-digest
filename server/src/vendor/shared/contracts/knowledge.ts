@@ -286,6 +286,7 @@ export const Agent = z.object({
   runs_count: z.number().int().optional(),
   accept_rate_pct: z.number().optional(),
   avg_cost_usd: z.number().nullish(),
+  avg_duration_ms: z.number().nullish(),
 });
 export type Agent = z.infer<typeof Agent>;
 

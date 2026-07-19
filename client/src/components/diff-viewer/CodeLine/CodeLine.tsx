@@ -69,7 +69,7 @@ export function CodeLine({
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
-  badge?: { severity: string; findingId: string };
+  badge?: { severity: string; findingId: string; accepted?: boolean };
   targetLine?: number;
 }) {
   const router = useRouter();
@@ -111,8 +111,9 @@ export function CodeLine({
             : {}),
           ...(badge && BADGE_BORDER[badge.severity]
             ? {
-                borderLeft: `3px solid ${BADGE_BORDER[badge.severity]}`,
-                background: BADGE_BG[badge.severity],
+                borderLeft: `3px solid ${badge.accepted ? "var(--border)" : BADGE_BORDER[badge.severity]}`,
+                background: badge.accepted ? "transparent" : BADGE_BG[badge.severity],
+                opacity: badge.accepted ? 0.45 : 1,
               }
             : {}),
         }}
@@ -154,7 +155,7 @@ export function CodeLine({
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") e.currentTarget.click();
             }}
-            style={{ ...BADGE_STYLE[badge.severity], cursor: "pointer" }}
+            style={{ ...BADGE_STYLE[badge.severity], cursor: badge.accepted ? "default" : "pointer", opacity: badge.accepted ? 0.45 : 1 }}
           >
             {BADGE_LABEL[badge.severity] ?? badge.severity.toLowerCase()}
           </span>

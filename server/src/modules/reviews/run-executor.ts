@@ -5,6 +5,7 @@ import type {
   RunTrace,
   UnifiedDiff,
   IssueMeta,
+  MemoryPulled,
 } from "@devdigest/shared";
 import { reviewPullRequest, countBlockers } from "@devdigest/reviewer-core";
 import { RunLogger } from "../../platform/run-logger.js";
@@ -183,54 +184,54 @@ export class ReviewRunExecutor {
         : "Continuing without intent (not derived or failed)",
     );
 
-    for (const { agent, runId } of jobs) {
-      const agentStart = Date.now();
-      logger?.info(
-        {
-          runId,
-          agent: agent.name,
-          provider: agent.provider,
-          model: agent.model,
-          prId: pull.id,
-        },
-        `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
-      );
-      try {
-        const outcome = await this.runOneAgent(
-          workspaceId,
-          pull,
-          repo,
-          diff,
-          agent,
-          runId,
-          runLog,
-          intentText,
-        );
+    await Promise.allSettled(
+      jobs.map(async ({ agent, runId }) => {
+        const agentStart = Date.now();
         logger?.info(
           {
             runId,
             agent: agent.name,
-            findings: outcome.findings.length,
-            grounding: outcome.grounding,
-            durationMs: Date.now() - agentStart,
+            provider: agent.provider,
+            model: agent.model,
+            prId: pull.id,
           },
-          `review: agent "${agent.name}" done — ${outcome.findings.length} finding(s)`,
+          `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
         );
-      } catch (err) {
-        // runOneAgent already persisted the failure/cancel (status + error +
-        // trace) and completed the bus; here we only log at the run level.
-        const cancelled = err instanceof RunCancelledError;
-        logger?.[cancelled ? "info" : "error"](
-          {
+        try {
+          const outcome = await this.runOneAgent(
+            workspaceId,
+            pull,
+            repo,
+            diff,
+            agent,
             runId,
-            agent: agent.name,
-            err: (err as Error).message,
-            durationMs: Date.now() - agentStart,
-          },
-          `review: agent "${agent.name}" ${cancelled ? "cancelled" : "failed"}`,
-        );
-      }
-    }
+            runLog,
+            intentText,
+          );
+          logger?.info(
+            {
+              runId,
+              agent: agent.name,
+              findings: outcome.findings.length,
+              grounding: outcome.grounding,
+              durationMs: Date.now() - agentStart,
+            },
+            `review: agent "${agent.name}" done — ${outcome.findings.length} finding(s)`,
+          );
+        } catch (err) {
+          const cancelled = err instanceof RunCancelledError;
+          logger?.[cancelled ? "info" : "error"](
+            {
+              runId,
+              agent: agent.name,
+              err: (err as Error).message,
+              durationMs: Date.now() - agentStart,
+            },
+            `review: agent "${agent.name}" ${cancelled ? "cancelled" : "failed"}`,
+          );
+        }
+      }),
+    );
   }
 
   /** Execute a single agent's review against a PR, streaming progress. */
@@ -341,7 +342,7 @@ export class ReviewRunExecutor {
       // Merge agent's own contextDocPaths with enabled linked skills' paths.
       // Agent paths go first; insertion-order Set deduplicates.
       const allContextPaths = [
-        ...(agent.contextDocPaths as string[] ?? []),
+        ...((agent.contextDocPaths as string[]) ?? []),
         ...linkedSkills
           .filter((s) => s.skill.enabled)
           .flatMap((s) => (s.skill.contextDocPaths as string[]) ?? []),
@@ -357,13 +358,14 @@ export class ReviewRunExecutor {
         return true;
       });
 
-      const specDocs = validPaths.length > 0
-        ? await this.container.contextService.readDocsByPaths(
-            repo.clonePath ?? "",
-            validPaths,
-            (p) => runLog.info(`Context doc not found at ${p} — skipping`),
-          )
-        : [];
+      const specDocs =
+        validPaths.length > 0
+          ? await this.container.contextService.readDocsByPaths(
+              repo.clonePath ?? "",
+              validPaths,
+              (p) => runLog.info(`Context doc not found at ${p} — skipping`),
+            )
+          : [];
 
       const specContents = specDocs.map(
         (doc) =>
@@ -375,6 +377,40 @@ export class ReviewRunExecutor {
         runLog.info(
           `Specs: ${specContents.length} context doc(s) attached to prompt`,
         );
+      }
+
+      // ---- Memory: pgvector similarity search --------------------------------
+      // Embed the PR title + changed file paths, search the memory table for
+      // top-K relevant learnings scoped to this workspace/repo. Results are
+      // injected into the prompt and recorded in the run trace.
+      let memoryPulled: MemoryPulled[] = [];
+      let memoryIds: string[] = [];
+      try {
+        const embedder = await this.container.embedder();
+        const queryText = [pull.title, ...diff.files.map((f) => f.path)].join(
+          " ",
+        );
+        const [[queryEmbedding]] = [await embedder.embed([queryText])];
+        if (queryEmbedding) {
+          const repo = await this.repo.getRepo(pull.repoId);
+          const hits = await this.repo.searchMemory({
+            workspaceId,
+            repoId: repo?.id ?? null,
+            embedding: queryEmbedding,
+            limit: 5,
+          });
+          if (hits.length > 0) {
+            memoryPulled = hits.map((h) => ({ text: h.content }));
+            memoryIds = hits.map((h) => h.id);
+            runLog.info(
+              `Memory: ${hits.length} relevant learning(s) retrieved`,
+            );
+            // AC-40: stamp last_used_at so stale memories surface in curator
+            await this.repo.bumpMemoryLastUsedAt(memoryIds);
+          }
+        }
+      } catch {
+        // Never let memory retrieval break a run
       }
 
       // ---- Engine: assemble → single-pass → grounding -----------------------
@@ -400,6 +436,9 @@ export class ReviewRunExecutor {
         ...(callersDigest ? { callers: callersDigest } : {}),
         // T3 — repo skeleton, same omit-when-empty contract.
         ...(repoMap ? { repoMap } : {}),
+        // Memory: relevant learnings from pgvector search. assemblePrompt
+        // renders as "## Memory" section. Empty → section omitted.
+        ...(memoryPulled.length > 0 ? { memory: memoryPulled.map((m) => m.text) } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -486,7 +525,7 @@ export class ReviewRunExecutor {
           ms: Math.round(durationMs / Math.max(outcome.chunks.length, 1)),
         })),
         raw_output: outcome.raw,
-        memory_pulled: [],
+        memory_pulled: memoryPulled,
         specs_read: specsRead,
         // Persisted log = the run's FULL event buffer (incl. shared pre-work:
         // diff load + intent), not just events recorded inside this method.

@@ -51,6 +51,7 @@ export const findings = pgTable("findings", {
   trifectaComponents: jsonb("trifecta_components").$type<string[]>(),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
   dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+  repliedAt: timestamp("replied_at", { withTimezone: true }),
 });
 
 export const prIntent = pgTable("pr_intent", {

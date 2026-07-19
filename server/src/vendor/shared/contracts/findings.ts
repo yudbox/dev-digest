@@ -97,5 +97,6 @@ export type FindingActionKind = z.infer<typeof FindingActionKind>;
 export const FindingAction = z.object({
   action: FindingActionKind,
   reply: z.string().optional(),
+  note: z.string().optional(),
 });
 export type FindingAction = z.infer<typeof FindingAction>;

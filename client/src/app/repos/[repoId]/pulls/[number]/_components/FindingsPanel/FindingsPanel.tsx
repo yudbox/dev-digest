@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { Toggle, EmptyState, SEV, Icon } from "@devdigest/ui";
 import type { FindingRecord, Severity, EvalCaseInput } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
-import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
+import { useFindingAction, useCreatePrComment } from "../../../../../../../lib/hooks/reviews";
 import { usePrefillEvalCase } from "@/lib/hooks/evals";
 import { EvalCaseModal } from "@/components/evals/EvalCaseModal";
 import { KEY_TO_ACTION, SEVERITY_FILTERS } from "./constants";
@@ -28,6 +28,7 @@ export function FindingsPanel({
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
+  const postComment = useCreatePrComment(prId);
   const searchParams = useSearchParams();
   const targetFindingId = searchParams.get("finding");
   const [hideLow, setHideLow] = React.useState(false);
@@ -126,9 +127,23 @@ export function FindingsPanel({
               pending={action.isPending && action.variables?.findingId === f.id}
               repoFullName={repoFullName}
               headSha={headSha}
-              onAction={(act) =>
-                action.mutate({ findingId: f.id, action: act, prId })
-              }
+              onAction={(act, extra) => {
+                action.mutate({
+                  findingId: f.id,
+                  action: act,
+                  prId,
+                  note: extra?.note,
+                  reply: extra?.reply,
+                });
+                // AC-37: post inline GitHub comment when user replies to author
+                if (act === "reply" && extra?.reply) {
+                  postComment.mutate({
+                    path: f.file,
+                    line: f.start_line,
+                    body: extra.reply,
+                  });
+                }
+              }}
               onCreateEvalCase={(finding) =>
                 prefillEvalCase.mutate(finding.id, {
                   onSuccess: (input) => setEvalPrefill(input),

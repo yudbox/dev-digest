@@ -2,6 +2,8 @@ import type { Container } from "../../platform/container.js";
 import type {
   FindingActionKind,
   Intent,
+  MultiAgentRun,
+  MultiAgentRunSummary,
   RunEventKind,
   RunTrace,
 } from "@devdigest/shared";
@@ -174,8 +176,9 @@ export class ReviewService {
     workspaceId: string,
     findingId: string,
     action: FindingActionKind,
+    body?: { note?: string },
   ): Promise<{ finding: ReviewDtoFinding }> {
-    return actOnFindingImpl(this.repo, workspaceId, findingId, action);
+    return actOnFindingImpl(this.repo, workspaceId, findingId, action, this.container, body);
   }
 
   // ===========================================================================
@@ -250,5 +253,96 @@ export class ReviewService {
       undefined,
       true,
     );
+  }
+
+  // ===========================================================================
+  // Multi-agent reviews
+  // ===========================================================================
+
+  /**
+   * Launch a multi-agent review for a specific set of agents. Creates a
+   * `multi_agent_runs` row, fires concurrent agent runs (Promise.allSettled),
+   * and returns the batch ID immediately for SSE subscription.
+   */
+  async runMultiAgentReview(
+    workspaceId: string,
+    prId: string,
+    agentIds: string[],
+    logger?: Logger,
+  ): Promise<{
+    multiAgentRunId: string;
+    runs: { run_id: string; agent_id: string; agent_name: string }[];
+  }> {
+    if (agentIds.length === 0) {
+      throw new AppError("invalid_run_request", "At least one agent required", 400);
+    }
+
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError("Pull request not found");
+    const repo = await this.repo.getRepo(pull.repoId);
+    if (!repo) throw new NotFoundError("Repo not found");
+
+    const targets: AgentRow[] = [];
+    for (const agentId of agentIds) {
+      const agent = await this.agents.getById(workspaceId, agentId);
+      if (!agent) throw new NotFoundError(`Agent ${agentId} not found`);
+      targets.push(agent);
+    }
+
+    // Create agent_run rows up-front so runIds are available for SSE.
+    const jobs: { agent: AgentRow; runId: string }[] = [];
+    const runs: { run_id: string; agent_id: string; agent_name: string }[] = [];
+    for (const agent of targets) {
+      const runId = await this.repo.createAgentRun({
+        workspaceId,
+        agentId: agent.id,
+        prId,
+        provider: agent.provider,
+        model: agent.model,
+      });
+      runs.push({ run_id: runId, agent_id: agent.id, agent_name: agent.name });
+      jobs.push({ agent, runId });
+    }
+
+    // Create the multi_agent_runs batch row and link all agent_runs to it.
+    const batch = await this.repo.createMultiAgentRun({
+      workspaceId,
+      prId,
+      agentRunIds: jobs.map((j) => j.runId),
+    });
+
+    // Fire-and-forget concurrent execution.
+    void this.executor
+      .executeRuns(workspaceId, pull, repo, jobs, logger)
+      .catch((err) => {
+        logger?.error(
+          { prId, err: (err as Error).message },
+          "multi-agent review: background execution crashed",
+        );
+      });
+
+    return { multiAgentRunId: batch.id, runs };
+  }
+
+  async listMultiAgentRuns(params: {
+    workspaceId: string;
+    limit?: number;
+    cursor?: string;
+    status?: string;
+    q?: string;
+  }): Promise<{ items: MultiAgentRunSummary[]; next_cursor: string | null }> {
+    return this.repo.listMultiAgentRuns(params);
+  }
+
+  async getMultiAgentRun(
+    workspaceId: string,
+    id: string,
+  ): Promise<MultiAgentRun | null> {
+    const run = await this.repo.getMultiAgentRunById(id);
+    if (!run) return null;
+    // Workspace scoping: verify the run belongs to this workspace via the PR.
+    const pull = await this.repo.getPull(workspaceId, run.pr_id);
+    if (!pull) return null;
+    return run;
   }
 }

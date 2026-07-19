@@ -10,6 +10,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("../../../../../../../lib/hooks/reviews", () => ({
   useFindingAction: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreatePrComment: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const prefillMutate = vi.fn();
@@ -98,7 +99,10 @@ describe("FindingsPanel (smoke)", () => {
   });
 
   it("opens EvalCaseModal prefilled from a resolved finding (AC-9)", () => {
-    const accepted: FindingRecord = { ...FINDINGS[0]!, accepted_at: "2026-01-01T00:00:00Z" };
+    const accepted: FindingRecord = {
+      ...FINDINGS[0]!,
+      accepted_at: "2026-01-01T00:00:00Z",
+    };
     const prefillResult: EvalCaseInput = {
       owner_kind: "agent",
       owner_id: "a1",
@@ -106,7 +110,9 @@ describe("FindingsPanel (smoke)", () => {
       input_diff: "",
       input_files: null,
       input_meta: null,
-      expected_output: [{ file: "src/config.ts", start_line: 11, end_line: 11 }],
+      expected_output: [
+        { file: "src/config.ts", start_line: 11, end_line: 11 },
+      ],
       notes: null,
     };
     prefillMutate.mockImplementation(

@@ -77,7 +77,11 @@ export const ReadingPathItem = z.object({
 });
 export type ReadingPathItem = z.infer<typeof ReadingPathItem>;
 
-export const GapType = z.enum(["missing-test", "missing-doc", "missing-pattern"]);
+export const GapType = z.enum([
+  "missing-test",
+  "missing-doc",
+  "missing-pattern",
+]);
 export type GapType = z.infer<typeof GapType>;
 
 export const Complexity = z.enum(["Low", "Medium", "High"]);
@@ -278,6 +282,7 @@ export const Agent = z.object({
   runs_count: z.number().int().optional(),
   accept_rate_pct: z.number().optional(),
   avg_cost_usd: z.number().nullish(),
+  avg_duration_ms: z.number().nullish(),
 });
 export type Agent = z.infer<typeof Agent>;
 

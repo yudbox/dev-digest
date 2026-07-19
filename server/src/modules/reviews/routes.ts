@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
-import { RunRequest } from "@devdigest/shared";
+import { z } from "zod";
+import { RunRequest, FindingAction } from "@devdigest/shared";
 import type { RunEvent } from "@devdigest/shared";
 import { getContext } from "../_shared/context.js";
 import { IdParams } from "../_shared/schemas.js";
@@ -10,14 +11,35 @@ import { EvalsService } from "../evals/service.js";
 
 /**
  * reviews module.
- *   POST   /pulls/:id/review  {agentId} | {all:true}  → run review(s); returns runs
- *   GET    /runs/:id/events                            → SSE stream of RunEvent (replay-first)
- *   GET    /runs/:id/trace                             → the single-document RunTrace
- *   GET    /pulls/:id/reviews                          → persisted reviews + findings for a PR
- *   POST   /findings/:id/(accept|dismiss)              → finding actions
- *   POST   /findings/:id/eval-case                     → prefill an EvalCaseInput (A6, no DB insert)
+ *   POST   /pulls/:id/review              {agentId} | {all:true}   → run review(s)
+ *   POST   /pulls/:id/multi-agent-run     {agentIds:[]}            → multi-agent batch
+ *   GET    /multi-agent-runs              ?limit&cursor&status&q   → list runs (keyset)
+ *   GET    /multi-agent-runs/:id                                   → full detail
+ *   GET    /runs/:id/events                                        → SSE stream
+ *   GET    /runs/:id/trace                                         → RunTrace doc
+ *   GET    /pulls/:id/reviews                                      → reviews + findings
+ *   POST   /findings/:id/(accept|dismiss|undo|learn|reply)         → finding actions
+ *   POST   /findings/:id/eval-case                                 → eval-case prefill
  */
-const FINDING_ACTIONS = ["accept", "dismiss"] as const;
+const FINDING_ACTIONS = [
+  "accept",
+  "dismiss",
+  "undo",
+  "learn",
+  "reply",
+] as const;
+
+const MultiAgentRunRequest = z.object({
+  agentIds: z.array(z.string().uuid()).min(1),
+});
+
+const MultiAgentRunsQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.string().optional(),
+  status: z.enum(["running", "failed", "done"]).optional(),
+  q: z.string().optional(),
+});
+
 export default async function reviewsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
@@ -47,6 +69,53 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
         req.log,
       );
       return { pr_id: req.params.id, runs, reviews };
+    },
+  );
+
+  // ---- Multi-agent review run (N≥1 agents, always creates multi_agent_runs row) -
+  app.post(
+    "/pulls/:id/multi-agent-run",
+    {
+      schema: { params: IdParams, body: MultiAgentRunRequest },
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+    },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      const { multiAgentRunId, runs } = await service.runMultiAgentReview(
+        workspaceId,
+        req.params.id,
+        req.body.agentIds,
+        req.log,
+      );
+      return { multi_agent_run_id: multiAgentRunId, pr_id: req.params.id, runs };
+    },
+  );
+
+  // ---- Multi-agent runs list (workspace-scoped, keyset pagination) ---------
+  app.get(
+    "/multi-agent-runs",
+    { schema: { querystring: MultiAgentRunsQuery } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return service.listMultiAgentRuns({
+        workspaceId,
+        limit: req.query.limit,
+        cursor: req.query.cursor,
+        status: req.query.status,
+        q: req.query.q,
+      });
+    },
+  );
+
+  // ---- Multi-agent run detail (full with columns + conflicts) --------------
+  app.get(
+    "/multi-agent-runs/:id",
+    { schema: { params: IdParams } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      const run = await service.getMultiAgentRun(workspaceId, req.params.id);
+      if (!run) throw new NotFoundError("Multi-agent run not found");
+      return run;
     },
   );
 
@@ -159,19 +228,15 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
     return { ok: true };
   });
 
-  // ---- Finding actions (accept / dismiss / undo) -------------------------
-  for (const action of [...FINDING_ACTIONS, "undo"] as const) {
+  // ---- Finding actions (accept / dismiss / undo / learn / reply) ----------
+  for (const action of FINDING_ACTIONS) {
     app.post(
       `/findings/:id/${action}`,
-      { schema: { params: IdParams } },
+      { schema: { params: IdParams, body: FindingAction.partial().nullable().optional() } },
       async (req) => {
         const { workspaceId } = await getContext(container, req);
-        const result = await service.actOnFinding(
-          workspaceId,
-          req.params.id,
-          action,
-        );
-        return result;
+        const body = req.body as { note?: string } | undefined;
+        return service.actOnFinding(workspaceId, req.params.id, action, body);
       },
     );
   }

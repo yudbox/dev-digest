@@ -78,6 +78,18 @@ export const NAV: NavGroup[] = [
       },
     ],
   },
+  {
+    section: "GLOBAL",
+    items: [
+      {
+        key: "multi-agent",
+        label: "Multi-Agent Review",
+        icon: "Users",
+        href: "/repos/:repoId/multi-agent-review",
+        gKey: "m",
+      },
+    ],
+  },
 ];
 
 export const SETTINGS_ITEM: NavItemDef = {

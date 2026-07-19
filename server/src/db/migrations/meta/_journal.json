@@ -134,6 +134,13 @@
       "when": 1783401911364,
       "tag": "0018_special_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1783851036131,
+      "tag": "0019_kind_impossible_man",
+      "breakpoints": true
     }
   ]
 }
