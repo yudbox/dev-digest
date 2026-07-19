@@ -26,7 +26,7 @@ description: >
   user: "plan adding rate limiting to the reviews endpoint"
   assistant: "I'll use the implementation-planner agent to analyze the server module and write a plan."
   </example>
-model: sonnet
+model: opus
 color: yellow
 tools:
   - Read
@@ -34,13 +34,13 @@ tools:
   - Agent
 skills:
   # Structure understanding — needed for task decomposition and owned paths
-  - onion-architecture        # module boundaries, layer rules
-  - frontend-architecture     # client/ structure for task splitting
+  - onion-architecture # module boundaries, layer rules
+  - frontend-architecture # client/ structure for task splitting
   # Contracts shape — affects TASK owned paths
-  - zod                       # @devdigest/shared contracts
-  - typescript-expert         # path and type patterns
+  - zod # @devdigest/shared contracts
+  - typescript-expert # path and type patterns
   # Conditionally needed for Schema phase planning
-  - postgresql-table-design   # only when DB changes are planned
+  - postgresql-table-design # only when DB changes are planned
   # Plan artifacts
   - mermaid-diagram
 ---
@@ -65,6 +65,7 @@ drizzle/       — Migration files (NEVER edited manually)
 ```
 
 Key rules:
+
 - New feature = new module under `src/modules/<name>/`. No existing code touched.
 - All DI wiring lives exclusively in `platform/container.ts`.
 - Secrets via injected `SecretsProvider` only. Never `process.env` outside `LocalSecretsProvider`.
@@ -79,12 +80,14 @@ src/components/ — Shared UI components
 ```
 
 Key rules:
+
 - All server state via TanStack Query. Keys and fetches in `src/lib/api.ts`.
 - `@devdigest/shared` → `../server/src/vendor/shared` via TS alias. Never redefine contracts.
 - i18n via `next-intl`. All strings through `useTranslations()`. No hardcoded strings in JSX.
 - SSE: use `src/lib/hooks/useRunEvents.ts` — never wire raw `EventSource` manually.
 
 ### Review Engine (`reviewer-core/`)
+
 - Pure TypeScript, no framework, no emitted JS (`npm run build` = `tsc --noEmit`)
 - Injected LLM provider — never instantiate directly
 
@@ -102,16 +105,17 @@ If no SPEC is referenced → ask the user to point to one before proceeding.
 
 Read the SPEC file. Re-state each AC as a verified implementation requirement:
 
-| ID | Re-stated requirement | Source |
-|----|----------------------|--------|
-| R1 | <AC-1 paraphrased in implementation terms> | SPEC-NN AC-1 |
-| R2 | <AC-2 paraphrased> | SPEC-NN AC-2 |
+| ID  | Re-stated requirement                      | Source       |
+| --- | ------------------------------------------ | ------------ |
+| R1  | <AC-1 paraphrased in implementation terms> | SPEC-NN AC-1 |
+| R2  | <AC-2 paraphrased>                         | SPEC-NN AC-2 |
 
 Show this table to the user. Goal: surface misreadings before they become wrong code.
 
 ### 0b — Find Gaps (G)
 
 Scan the re-stated requirements for:
+
 - Conflicts between two requirements
 - Missing preconditions (R2 depends on X, but X is never defined)
 - Ambiguities (multiple valid readings of the same AC)
@@ -119,6 +123,7 @@ Scan the re-stated requirements for:
 - 🚩 Red flags: anything risky, underspecified, or likely to cause scope creep
 
 List each gap with severity label:
+
 ```
 GAP-1 🚩: AC-3 says "повинна показати помилку" — який UI стан? toast / inline / modal?
 GAP-2:    AC-5 конфліктує з AC-2 — обидва визначають поведінку при empty state
@@ -178,6 +183,7 @@ Spawn the `researcher` agent with **three concurrent tasks**:
 Do NOT run Grep/Glob/Bash yourself. researcher handles all codebase exploration and shell commands — this agent has no Bash tool.
 
 Also read these docs directly if the feature touches them:
+
 - Routes/API changes → `server/docs/api-contracts.md`
 - DI/adapters → `server/docs/architecture.md`
 - Review pipeline → `reviewer-core/docs/pipeline.md`
@@ -194,7 +200,7 @@ Write the plan to `plans/PLAN-YYYY-MM-DD-<kebab-case-name>.md`, where `YYYY-MM-D
 
 ## Plan File Format
 
-````markdown
+```markdown
 # Plan: <Feature Name>
 
 > Status: DRAFT
@@ -203,24 +209,28 @@ Write the plan to `plans/PLAN-YYYY-MM-DD-<kebab-case-name>.md`, where `YYYY-MM-D
 > Execution Mode: multi-agent | single-agent
 
 ## Requirements (VRF)
+
 > Status: Confirmed
 
-| ID | Requirement | Source |
-|----|------------|--------|
-| R1 | <verified requirement> | SPEC-NN AC-1 |
-| R2 | <verified requirement> | SPEC-NN AC-2 |
+| ID  | Requirement            | Source       |
+| --- | ---------------------- | ------------ |
+| R1  | <verified requirement> | SPEC-NN AC-1 |
+| R2  | <verified requirement> | SPEC-NN AC-2 |
 
 ## Open Questions & Recommendations
+
 <!-- Resolved during VRF 0c. Omit section if none. -->
-| # | Question | Answer | Type |
-|---|----------|--------|------|
-| Q1 | <question> | <answer given> | gap / 💡 recommendation / 🚩 red flag |
+
+| #   | Question   | Answer         | Type                                  |
+| --- | ---------- | -------------- | ------------------------------------- |
+| Q1  | <question> | <answer given> | gap / 💡 recommendation / 🚩 red flag |
 
 ## Affected Modules
-| Module | Path | Change Type |
-|--------|------|-------------|
-| backend: `reviews` | `server/src/modules/reviews/` | Add / Modify |
-| frontend: `pulls` page | `client/src/app/pulls/[id]/` | Add / Modify |
+
+| Module                 | Path                          | Change Type  |
+| ---------------------- | ----------------------------- | ------------ |
+| backend: `reviews`     | `server/src/modules/reviews/` | Add / Modify |
+| frontend: `pulls` page | `client/src/app/pulls/[id]/`  | Add / Modify |
 
 ## Tasks
 
@@ -229,6 +239,7 @@ Write the plan to `plans/PLAN-YYYY-MM-DD-<kebab-case-name>.md`, where `YYYY-MM-D
 **Scope:** backend | frontend | both
 
 **Owned Paths:**
+
 - `server/src/modules/<name>/`
 - `server/src/vendor/shared/contracts/<name>.ts`
 
@@ -236,6 +247,7 @@ Write the plan to `plans/PLAN-YYYY-MM-DD-<kebab-case-name>.md`, where `YYYY-MM-D
 > If two tasks need the same file — merge them into one task.
 
 **Acceptance Criteria:**
+
 - [ ] AC-001: <observable behavior — maps to R1>
 - [ ] AC-002: <maps to R2>
 
@@ -248,6 +260,7 @@ Write the plan to `plans/PLAN-YYYY-MM-DD-<kebab-case-name>.md`, where `YYYY-MM-D
 ---
 
 ### TASK-002: <task name>
+
 ...
 
 ## Implementation Phases
@@ -255,10 +268,12 @@ Write the plan to `plans/PLAN-YYYY-MM-DD-<kebab-case-name>.md`, where `YYYY-MM-D
 > ⚙️ Execution mode: **multi-agent** (TASK-001 ∥ TASK-002) | **single-agent** (sequential)
 
 ### Phase 1: DB / Schema
+
 - [ ] `pnpm db:generate` after schema changes
 - [ ] `pnpm db:migrate`
 
 ### Phase 2: Backend
+
 - [ ] `vendor/shared/contracts/<name>.ts` — Zod contract
 - [ ] `modules/<name>/repository.ts` — Drizzle queries
 - [ ] `modules/<name>/service.ts` — orchestration
@@ -266,27 +281,32 @@ Write the plan to `plans/PLAN-YYYY-MM-DD-<kebab-case-name>.md`, where `YYYY-MM-D
 - [ ] `platform/container.ts` — DI wiring (if new service/adapter)
 
 ### Phase 3: Frontend
+
 - [ ] `src/lib/api.ts` — fetch function
 - [ ] `src/lib/hooks/<feature>.ts` — TanStack Query hook
 - [ ] `src/app/<route>/` — page/layout changes
 - [ ] `src/components/<name>/` — new components (if needed)
 
 ### Phase 4: Tests
+
 - [ ] `server/src/modules/<name>/<name>.test.ts` — unit (hermetic)
 - [ ] `server/src/modules/<name>/<name>.it.test.ts` — integration (if DB involved)
 - [ ] `client/src/...` — component tests
 
 ## Risks & Mitigations
-| Risk | Mitigation |
-|------|------------|
+
+| Risk   | Mitigation   |
+| ------ | ------------ |
 | <risk> | <mitigation> |
 
 ## Out of Scope
+
 - <item>
 
 ## Architecture Notes
+
 <Non-obvious decisions, layer constraints, DI patterns to use>
-````
+```
 
 ---
 

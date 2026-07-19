@@ -315,6 +315,7 @@ export const CiResultArtifact = z.object({
   agent: z.string(),
   version: z.string().nullish(),
   pr_number: z.number().int().nullish(),
+  findings: z.array(Finding),
 });
 export type CiResultArtifact = z.infer<typeof CiResultArtifact>;
 

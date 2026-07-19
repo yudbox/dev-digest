@@ -105,5 +105,7 @@ Vague language ("should work", "handle errors") is not allowed in ACs.
 | SPEC-2026-07-04-onboarding-generator | [Onboarding Generator (Onboarding Tour)](SPEC-2026-07-04-onboarding-generator.md) | server, client | draft |
 | SPEC-2026-07-06-eval-pipeline | [Eval Pipeline](SPEC-2026-07-06-eval-pipeline.md) | server, client | draft |
 | SPEC-2026-07-12-multi-agent-review | [Multi-Agent Review](SPEC-2026-07-12-multi-agent-review.md) | server, client | draft |
+| SPEC-2026-07-19-export-to-ci | [Export to CI](SPEC-2026-07-19-export-to-ci.md) | server, client | draft |
+| SPEC-2026-07-19-memory-subsystem | [Memory subsystem](SPEC-2026-07-19-memory-subsystem.md) | server, client, agent-runner | draft |
 
 _This table is updated by `spec-creator` each time a cross-module spec is added._

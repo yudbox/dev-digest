@@ -1,9 +1,9 @@
-import type { Finding } from '@devdigest/shared';
-import { CiResultArtifact } from '@devdigest/shared';
-import { RunnerError } from './errors.js';
+import type { Finding } from "@devdigest/shared";
+import { CiResultArtifact } from "@devdigest/shared";
+import { RunnerError } from "./errors.js";
 
 /** Runner version string embedded in every artifact (informational only). */
-export const RUNNER_VERSION = '1';
+export const RUNNER_VERSION = "1";
 
 export interface BuildResultArtifactInput {
   findings: Finding[];
@@ -13,11 +13,15 @@ export interface BuildResultArtifactInput {
   prNumber: number;
 }
 
-function severityCounts(findings: Finding[]): { critical: number; warning: number; suggestion: number } {
+function severityCounts(findings: Finding[]): {
+  critical: number;
+  warning: number;
+  suggestion: number;
+} {
   const counts = { critical: 0, warning: 0, suggestion: 0 };
   for (const f of findings) {
-    if (f.severity === 'CRITICAL') counts.critical++;
-    else if (f.severity === 'WARNING') counts.warning++;
+    if (f.severity === "CRITICAL") counts.critical++;
+    else if (f.severity === "WARNING") counts.warning++;
     else counts.suggestion++;
   }
   return counts;
@@ -29,7 +33,9 @@ function severityCounts(findings: Finding[]): { critical: number; warning: numbe
  * (T6) will `safeParse` on the way back in, so a malformed artifact fails
  * loudly here rather than silently on ingest.
  */
-export function buildResultArtifact(input: BuildResultArtifactInput): CiResultArtifact {
+export function buildResultArtifact(
+  input: BuildResultArtifactInput,
+): CiResultArtifact {
   const counts = severityCounts(input.findings);
   const candidate = {
     findings_count: input.findings.length,
@@ -41,6 +47,7 @@ export function buildResultArtifact(input: BuildResultArtifactInput): CiResultAr
     agent: input.agent,
     version: RUNNER_VERSION,
     pr_number: input.prNumber,
+    findings: input.findings,
   };
   const result = CiResultArtifact.safeParse(candidate);
   if (!result.success) {
