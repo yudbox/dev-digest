@@ -85,7 +85,7 @@ export const NAV: NavGroup[] = [
         key: "multi-agent",
         label: "Multi-Agent Review",
         icon: "Users",
-        href: "/multi-agent-review",
+        href: "/repos/:repoId/multi-agent-review",
         gKey: "m",
       },
     ],

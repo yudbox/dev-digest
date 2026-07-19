@@ -281,11 +281,5 @@ export function useMultiAgentRun(id: string | null | undefined) {
     queryKey: ["multi-agent-run", id],
     queryFn: () => api.get<MultiAgentRun>(`/multi-agent-runs/${id}`),
     enabled: !!id,
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      if (!data) return false;
-      // Poll while any column is still running
-      return data.columns.some((c) => c.status === "running") ? 3000 : false;
-    },
   });
 }

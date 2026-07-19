@@ -77,7 +77,11 @@ function GroupSection({
                   ? new Map(
                       smartFile.line_findings.map((f) => [
                         f.line,
-                        { severity: f.severity, findingId: f.id },
+                        {
+                          severity: f.severity,
+                          findingId: f.id,
+                          accepted: f.accepted ?? false,
+                        },
                       ]),
                     )
                   : undefined

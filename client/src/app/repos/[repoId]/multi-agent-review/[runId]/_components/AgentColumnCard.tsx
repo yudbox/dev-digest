@@ -3,14 +3,21 @@
 
 import React from "react";
 import type { AgentColumn } from "@devdigest/shared";
-import { Icon } from "@devdigest/ui";
-import { agentIcon } from "../../agentIconMap";
+import { Icon, SEV } from "@devdigest/ui";
+import { agentIcon, agentColor as getAgentColor } from "../../agentIconMap";
 
 const SEV_COLOR: Record<string, string> = {
   CRITICAL: "var(--critical, #f87171)",
   WARNING: "var(--warning, #fb923c)",
   SUGGESTION: "var(--suggestion, #60a5fa)",
 };
+
+function SevIcon({ severity }: { severity: string }) {
+  const meta = SEV[severity as keyof typeof SEV];
+  if (!meta) return null;
+  const SIcon = Icon[meta.icon as keyof typeof Icon] as React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
+  return <SIcon size={13} style={{ color: meta.c, flexShrink: 0 }} />;
+}
 
 /** Client-side progress estimate per AC-63: min(95%, elapsed/avg*100) */
 export function estimateProgress(
@@ -30,8 +37,8 @@ export function AgentColumnCard({
   column: AgentColumn;
   /** Epoch ms when this run started (for progress calc). */
   startedAt?: number;
-  /** Click a finding row → switch to Tabs mode. */
-  onFindingClick?: (agentId: string, runId: string) => void;
+  /** Click a finding row → switch to Tabs mode, passing findingId for auto-scroll. */
+  onFindingClick?: (agentId: string, runId: string, findingId: string) => void;
   onViewTrace?: () => void;
 }) {
   const [now, setNow] = React.useState(Date.now());
@@ -47,28 +54,30 @@ export function AgentColumnCard({
 
   const elapsedMs = startedAt ? now - startedAt : 0;
   const progress = running
-    ? estimateProgress(elapsedMs, column.duration_ms)
+    ? estimateProgress(elapsedMs, column.avg_duration_ms)
     : column.status === "done"
       ? 100
       : 0;
 
-  const AgentIcon = Icon[agentIcon(column.agent_name)] ?? Icon.Bot;
+  const AgentIcon =
+    (
+      Icon as Record<
+        string,
+        React.ComponentType<{ size?: number; style?: React.CSSProperties }>
+      >
+    )[agentIcon(column.agent_name)] ?? Icon.Bot;
 
-  const borderColor = failed
-    ? "var(--critical, #f87171)"
-    : column.verdict === "request_changes"
-      ? "var(--critical, #f87171)"
-      : column.verdict === "approve"
-        ? "var(--ok, #4ade80)"
-        : "var(--border)";
+  const agentColor = getAgentColor(column.agent_id);
+
+  // Card border: always the agent's own color
+  const borderColor = agentColor;
 
   return (
     <div
       style={{
-        minWidth: 280,
-        maxWidth: 320,
+        width: 300,
         flexShrink: 0,
-        border: `1px solid ${running ? "var(--accent, #4f9cf9)" : borderColor}`,
+        border: `1px solid ${running ? agentColor : borderColor}`,
         borderRadius: 10,
         background: "var(--surface-raised)",
         overflow: "hidden",
@@ -90,14 +99,15 @@ export function AgentColumnCard({
             width: 28,
             height: 28,
             borderRadius: 7,
-            background: "var(--surface)",
+            background: `${agentColor}22`,
+            border: `1px solid ${agentColor}55`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
           }}
         >
-          <AgentIcon size={14} style={{ color: "var(--text-muted)" }} />
+          <AgentIcon size={14} style={{ color: agentColor }} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
@@ -132,13 +142,11 @@ export function AgentColumnCard({
               width: 32,
               height: 32,
               borderRadius: "50%",
-              background: `conic-gradient(var(--accent, #4f9cf9) ${progress * 3.6}deg, var(--surface) 0deg)`,
+              background: `conic-gradient(${agentColor} ${progress * 3.6}deg, #2a2a2a 0deg)`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
-              fontSize: 9,
-              color: "var(--text-muted)",
             }}
           >
             <div
@@ -146,23 +154,25 @@ export function AgentColumnCard({
                 width: 22,
                 height: 22,
                 borderRadius: "50%",
-                background: "var(--surface-raised)",
+                background: "#1a1a1a",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 9,
+                fontWeight: 700,
+                color: "var(--text-muted)",
               }}
             >
               {Math.round(progress)}%
             </div>
           </div>
-        ) : column.score != null ? (
+        ) : column.score != null || failed ? (
           <div
             style={{
               width: 32,
               height: 32,
               borderRadius: "50%",
-              background: `conic-gradient(var(--ok, #4ade80) ${column.score * 3.6}deg, var(--surface) 0deg)`,
+              background: `conic-gradient(${agentColor} ${(column.score ?? 0) * 3.6}deg, #2a2a2a 0deg)`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -174,7 +184,7 @@ export function AgentColumnCard({
                 width: 22,
                 height: 22,
                 borderRadius: "50%",
-                background: "var(--surface-raised)",
+                background: "#1a1a1a",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -183,18 +193,19 @@ export function AgentColumnCard({
                 color: "var(--text)",
               }}
             >
-              {column.score}
+              {column.score ?? 0}
             </div>
           </div>
         ) : null}
       </div>
 
-      {/* Findings list — vertically scrollable (AC-65: 5+ findings) */}
+      {/* Findings list */}
       <div
         style={{
           maxHeight: running ? 100 : 240,
           overflowY: "auto",
-          scrollbarWidth: "thin",
+          scrollbarWidth: "none",
+          padding: running ? 0 : "4px 0",
         }}
       >
         {running && (
@@ -213,48 +224,47 @@ export function AgentColumnCard({
           column.findings.map((finding) => (
             <div
               key={finding.id}
-              onClick={() => onFindingClick?.(column.agent_id, column.run_id)}
+              onClick={() =>
+                onFindingClick?.(column.agent_id, column.run_id, finding.id)
+              }
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 14px",
+                margin: "6px 10px",
+                padding: "8px 10px",
+                borderRadius: 7,
+                background: "var(--surface, #1a1a1a)",
+                border: "1px solid var(--border-subtle, rgba(255,255,255,0.06))",
                 cursor: onFindingClick ? "pointer" : "default",
-                borderBottom: "1px solid var(--border-subtle, transparent)",
-                fontSize: 12,
               }}
             >
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  background:
-                    SEV_COLOR[finding.severity] ?? "var(--text-muted)",
-                  flexShrink: 0,
-                }}
-              />
-              <span
-                style={{
-                  flex: 1,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  color: "var(--text)",
-                }}
-              >
-                {finding.title}
-              </span>
-              <span
+              {/* Title row: severity icon + bold title */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
+                <SevIcon severity={finding.severity} />
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--text)",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {finding.title}
+                </span>
+              </div>
+              {/* File:line */}
+              <div
                 style={{
                   fontSize: 10,
                   color: "var(--text-muted)",
                   fontFamily: "monospace",
-                  flexShrink: 0,
+                  marginTop: 4,
+                  paddingLeft: 20,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}
               >
-                {finding.file.split("/").pop()}:{finding.start_line}
-              </span>
+                {finding.file}:{finding.start_line}
+              </div>
             </div>
           ))}
         {!running && column.findings.length === 0 && !failed && (

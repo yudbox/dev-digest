@@ -39,6 +39,7 @@ export const AgentColumn = z.object({
   score: z.number().int().nullable(),
   summary: z.string().nullable(),
   duration_ms: z.number().int().nullable(),
+  avg_duration_ms: z.number().nullish(),
   cost_usd: z.number().nullable(),
   findings: z.array(AgentColumnFinding),
 });
@@ -73,6 +74,8 @@ export const MultiAgentRun = z.object({
   pr_id: z.string(),
   pr_number: z.number().int().nullish(),
   pr_title: z.string(),
+  repo_full_name: z.string().nullish(),
+  head_sha: z.string().nullish(),
   ran_at: z.string(),
   agent_count: z.number().int(),
   total_duration_ms: z.number().int(),

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, max, sql } from "drizzle-orm";
+import { and, avg, count, desc, eq, inArray, max, sql } from "drizzle-orm";
 import type { Db } from "../../../db/client.js";
 import * as t from "../../../db/schema.js";
 import type {
@@ -56,9 +56,12 @@ export async function getMultiAgentRunById(
       ranAt: t.multiAgentRuns.ranAt,
       prNumber: t.pullRequests.number,
       prTitle: t.pullRequests.title,
+      repoFullName: t.repos.fullName,
+      headSha: t.pullRequests.headSha,
     })
     .from(t.multiAgentRuns)
     .innerJoin(t.pullRequests, eq(t.pullRequests.id, t.multiAgentRuns.prId))
+    .leftJoin(t.repos, eq(t.repos.id, t.pullRequests.repoId))
     .where(eq(t.multiAgentRuns.id, id));
 
   if (!run) return null;
@@ -82,6 +85,8 @@ export async function getMultiAgentRunById(
       pr_id: run.prId,
       pr_number: run.prNumber,
       pr_title: run.prTitle,
+      repo_full_name: run.repoFullName ?? null,
+      head_sha: run.headSha ?? null,
       ran_at: run.ranAt.toISOString(),
       agent_count: 0,
       total_duration_ms: 0,
@@ -104,6 +109,21 @@ export async function getMultiAgentRunById(
           .where(inArray(t.agents.id, agentIds))
       : [];
   const agentNameMap = new Map(agentRows.map((a) => [a.id, a.name]));
+
+  const avgDurationRows =
+    agentIds.length > 0
+      ? await db
+          .select({
+            agentId: t.agentRuns.agentId,
+            avgDurationMs: avg(t.agentRuns.durationMs),
+          })
+          .from(t.agentRuns)
+          .where(inArray(t.agentRuns.agentId, agentIds))
+          .groupBy(t.agentRuns.agentId)
+      : [];
+  const avgDurationMap = new Map(
+    avgDurationRows.map((r) => [r.agentId, r.avgDurationMs == null ? null : Number(r.avgDurationMs)]),
+  );
 
   const reviewRows = await db
     .select()
@@ -157,6 +177,7 @@ export async function getMultiAgentRunById(
       score: review?.score ?? null,
       summary: review?.summary ?? null,
       duration_ms: ar.durationMs,
+      avg_duration_ms: avgDurationMap.get(agentId) ?? null,
       cost_usd: ar.costUsd,
       findings: columnFindings,
     };
@@ -174,6 +195,8 @@ export async function getMultiAgentRunById(
     pr_id: run.prId,
     pr_number: run.prNumber,
     pr_title: run.prTitle,
+    repo_full_name: run.repoFullName ?? null,
+    head_sha: run.headSha ?? null,
     ran_at: run.ranAt.toISOString(),
     agent_count: agentRunRows.length,
     total_duration_ms: totalDurationMs,
@@ -204,13 +227,13 @@ export async function listMultiAgentRuns(
       totalCostUsd: sql<number>`COALESCE(SUM(${t.agentRuns.costUsd}), 0)`.as(
         "total_cost_usd",
       ),
-      status: sql<"running" | "failed" | "done">`
+      runStatus: sql<"running" | "failed" | "done">`
         CASE
           WHEN SUM(CASE WHEN ${t.agentRuns.status} = 'running' THEN 1 ELSE 0 END) > 0 THEN 'running'
           WHEN SUM(CASE WHEN ${t.agentRuns.status} = 'failed'  THEN 1 ELSE 0 END) > 0 THEN 'failed'
           ELSE 'done'
         END
-      `.as("status"),
+      `.as("run_status"),
     })
     .from(t.agentRuns)
     .where(sql`${t.agentRuns.multiAgentRunId} IS NOT NULL`)
@@ -229,7 +252,7 @@ export async function listMultiAgentRuns(
   }
 
   if (params.status) {
-    conditions.push(sql`${runsAgg.status} = ${params.status}`);
+    conditions.push(sql`${runsAgg.runStatus} = ${params.status}`);
   }
 
   if (params.q) {
@@ -249,7 +272,7 @@ export async function listMultiAgentRuns(
       agentCount: runsAgg.agentCount,
       totalDurationMs: runsAgg.totalDurationMs,
       totalCostUsd: runsAgg.totalCostUsd,
-      status: runsAgg.status,
+      status: runsAgg.runStatus,
     })
     .from(t.multiAgentRuns)
     .innerJoin(t.pullRequests, eq(t.pullRequests.id, t.multiAgentRuns.prId))

@@ -232,7 +232,7 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
   for (const action of FINDING_ACTIONS) {
     app.post(
       `/findings/:id/${action}`,
-      { schema: { params: IdParams, body: FindingAction.partial().optional() } },
+      { schema: { params: IdParams, body: FindingAction.partial().nullable().optional() } },
       async (req) => {
         const { workspaceId } = await getContext(container, req);
         const body = req.body as { note?: string } | undefined;

@@ -118,6 +118,7 @@ export const SmartDiffFile = z.object({
         id: z.string(),
         line: z.number().int(),
         severity: z.string(),
+        accepted: z.boolean().optional(),
       }),
     )
     .nullish(),

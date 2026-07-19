@@ -5,6 +5,7 @@ import messages from "../../../../../../../../messages/en/prReview.json";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useParams: () => ({ repoId: "repo1" }),
 }));
 vi.mock("../../../../../../../lib/hooks/agents", () => ({
   useAgents: () => ({

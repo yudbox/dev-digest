@@ -68,6 +68,12 @@ export function FindingCard({
     if (targeted) setExpanded(true);
   }, [targeted]);
 
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (targeted && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [targeted]);
   const openComposer = (kind: "learn" | "reply") => {
     setComposerText(kind === "learn" ? f.title : "");
     setComposer(kind);
@@ -85,6 +91,7 @@ export function FindingCard({
   };
   return (
     <div
+      ref={cardRef}
       data-finding-id={f.id}
       style={s.card(!!focused || !!targeted, sevColor, muted)}
     >

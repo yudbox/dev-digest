@@ -4,7 +4,7 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Icon } from "@devdigest/ui";
 import { Checkbox } from "@devdigest/ui";
 import { useAgents } from "../../../../../../../lib/hooks/agents";
@@ -35,6 +35,7 @@ export function RunReviewDropdown({
   onRunsStarted?: (runIds: string[]) => void;
 }) {
   const router = useRouter();
+  const { repoId } = useParams<{ repoId: string }>();
   const { data: agents } = useAgents();
   const runSingle = useRunReview();
   const runMulti = useRunMultiAgentReview();
@@ -93,7 +94,7 @@ export function RunReviewDropdown({
       onRunsStarted?.(res.runs.map((r) => r.run_id));
     } else {
       const res = await runMulti.mutateAsync({ prId, agentIds: [...checked] });
-      router.push(`/multi-agent-review/${res.multi_agent_run_id}`);
+      router.push(`/repos/${repoId}/multi-agent-review/${res.multi_agent_run_id}`);
     }
   };
 
