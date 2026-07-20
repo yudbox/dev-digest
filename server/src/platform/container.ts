@@ -28,6 +28,7 @@ import { SkillsRepository } from '../modules/skills/repository.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import { RepoRepository } from '../modules/repos/repository.js';
 import { EvalsRepository } from '../modules/evals/repository.js';
+import { CiRepository } from '../modules/ci/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
@@ -80,6 +81,7 @@ export class Container {
   private _reviewRepo?: ReviewRepository;
   private _reposRepo?: RepoRepository;
   private _evalsRepo?: EvalsRepository;
+  private _ciRepo?: CiRepository;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
@@ -128,6 +130,10 @@ export class Container {
 
   get evalsRepo(): EvalsRepository {
     return (this._evalsRepo ??= new EvalsRepository(this.db));
+  }
+
+  get ciRepo(): CiRepository {
+    return (this._ciRepo ??= new CiRepository(this.db));
   }
 
   get codeIndex(): CodeIndex {

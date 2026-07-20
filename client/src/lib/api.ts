@@ -156,17 +156,19 @@ export function updateSkillContextPaths(
 export function postOnboarding(
   repoId: string,
   opts?: { force?: boolean },
-): Promise<import('@devdigest/shared').Onboarding> {
+): Promise<import("@devdigest/shared").Onboarding> {
   const url = opts?.force
     ? `/repos/${repoId}/onboarding?force=true`
     : `/repos/${repoId}/onboarding`;
-  return api.post<import('@devdigest/shared').Onboarding>(url);
+  return api.post<import("@devdigest/shared").Onboarding>(url);
 }
 
 export function getOnboarding(
   repoId: string,
-): Promise<import('@devdigest/shared').Onboarding> {
-  return api.get<import('@devdigest/shared').Onboarding>(`/repos/${repoId}/onboarding`);
+): Promise<import("@devdigest/shared").Onboarding> {
+  return api.get<import("@devdigest/shared").Onboarding>(
+    `/repos/${repoId}/onboarding`,
+  );
 }
 
 // ---- Evals -------------------------------------------------------------
@@ -215,7 +217,9 @@ export function runAgentEvals(agentId: string): Promise<EvalBatchRunResponse> {
 /** Unlike `runAgentEvals`, the skill batch-run route has no `EvalBatchSummary`
  *  to return (skills have no `agent_version`-style aggregate row) — just the
  *  per-case results. */
-export function runSkillEvals(skillId: string): Promise<{ runs: EvalRunResult[] }> {
+export function runSkillEvals(
+  skillId: string,
+): Promise<{ runs: EvalRunResult[] }> {
   return api.post<{ runs: EvalRunResult[] }>(`/skills/${skillId}/eval-runs`);
 }
 
@@ -253,4 +257,60 @@ export function fetchAgentVersions(
   agentId: string,
 ): Promise<AgentVersionSummary[]> {
   return api.get<AgentVersionSummary[]>(`/agents/${agentId}/versions`);
+}
+
+// ---- CI export / installations / runs -------------------------------------
+
+import type {
+  CiExportInputBody,
+  CiExport,
+  CiInstallationsResponse,
+  CiRunsResponse,
+  CiRunsQuery,
+  CiRefreshInput,
+  CiRefreshResult,
+} from "@devdigest/shared";
+
+export function exportCi(
+  agentId: string,
+  input: CiExportInputBody,
+): Promise<CiExport> {
+  return api.post<CiExport>(`/agents/${agentId}/export-ci`, input);
+}
+
+export function getCiInstallations(
+  agentId: string,
+): Promise<CiInstallationsResponse> {
+  return api.get<CiInstallationsResponse>(
+    `/agents/${agentId}/ci-installations`,
+  );
+}
+
+export function updateCiConfig(agentId: string): Promise<{ ok: boolean }> {
+  return api.post<{ ok: boolean }>(`/agents/${agentId}/ci-config`, {});
+}
+
+export function getCiRuns(filters?: CiRunsQuery): Promise<CiRunsResponse> {
+  const params = filters
+    ? "?" +
+      new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(filters).filter(([, v]) => v !== undefined),
+        ) as Record<string, string>,
+      ).toString()
+    : "";
+  return api.get<CiRunsResponse>(`/ci-runs${params}`);
+}
+
+export function refreshCiRuns(
+  input?: CiRefreshInput,
+): Promise<CiRefreshResult> {
+  return api.post<CiRefreshResult>("/ci-runs/refresh", input ?? {});
+}
+
+export function patchAgentCiFailOn(
+  agentId: string,
+  ci_fail_on: string,
+): Promise<Agent> {
+  return api.put<Agent>(`/agents/${agentId}`, { ci_fail_on });
 }

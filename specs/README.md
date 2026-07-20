@@ -43,12 +43,14 @@ writes SPEC-NN.md        reads spec, runs VRF,       executes PLAN-*.md
 ## When to write a spec
 
 Write a spec when:
+
 - The feature is non-trivial (touches more than 1 file or has user-facing behavior)
 - There are open design questions that need to be answered before coding
 - The feature crosses module boundaries (client <-> server <-> reviewer-core)
 - A bug fix changes observable behavior
 
 Skip a spec for:
+
 - Typo/copy fixes
 - Pure refactors with no behavior change
 - Config/tooling changes
@@ -83,13 +85,13 @@ Status is updated **manually** in the spec file header.
 
 Every AC uses one of five EARS patterns:
 
-| Pattern | Syntax |
-|---------|--------|
-| Ubiquitous | «Система повинна (shall) ...» |
-| Event-driven | «КОЛИ \<подія\>, система повинна (shall) ...» |
-| State-driven | «ПОКИ \<стан\>, система повинна (shall) ...» |
+| Pattern           | Syntax                                             |
+| ----------------- | -------------------------------------------------- |
+| Ubiquitous        | «Система повинна (shall) ...»                      |
+| Event-driven      | «КОЛИ \<подія\>, система повинна (shall) ...»      |
+| State-driven      | «ПОКИ \<стан\>, система повинна (shall) ...»       |
 | Unwanted behavior | «ЯКЩО \<умова\>, ТОДІ система повинна (shall) ...» |
-| Optional feature | «ДЕ \<умова\>, система повинна (shall) ...» |
+| Optional feature  | «ДЕ \<умова\>, система повинна (shall) ...»        |
 
 Vague language ("should work", "handle errors") is not allowed in ACs.
 
@@ -97,15 +99,15 @@ Vague language ("should work", "handle errors") is not allowed in ACs.
 
 ## Cross-module spec index
 
-| Spec | Title | Modules | Status |
-|------|-------|---------|--------|
-| SPEC-2026-07-02-project-context | [Project Context](SPEC-2026-07-02-project-context.md) | server, client | draft |
-| SPEC-2026-07-03-pr-why-risk-brief | [PR Why+Risk Brief](SPEC-2026-07-03-pr-why-risk-brief.md) | server, client | draft |
-| SPEC-2026-07-04-context-root-scan | [Context Root Scan](SPEC-2026-07-04-context-root-scan.md) | server, client | draft |
-| SPEC-2026-07-04-onboarding-generator | [Onboarding Generator (Onboarding Tour)](SPEC-2026-07-04-onboarding-generator.md) | server, client | draft |
-| SPEC-2026-07-06-eval-pipeline | [Eval Pipeline](SPEC-2026-07-06-eval-pipeline.md) | server, client | draft |
-| SPEC-2026-07-12-multi-agent-review | [Multi-Agent Review](SPEC-2026-07-12-multi-agent-review.md) | server, client | draft |
-| SPEC-2026-07-19-export-to-ci | [Export to CI](SPEC-2026-07-19-export-to-ci.md) | server, client | draft |
-| SPEC-2026-07-19-memory-subsystem | [Memory subsystem](SPEC-2026-07-19-memory-subsystem.md) | server, client, agent-runner | draft |
+| Spec                                 | Title                                                                             | Modules                      | Status |
+| ------------------------------------ | --------------------------------------------------------------------------------- | ---------------------------- | ------ |
+| SPEC-2026-07-02-project-context      | [Project Context](SPEC-2026-07-02-project-context.md)                             | server, client               | draft  |
+| SPEC-2026-07-03-pr-why-risk-brief    | [PR Why+Risk Brief](SPEC-2026-07-03-pr-why-risk-brief.md)                         | server, client               | draft  |
+| SPEC-2026-07-04-context-root-scan    | [Context Root Scan](SPEC-2026-07-04-context-root-scan.md)                         | server, client               | draft  |
+| SPEC-2026-07-04-onboarding-generator | [Onboarding Generator (Onboarding Tour)](SPEC-2026-07-04-onboarding-generator.md) | server, client               | draft  |
+| SPEC-2026-07-06-eval-pipeline        | [Eval Pipeline](SPEC-2026-07-06-eval-pipeline.md)                                 | server, client               | draft  |
+| SPEC-2026-07-12-multi-agent-review   | [Multi-Agent Review](SPEC-2026-07-12-multi-agent-review.md)                       | server, client               | draft  |
+| SPEC-2026-07-19-export-to-ci         | [Export to CI](SPEC-2026-07-19-export-to-ci.md)                                   | server, client               | draft  |
+| SPEC-2026-07-19-memory-subsystem     | [Memory subsystem](SPEC-2026-07-19-memory-subsystem.md)                           | server, client, agent-runner | draft  |
 
 _This table is updated by `spec-creator` each time a cross-module spec is added._

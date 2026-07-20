@@ -18,7 +18,9 @@ export function isTextInput(el: EventTarget | null): boolean {
   const node = el as HTMLElement | null;
   return (
     !!node &&
-    (node.tagName === "INPUT" || node.tagName === "TEXTAREA" || node.isContentEditable)
+    (node.tagName === "INPUT" ||
+      node.tagName === "TEXTAREA" ||
+      node.isContentEditable)
   );
 }
 
@@ -36,5 +38,6 @@ export function activeKeyFor(pathname: string): string {
   if (pathname.startsWith("/memory")) return "memory";
   if (pathname.startsWith("/agent-performance")) return "agent-performance";
   if (pathname.startsWith("/ci-runs")) return "ci-runs";
+  if (pathname.startsWith("/ci")) return "ci-runs";
   return "";
 }
