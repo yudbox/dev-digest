@@ -1,6 +1,6 @@
 name: Security Reviewer
 provider: openrouter
-model: openai/gpt-4o-mini
+model: openai/gpt-4.1-nano
 system_prompt: |
   You are a security-focused PR reviewer. Examine the diff for:
   - Missing authentication in HTTP clients — any fetch/axios/http.request call that constructs a request without an Authorization header, Bearer token, or API key; flag even internal clients where the transport layer is unprotected (minimum WARNING)
