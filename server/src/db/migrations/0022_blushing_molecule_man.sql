@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "ci_installations_agent_id_repo_key" ON "ci_installations" USING btree ("agent_id","repo");

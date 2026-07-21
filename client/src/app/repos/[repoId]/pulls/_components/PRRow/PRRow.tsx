@@ -23,7 +23,9 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const { size, lines } = sizeOf(pr);
   const reviewed = pr.score != null; // null score ⇒ PR has never been reviewed
   const totalFindings =
-    (pr.findings_critical ?? 0) + (pr.findings_warning ?? 0) + (pr.findings_suggestion ?? 0);
+    (pr.findings_critical ?? 0) +
+    (pr.findings_warning ?? 0) +
+    (pr.findings_suggestion ?? 0);
 
   const { data: reviewsData, isLoading: reviewsLoading } = usePrReviews(
     anchorRect && totalFindings > 0 ? pr.id : undefined,
@@ -68,13 +70,30 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
       </div>
       <div
         style={s.findingsCell}
-        onMouseEnter={(e) => {
+        onClick={(e) => {
           e.stopPropagation();
-          setAnchorRect(e.currentTarget.getBoundingClientRect());
-        }}
-        onMouseLeave={(e) => {
-          e.stopPropagation();
-          setAnchorRect(null);
+          if (totalFindings > 0) {
+            // Use the chip wrapper rect if available, else the clicked element
+            const chip = (e.target as HTMLElement).closest(
+              "[data-findings-chip]",
+            ) as HTMLElement | null;
+            const el = chip ?? (e.target as HTMLElement);
+            const rect = el.getBoundingClientRect();
+            console.log(
+              "[PRRow click] top=",
+              rect.top,
+              "bottom=",
+              rect.bottom,
+              "left=",
+              rect.left,
+              "clientY=",
+              e.clientY,
+              "el=",
+              el.tagName,
+              el.getAttribute("data-findings-chip"),
+            );
+            setAnchorRect((prev) => (prev ? null : rect));
+          }
         }}
       >
         {!reviewed || totalFindings === 0 ? (
@@ -83,7 +102,11 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
           FINDINGS_FIELDS.map(({ sev, field }) => {
             const n = pr[field] ?? 0;
             if (!n) return null;
-            return <SeverityChip key={sev} sev={sev} count={n} />;
+            return (
+              <span key={sev} data-findings-chip>
+                <SeverityChip sev={sev} count={n} />
+              </span>
+            );
           })
         )}
         {anchorRect && totalFindings > 0 && (
@@ -91,6 +114,7 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
             review={latestReview}
             isLoading={reviewsLoading}
             anchorRect={anchorRect}
+            onClose={() => setAnchorRect(null)}
           />
         )}
       </div>

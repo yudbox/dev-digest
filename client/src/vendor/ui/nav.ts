@@ -82,6 +82,13 @@ export const NAV: NavGroup[] = [
     section: "GLOBAL",
     items: [
       {
+        key: "ci-runs",
+        label: "CI Runs",
+        icon: "GitBranch",
+        href: "/ci",
+        gKey: "r",
+      },
+      {
         key: "multi-agent",
         label: "Multi-Agent Review",
         icon: "Users",

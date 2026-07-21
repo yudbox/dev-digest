@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { Verdict, Finding, Severity, FindingCategory } from "./findings";
-import { EvalRun, EvalOwnerKind, Conformance } from "./knowledge";
+import {
+  EvalRun,
+  EvalOwnerKind,
+  Conformance,
+  Provider,
+  CiFailOn,
+} from "./knowledge";
 
 /**
  * A4 — Eval / CI / Compose / Conformance API contracts (L06).
@@ -211,12 +217,41 @@ export const CiFile = z.object({
 });
 export type CiFile = z.infer<typeof CiFile>;
 
+/**
+ * AgentManifest — the agent contract shared by the studio and the CI runner.
+ *
+ * The studio (`CiService.agentYaml`) WRITES this shape to
+ * `.devdigest/agents/<slug>.yaml`; the agent-runner READS it. Keeping one Zod
+ * schema for both ends guarantees the formats never drift. `skills` are slugs
+ * resolved to `.devdigest/skills/<slug>.md`.
+ */
+export const AgentManifest = z.object({
+  name: z.string().min(1),
+  provider: Provider.default("openrouter"),
+  model: z.string().min(1),
+  system_prompt: z.string(),
+  // Tolerate both a missing key and an explicit `null` (YAML `skills:` with no
+  // value parses to null, which `.default([])` does NOT catch) — normalize both
+  // to an empty array so manifests without skills validate cleanly.
+  skills: z
+    .array(z.string())
+    .nullish()
+    .transform((v) => v ?? []),
+  strategy: z.enum(["auto", "single-pass", "map-reduce"]).default("auto"),
+  // CI gate policy (see CiFailOn) — when the posted review should BLOCK
+  // (REQUEST_CHANGES + fail the check) vs just comment. Default: block on critical.
+  ci_fail_on: CiFailOn.default("critical"),
+});
+export type AgentManifest = z.infer<typeof AgentManifest>;
+/** Caller-facing input type — `.default()` fields stay optional. */
+export type AgentManifestInput = z.input<typeof AgentManifest>;
+
 /** Request body for `POST /agents/:id/export-ci`. */
 export const CiExportInput = z.object({
   repo: z.string().min(1), // "owner/name"
   target: CiTarget.default("gha"),
-  /** "open_pr" opens a PR with the files; "files" just returns/persists them. */
-  action: z.enum(["open_pr", "files"]).default("open_pr"),
+  /** "open_pr" opens a PR with the files; "files" returns a zip; "preview" returns files as JSON for the wizard. */
+  action: z.enum(["open_pr", "files", "preview"]).default("open_pr"),
   post_as: z
     .enum(["github_review", "pr_comment", "none"])
     .default("github_review"),
@@ -258,14 +293,26 @@ export const CiRun = z.object({
   id: z.string(),
   ci_installation_id: z.string().nullable(),
   pr_number: z.number().int().nullable(),
+  pr_title: z.string().nullable(),
   ran_at: z.string().nullable(),
   status: z.string().nullable(),
   findings_count: z.number().int().nullable(),
+  critical: z.number().int().nullable(),
+  warning: z.number().int().nullable(),
+  suggestion: z.number().int().nullable(),
   cost_usd: z.number().nullable(),
+  duration_ms: z.number().int().nullable(),
   github_url: z.string().nullable(),
   source: z.string().nullable(),
+  /** repo (from ci_installations join) — used by the CI Runs table + Trace. */
+  repo: z.string().nullish(),
+  /** target_type (from ci_installations join) — SOURCE column. */
+  target_type: CiTarget.nullish(),
+  /** agent name (from agents join). */
   agent: z.string().nullish(),
   duration_s: z.number().nullish(),
+  /** Individual findings joined from ci_run_findings (unordered; render-sorted). */
+  findings: z.array(Finding).default([]),
 });
 export type CiRun = z.infer<typeof CiRun>;
 
@@ -283,8 +330,54 @@ export const CiResultArtifact = z.object({
   agent: z.string(),
   version: z.string().nullish(),
   pr_number: z.number().int().nullish(),
+  findings: z.array(Finding),
 });
 export type CiResultArtifact = z.infer<typeof CiResultArtifact>;
+
+/** One installation row for the agent CI tab (installation + latest-run join). */
+export const CiInstallationRow = CiInstallation.extend({
+  last_run_status: z.string().nullable(),
+  last_ran_at: z.string().nullable(),
+});
+export type CiInstallationRow = z.infer<typeof CiInstallationRow>;
+
+/** Response of `GET /agents/:id/ci-installations`. */
+export const CiInstallationsResponse = z.object({
+  installations: z.array(CiInstallationRow),
+  active_count: z.number().int(),
+});
+export type CiInstallationsResponse = z.infer<typeof CiInstallationsResponse>;
+
+/** Server-side filters for `GET /ci-runs` (all optional). */
+export const CiRunsQuery = z.object({
+  from: z.string().optional(),
+  to: z.string().optional(),
+  agent: z.string().optional(),
+  repo: z.string().optional(),
+  status: z.string().optional(),
+  source: z.string().optional(),
+});
+export type CiRunsQuery = z.infer<typeof CiRunsQuery>;
+
+/** Response of `GET /ci-runs`. */
+export const CiRunsResponse = z.object({
+  runs: z.array(CiRun),
+});
+export type CiRunsResponse = z.infer<typeof CiRunsResponse>;
+
+/** Body for `POST /ci-runs/refresh` (optional repo filter). */
+export const CiRefreshInput = z.object({
+  repo: z.string().optional(),
+});
+export type CiRefreshInput = z.infer<typeof CiRefreshInput>;
+
+/** Result of an ingest refresh (shown by AutoTriggerStatus). */
+export const CiRefreshResult = z.object({
+  synced_at: z.string(),
+  ingested: z.number().int(),
+  installations_checked: z.number().int(),
+});
+export type CiRefreshResult = z.infer<typeof CiRefreshResult>;
 
 // ===========================================================================
 // Conformance (PRD ↔ PR) — API record (the analysis shape is `Conformance`)
