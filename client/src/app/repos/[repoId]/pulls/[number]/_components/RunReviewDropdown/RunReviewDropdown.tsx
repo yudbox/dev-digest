@@ -94,7 +94,9 @@ export function RunReviewDropdown({
       onRunsStarted?.(res.runs.map((r) => r.run_id));
     } else {
       const res = await runMulti.mutateAsync({ prId, agentIds: [...checked] });
-      router.push(`/repos/${repoId}/multi-agent-review/${res.multi_agent_run_id}`);
+      router.push(
+        `/repos/${repoId}/multi-agent-review/${res.multi_agent_run_id}`,
+      );
     }
   };
 
@@ -117,8 +119,8 @@ export function RunReviewDropdown({
           fontWeight: 500,
           cursor: "pointer",
           border: "1px solid var(--border)",
-          background: "var(--surface-raised)",
-          color: "var(--text)",
+          background: "var(--bg-elevated)",
+          color: "var(--text-primary)",
           opacity: warnMerged ? 0.7 : 1,
         }}
       >
@@ -135,7 +137,7 @@ export function RunReviewDropdown({
             right: 0,
             top: "calc(100% + 6px)",
             width: 320,
-            background: "var(--surface-raised)",
+            background: "var(--bg-elevated)",
             border: "1px solid var(--border)",
             borderRadius: 10,
             boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
@@ -148,11 +150,10 @@ export function RunReviewDropdown({
             <div
               style={{
                 padding: "8px 14px",
-                background:
-                  "color-mix(in srgb, var(--warning) 12%, transparent)",
+                background: "var(--warn-bg)",
                 borderBottom: "1px solid var(--border)",
                 fontSize: 12,
-                color: "var(--warning)",
+                color: "var(--warn)",
                 display: "flex",
                 gap: 6,
                 alignItems: "center",
@@ -222,21 +223,23 @@ export function RunReviewDropdown({
                     borderBottom:
                       "1px solid var(--border-subtle, var(--border))",
                     background: checked.has(a.id)
-                      ? "color-mix(in srgb, var(--accent) 8%, transparent)"
+                      ? "var(--accent-bg)"
                       : "transparent",
                     transition: "background 0.1s",
                   }}
                 >
-                  <Checkbox
-                    checked={checked.has(a.id)}
-                    onChange={() => toggle(a.id)}
-                  />
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={checked.has(a.id)}
+                      onChange={() => toggle(a.id)}
+                    />
+                  </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
                         fontSize: 13,
                         fontWeight: 500,
-                        color: "var(--text)",
+                        color: "var(--text-primary)",
                       }}
                     >
                       {a.name}
@@ -299,8 +302,7 @@ export function RunReviewDropdown({
                 fontWeight: 600,
                 cursor: n === 0 ? "not-allowed" : "pointer",
                 border: "none",
-                background:
-                  n === 0 ? "var(--surface)" : "var(--accent, #4f9cf9)",
+                background: n === 0 ? "var(--bg-surface)" : "var(--accent)",
                 color: n === 0 ? "var(--text-muted)" : "#fff",
                 display: "flex",
                 alignItems: "center",
