@@ -13,11 +13,11 @@ const CRITICAL_FINDING: Finding = {
   id: "f1",
   severity: "CRITICAL",
   category: "security",
-  title: "Hardcoded Stripe secret key",
+  title: "Hardcoded API credential",
   file: "src/config.ts",
   start_line: 10,
   end_line: 10,
-  rationale: "sk_live literal committed to source",
+  rationale: "provider credential literal committed to source",
   confidence: 0.97,
   kind: "finding",
 };
