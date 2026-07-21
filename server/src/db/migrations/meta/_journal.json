@@ -169,6 +169,13 @@
       "when": 1784572848872,
       "tag": "0023_melted_aqueduct",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1784630315052,
+      "tag": "0024_fresh_stone_men",
+      "breakpoints": true
     }
   ]
 }

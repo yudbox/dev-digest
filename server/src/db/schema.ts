@@ -12,39 +12,44 @@
  * The tables are organized into domain files under `./schema/`; this barrel
  * re-exports them so every consumer keeps importing from `db/schema` unchanged.
  */
-export * from './schema/core';
-export * from './schema/repos';
-export * from './schema/pulls';
-export * from './schema/reviews';
-export * from './schema/skills';
-export * from './schema/agents';
-export * from './schema/knowledge';
-export * from './schema/context';
-export * from './schema/eval';
-export * from './schema/ci';
-export * from './schema/runs';
-export * from './schema/ops';
-export * from './schema/repo-intel';
+export * from "./schema/core";
+export * from "./schema/repos";
+export * from "./schema/pulls";
+export * from "./schema/reviews";
+export * from "./schema/skills";
+export * from "./schema/agents";
+export * from "./schema/knowledge";
+export * from "./schema/context";
+export * from "./schema/eval";
+export * from "./schema/ci";
+export * from "./schema/runs";
+export * from "./schema/ops";
+export * from "./schema/repo-intel";
 
-import { users, workspaces, workspaceMembers, settings } from './schema/core';
-import { repos } from './schema/repos';
-import { pullRequests, prFiles, prCommits } from './schema/pulls';
-import { reviews, findings, prIntent, prBrief } from './schema/reviews';
-import { skills, skillVersions } from './schema/skills';
-import { agents, agentVersions, agentSkills } from './schema/agents';
-import { memory, conventions } from './schema/knowledge';
-import { codeChunks, symbols, references, onboarding } from './schema/context';
-import { evalCases, evalRuns, conformanceChecks, composedReviews } from './schema/eval';
-import { ciInstallations, ciRuns, ciRunFindings } from './schema/ci';
-import { agentRuns, runTraces, multiAgentRuns } from './schema/runs';
-import { jobs, installedPlugins, digests } from './schema/ops';
+import { users, workspaces, workspaceMembers, settings } from "./schema/core";
+import { repos } from "./schema/repos";
+import { pullRequests, prFiles, prCommits } from "./schema/pulls";
+import { reviews, findings, prIntent, prBrief } from "./schema/reviews";
+import { skills, skillVersions } from "./schema/skills";
+import { agents, agentVersions, agentSkills } from "./schema/agents";
+import { memory, conventions, memoryLearningState } from "./schema/knowledge";
+import { codeChunks, symbols, references, onboarding } from "./schema/context";
+import {
+  evalCases,
+  evalRuns,
+  conformanceChecks,
+  composedReviews,
+} from "./schema/eval";
+import { ciInstallations, ciRuns, ciRunFindings } from "./schema/ci";
+import { agentRuns, runTraces, multiAgentRuns } from "./schema/runs";
+import { jobs, installedPlugins, digests } from "./schema/ops";
 import {
   repoIndexState,
   fileEdges,
   fileFacts,
   fileRank,
   repoMapCache,
-} from './schema/repo-intel';
+} from "./schema/repo-intel";
 
 /** Convenience: the full schema object for drizzle() client typing. */
 export const schema = {
@@ -67,6 +72,7 @@ export const schema = {
   agentSkills,
   conventions,
   memory,
+  memoryLearningState,
   codeChunks,
   symbols,
   references,

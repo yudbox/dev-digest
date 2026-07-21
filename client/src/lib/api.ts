@@ -314,3 +314,46 @@ export function patchAgentCiFailOn(
 ): Promise<Agent> {
   return api.put<Agent>(`/agents/${agentId}`, { ci_fail_on });
 }
+
+// ---- Memory ---------------------------------------------------------------
+
+import type {
+  MemoryItemDto,
+  MemoryCreateInput,
+  MemoryUpdateInput,
+  MemoryListQuery,
+  MemoryListResponse,
+  MemoryRefreshResult,
+} from "@devdigest/shared";
+
+export function fetchMemory(
+  filters?: Partial<MemoryListQuery>,
+): Promise<MemoryListResponse> {
+  const params = filters
+    ? new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(filters).filter(([, v]) => v !== undefined),
+        ) as Record<string, string>,
+      ).toString()
+    : "";
+  return api.get<MemoryListResponse>(`/memory${params ? `?${params}` : ""}`);
+}
+
+export function createMemory(body: MemoryCreateInput): Promise<MemoryItemDto> {
+  return api.post<MemoryItemDto>("/memory", body);
+}
+
+export function updateMemory(
+  id: string,
+  body: Partial<MemoryUpdateInput>,
+): Promise<MemoryItemDto> {
+  return api.patch<MemoryItemDto>(`/memory/${id}`, body);
+}
+
+export function deleteMemory(id: string): Promise<void> {
+  return api.del<void>(`/memory/${id}`);
+}
+
+export function refreshMemory(): Promise<MemoryRefreshResult> {
+  return api.post<MemoryRefreshResult>("/memory/refresh");
+}

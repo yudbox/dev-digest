@@ -6,35 +6,39 @@ import type {
   CodeIndex,
   Embedder,
   LLMProvider,
-} from '@devdigest/shared';
-import type { AppConfig } from './config.js';
-import type { Db } from '../db/client.js';
-import { JobRunner } from './jobs.js';
-import { runBus, type RunBus } from './sse.js';
-import { LocalSecretsProvider } from '../adapters/secrets/local.js';
-import { LocalNoAuthProvider } from '../adapters/auth/local.js';
-import { OctokitGitHubClient } from '../adapters/github/octokit.js';
-import { SimpleGitClient } from '../adapters/git/simple-git.js';
-import { RipgrepCodeIndex } from '../adapters/codeindex/ripgrep.js';
-import { OpenAIProvider } from '../adapters/llm/openai.js';
-import { AnthropicProvider } from '../adapters/llm/anthropic.js';
-import { OpenAIEmbedder } from '../adapters/embedder/openai.js';
-import { OpenRouterProvider } from '@devdigest/reviewer-core';
-import { estimateCost } from '../adapters/llm/pricing.js';
-import { PriceBook } from './price-book.js';
-import { ConfigError } from './errors.js';
-import { AgentsRepository } from '../modules/agents/repository.js';
-import { SkillsRepository } from '../modules/skills/repository.js';
-import { ReviewRepository } from '../modules/reviews/repository.js';
-import { RepoRepository } from '../modules/repos/repository.js';
-import { EvalsRepository } from '../modules/evals/repository.js';
-import { CiRepository } from '../modules/ci/repository.js';
-import type { RepoIntel } from '../modules/repo-intel/types.js';
-import { RepoIntelService } from '../modules/repo-intel/service.js';
-import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
-import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
-import { ContextService } from '../modules/context/service.js';
-import { OnboardingService } from '../modules/onboarding/service.js';
+} from "@devdigest/shared";
+import type { AppConfig } from "./config.js";
+import type { Db } from "../db/client.js";
+import { JobRunner } from "./jobs.js";
+import { runBus, type RunBus } from "./sse.js";
+import { LocalSecretsProvider } from "../adapters/secrets/local.js";
+import { LocalNoAuthProvider } from "../adapters/auth/local.js";
+import { OctokitGitHubClient } from "../adapters/github/octokit.js";
+import { SimpleGitClient } from "../adapters/git/simple-git.js";
+import { RipgrepCodeIndex } from "../adapters/codeindex/ripgrep.js";
+import { OpenAIProvider } from "../adapters/llm/openai.js";
+import { AnthropicProvider } from "../adapters/llm/anthropic.js";
+import { OpenAIEmbedder } from "../adapters/embedder/openai.js";
+import { OpenRouterProvider } from "@devdigest/reviewer-core";
+import { estimateCost } from "../adapters/llm/pricing.js";
+import { PriceBook } from "./price-book.js";
+import { ConfigError } from "./errors.js";
+import { AgentsRepository } from "../modules/agents/repository.js";
+import { SkillsRepository } from "../modules/skills/repository.js";
+import { ReviewRepository } from "../modules/reviews/repository.js";
+import { RepoRepository } from "../modules/repos/repository.js";
+import { EvalsRepository } from "../modules/evals/repository.js";
+import { CiRepository } from "../modules/ci/repository.js";
+import { MemoryRepository } from "../modules/memory/repository.js";
+import type { RepoIntel } from "../modules/repo-intel/types.js";
+import { RepoIntelService } from "../modules/repo-intel/service.js";
+import { type DepGraph, DepCruiseGraph } from "../adapters/depgraph/index.js";
+import {
+  type Tokenizer,
+  TiktokenTokenizer,
+} from "../adapters/tokenizer/index.js";
+import { ContextService } from "../modules/context/service.js";
+import { OnboardingService } from "../modules/onboarding/service.js";
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -51,7 +55,7 @@ export interface ContainerOverrides {
   codeIndex?: CodeIndex;
   embedder?: Embedder;
   /** Pre-built providers by id (skip key lookup). */
-  llm?: Partial<Record<'openai' | 'anthropic' | 'openrouter', LLMProvider>>;
+  llm?: Partial<Record<"openai" | "anthropic" | "openrouter", LLMProvider>>;
   /** repo-intel facade (T1.1+) — tests inject mock RepoIntel implementations. */
   repoIntel?: RepoIntel;
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
@@ -82,6 +86,7 @@ export class Container {
   private _reposRepo?: RepoRepository;
   private _evalsRepo?: EvalsRepository;
   private _ciRepo?: CiRepository;
+  private _memoryRepo?: MemoryRepository;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
@@ -89,10 +94,15 @@ export class Container {
   private _contextService?: ContextService;
   private _onboarding?: OnboardingService;
 
-  constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
+  constructor(
+    config: AppConfig,
+    db: Db,
+    private overrides: ContainerOverrides = {},
+  ) {
     this.config = config;
     this.db = db;
-    this.secrets = overrides.secrets ?? new LocalSecretsProvider(config.secretsPath);
+    this.secrets =
+      overrides.secrets ?? new LocalSecretsProvider(config.secretsPath);
     this.auth = overrides.auth ?? new LocalNoAuthProvider(db);
     this.runBus = runBus;
     this.jobs = new JobRunner(db);
@@ -136,6 +146,10 @@ export class Container {
     return (this._ciRepo ??= new CiRepository(this.db));
   }
 
+  get memoryRepo(): MemoryRepository {
+    return (this._memoryRepo ??= new MemoryRepository(this.db));
+  }
+
   get codeIndex(): CodeIndex {
     if (this.overrides.codeIndex) return this.overrides.codeIndex;
     this._codeIndex ??= new RipgrepCodeIndex(this.git);
@@ -176,7 +190,7 @@ export class Container {
   get priceBook(): PriceBook {
     this._priceBook ??= new PriceBook(async () => {
       try {
-        const key = await this.secrets.get('OPENROUTER_API_KEY');
+        const key = await this.secrets.get("OPENROUTER_API_KEY");
         if (!key) return [];
         return await new OpenRouterProvider(key).listModels();
       } catch {
@@ -189,14 +203,14 @@ export class Container {
   async github(): Promise<GitHubClient> {
     if (this.overrides.github) return this.overrides.github;
     if (this._github) return this._github;
-    const token = await this.secrets.get('GITHUB_TOKEN');
-    if (!token) throw new ConfigError('GITHUB_TOKEN is not configured');
+    const token = await this.secrets.get("GITHUB_TOKEN");
+    if (!token) throw new ConfigError("GITHUB_TOKEN is not configured");
     this._github = new OctokitGitHubClient(token);
     return this._github;
   }
 
   /** Resolve an LLM provider by id; constructs from the secret key, cached. */
-  async llm(id: 'openai' | 'anthropic' | 'openrouter'): Promise<LLMProvider> {
+  async llm(id: "openai" | "anthropic" | "openrouter"): Promise<LLMProvider> {
     const injected = this.overrides.llm?.[id];
     if (injected) return injected;
     const cached = this.llmCache.get(id);
@@ -206,25 +220,27 @@ export class Container {
     return provider;
   }
 
-  private async buildLlm(id: 'openai' | 'anthropic' | 'openrouter'): Promise<LLMProvider> {
-    if (id === 'openai') {
-      const key = await this.secrets.get('OPENAI_API_KEY');
-      if (!key) throw new ConfigError('OPENAI_API_KEY is not configured');
+  private async buildLlm(
+    id: "openai" | "anthropic" | "openrouter",
+  ): Promise<LLMProvider> {
+    if (id === "openai") {
+      const key = await this.secrets.get("OPENAI_API_KEY");
+      if (!key) throw new ConfigError("OPENAI_API_KEY is not configured");
       return new OpenAIProvider(key);
     }
-    if (id === 'openrouter') {
+    if (id === "openrouter") {
       // Single OpenRouter provider lives in reviewer-core (shared with the CI
       // runner); inject the PriceBook so cost attribution uses LIVE OpenRouter
       // prices (with the static table as a fallback) rather than a hardcoded one.
-      const key = await this.secrets.get('OPENROUTER_API_KEY');
-      if (!key) throw new ConfigError('OPENROUTER_API_KEY is not configured');
+      const key = await this.secrets.get("OPENROUTER_API_KEY");
+      if (!key) throw new ConfigError("OPENROUTER_API_KEY is not configured");
       return new OpenRouterProvider(key, {
         estimateCost: (model, tokensIn, tokensOut) =>
           this.priceBook.estimate(model, tokensIn, tokensOut),
       });
     }
-    const key = await this.secrets.get('ANTHROPIC_API_KEY');
-    if (!key) throw new ConfigError('ANTHROPIC_API_KEY is not configured');
+    const key = await this.secrets.get("ANTHROPIC_API_KEY");
+    if (!key) throw new ConfigError("ANTHROPIC_API_KEY is not configured");
     return new AnthropicProvider(key);
   }
 
@@ -235,10 +251,12 @@ export class Container {
     // degrade gracefully (memory/RAG simply returns no hits).
     if (this.overrides.embedder) return this.overrides.embedder;
     if (!this.config.embeddingsEnabled) {
-      throw new ConfigError('Embeddings are disabled (set EMBEDDINGS_ENABLED=true to enable memory/RAG)');
+      throw new ConfigError(
+        "Embeddings are disabled (set EMBEDDINGS_ENABLED=true to enable memory/RAG)",
+      );
     }
     if (this._embedder) return this._embedder;
-    const openai = await this.llm('openai');
+    const openai = await this.llm("openai");
     this._embedder = new OpenAIEmbedder(openai);
     return this._embedder;
   }
