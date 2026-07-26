@@ -82,6 +82,13 @@ export const NAV: NavGroup[] = [
     section: "GLOBAL",
     items: [
       {
+        key: "memory",
+        label: "Memory",
+        icon: "Brain",
+        href: "/memory",
+        gKey: "y",
+      },
+      {
         key: "ci-runs",
         label: "CI Runs",
         icon: "GitBranch",

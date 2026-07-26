@@ -379,35 +379,22 @@ export class ReviewRunExecutor {
         );
       }
 
-      // ---- Memory: pgvector similarity search --------------------------------
-      // Embed the PR title + changed file paths, search the memory table for
-      // top-K relevant learnings scoped to this workspace/repo. Results are
-      // injected into the prompt and recorded in the run trace.
+      // ---- Memory: confidence+scope filter (AC-1/AC-3) ----------------------
+      // Select memory rows matching this workspace/repo with confidence >= 0.7.
+      // Inject their content strings into the prompt; bump lastUsedAt after.
       let memoryPulled: MemoryPulled[] = [];
       let memoryIds: string[] = [];
       try {
-        const embedder = await this.container.embedder();
-        const queryText = [pull.title, ...diff.files.map((f) => f.path)].join(
-          " ",
+        const memoryRows = await this.container.memoryRepo.selectForPrompt(
+          workspaceId,
+          pull.repoId,
         );
-        const [[queryEmbedding]] = [await embedder.embed([queryText])];
-        if (queryEmbedding) {
-          const repo = await this.repo.getRepo(pull.repoId);
-          const hits = await this.repo.searchMemory({
-            workspaceId,
-            repoId: repo?.id ?? null,
-            embedding: queryEmbedding,
-            limit: 5,
-          });
-          if (hits.length > 0) {
-            memoryPulled = hits.map((h) => ({ text: h.content }));
-            memoryIds = hits.map((h) => h.id);
-            runLog.info(
-              `Memory: ${hits.length} relevant learning(s) retrieved`,
-            );
-            // AC-40: stamp last_used_at so stale memories surface in curator
-            await this.repo.bumpMemoryLastUsedAt(memoryIds);
-          }
+        if (memoryRows.length > 0) {
+          memoryPulled = memoryRows.map((m) => ({ text: m.content }));
+          memoryIds = memoryRows.map((m) => m.id);
+          runLog.info(
+            `Memory: ${memoryRows.length} rule(s) injected into prompt`,
+          );
         }
       } catch {
         // Never let memory retrieval break a run
@@ -438,7 +425,9 @@ export class ReviewRunExecutor {
         ...(repoMap ? { repoMap } : {}),
         // Memory: relevant learnings from pgvector search. assemblePrompt
         // renders as "## Memory" section. Empty → section omitted.
-        ...(memoryPulled.length > 0 ? { memory: memoryPulled.map((m) => m.text) } : {}),
+        ...(memoryPulled.length > 0
+          ? { memory: memoryPulled.map((m) => m.text) }
+          : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -452,6 +441,13 @@ export class ReviewRunExecutor {
             throw new RunCancelledError();
         },
       });
+      // AC-3/R3: bump lastUsedAt for every memory row that reached the prompt.
+      if (memoryIds.length > 0) {
+        await this.container.memoryRepo
+          .touchLastUsed(memoryIds, new Date())
+          .catch(() => undefined);
+      }
+
       const { tokensIn, tokensOut, costUsd, grounding } = outcome;
 
       const keptFindings = outcome.review.findings;

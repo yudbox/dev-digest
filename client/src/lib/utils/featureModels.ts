@@ -46,4 +46,11 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
     defaultProvider: "openai",
     defaultModel: "gpt-5.4",
   },
+  {
+    id: "memory_distill",
+    label: "Memory \u00b7 Learning",
+    description: "Distills dismissed findings into memory rules.",
+    defaultProvider: "openrouter",
+    defaultModel: "deepseek/deepseek-v4-flash",
+  },
 ];

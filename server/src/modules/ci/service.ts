@@ -25,6 +25,7 @@ import { NotFoundError } from "../../platform/errors.js";
 import { assembleFiles } from "./generators/index.js";
 import type { CiRepository } from "./repository.js";
 import { extractFirstFileFromZip } from "./zip.js";
+import { buildMemorySnapshot } from "../memory/snapshot.js";
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for unit tests)
@@ -97,6 +98,22 @@ export class CiService {
     }));
 
     // Assemble CI files (may throw if runner dist is absent)
+    // TASK-006: build memory snapshot for the target repo
+    let memoryContent = "";
+    if (input.repo) {
+      const repoRow = await this.container.reposRepo.findByFullName(
+        workspaceId,
+        input.repo,
+      );
+      if (repoRow) {
+        memoryContent = await buildMemorySnapshot(
+          this.container,
+          workspaceId,
+          repoRow.id,
+        ).catch(() => "");
+      }
+    }
+
     const files = assembleFiles({
       agent: {
         id: agent.id,
@@ -112,6 +129,7 @@ export class CiService {
         triggers: input.triggers,
         postAs: input.post_as,
       },
+      memoryContent,
     });
 
     if (input.action === "files") {
