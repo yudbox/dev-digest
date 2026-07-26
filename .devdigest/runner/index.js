@@ -19845,6 +19845,7 @@ const FeatureModelId = enumType([
     "conformance",
     "conventions",
     "eval",
+    "memory_distill",
 ]);
 /** A chosen provider + model for one feature. */
 const FeatureModelChoice = objectType({
@@ -19893,6 +19894,13 @@ const FEATURE_MODELS = [
         description: "Extracts coding conventions from the repo.",
         defaultProvider: "openai",
         defaultModel: "gpt-5.4",
+    },
+    {
+        id: "memory_distill",
+        label: "Memory \u00b7 Learning",
+        description: "Distills dismissed findings into memory rules.",
+        defaultProvider: "openrouter",
+        defaultModel: "deepseek/deepseek-v4-flash",
     },
 ];
 // ---- Settings ----
@@ -20310,8 +20318,8 @@ const AgentManifest = objectType({
 const CiExportInput = objectType({
     repo: stringType().min(1), // "owner/name"
     target: CiTarget.default("gha"),
-    /** "open_pr" opens a PR with the files; "files" just returns/persists them. */
-    action: enumType(["open_pr", "files"]).default("open_pr"),
+    /** "open_pr" opens a PR with the files; "files" returns a zip; "preview" returns files as JSON for the wizard. */
+    action: enumType(["open_pr", "files", "preview"]).default("open_pr"),
     post_as: enumType(["github_review", "pr_comment", "none"])
         .default("github_review"),
     triggers: arrayType(stringType()).default(["opened", "synchronize", "reopened"]),
@@ -20323,6 +20331,11 @@ const CiInstallation = objectType({
     agent_id: stringType(),
     repo: stringType(),
     target_type: CiTarget,
+    // The wizard's own choices at install time — "Update CI config" re-exports
+    // using these, instead of hardcoded defaults that would silently overwrite
+    // whatever was actually configured for this installation.
+    post_as: enumType(["github_review", "pr_comment", "none"]),
+    triggers: arrayType(stringType()),
     installed_at: stringType(),
 });
 /** Response of `POST /agents/:id/export-ci`. */
@@ -20389,6 +20402,15 @@ const CiInstallationsResponse = objectType({
     installations: arrayType(CiInstallationRow),
     active_count: numberType().int(),
 });
+/**
+ * Response of `POST /agents/:id/ci-config` (Update CI config). Each repo is
+ * isolated — one repo failing does not stop the others, and the caller gets
+ * a full account of what succeeded/failed instead of an opaque throw.
+ */
+const CiUpdateConfigResult = objectType({
+    updated: arrayType(objectType({ repo: stringType(), url: stringType().nullable() })),
+    failed: arrayType(objectType({ repo: stringType(), error: stringType() })),
+});
 /** Server-side filters for `GET /ci-runs` (all optional). */
 const CiRunsQuery = objectType({
     from: stringType().optional(),
@@ -20437,6 +20459,97 @@ const HookScanResult = objectType({
     pr_id: stringType(),
     review_id: stringType().nullable(),
     findings: arrayType(Finding),
+});
+
+;// CONCATENATED MODULE: ../server/src/vendor/shared/contracts/memory.ts
+
+/**
+ * Memory subsystem — API contracts.
+ *
+ * TASK-001: New file. Shared between server and client (mirrored verbatim).
+ *
+ * Design rules:
+ *  - scope='repo' requires repoId (enforced by superRefine in MemoryCreateInput).
+ *  - scope='global'|'team' → repoId is stripped/null.
+ *  - source: 'explicit' = user-added; 'auto' = distilled from dismissed findings.
+ *  - confidence: explicit rows default 0.9; auto rows use autoConfidence(count).
+ */
+// ---------------------------------------------------------------------------
+// Enums (MemoryScope + MemoryKind are re-exported from knowledge.ts)
+// ---------------------------------------------------------------------------
+
+
+const MemorySourceKind = enumType(["explicit", "auto"]);
+// ---------------------------------------------------------------------------
+// API shapes
+// ---------------------------------------------------------------------------
+/** Full row DTO returned by list/get/create/update. */
+const MemoryItemDto = objectType({
+    id: stringType(),
+    workspaceId: stringType(),
+    repoId: stringType().nullable(),
+    /** For display in the SCOPE column: "global", "team", or "repo · owner/name". */
+    scopeLabel: stringType(),
+    scope: MemoryScope,
+    kind: MemoryKind,
+    content: stringType(),
+    confidence: numberType().min(0).max(1),
+    /** 'explicit' | 'auto' */
+    source: MemorySourceKind,
+    /** Provenance for auto rows: { findingIds?, prNumbers? }. Null for explicit. */
+    sources: unknownType().nullable(),
+    createdAt: stringType(),
+    updatedAt: stringType(),
+    lastUsedAt: stringType().nullable(),
+});
+/** Create payload (POST /memory). */
+const MemoryCreateInput = objectType({
+    content: stringType().min(1, "content is required"),
+    kind: MemoryKind,
+    scope: MemoryScope,
+    repoId: stringType().uuid().optional(),
+})
+    .superRefine((val, ctx) => {
+    if (val.scope === "repo" && !val.repoId) {
+        ctx.addIssue({
+            code: ZodIssueCode.custom,
+            path: ["repoId"],
+            message: "repoId is required when scope is 'repo'",
+        });
+    }
+});
+/** Partial update payload (PATCH /memory/:id). */
+const MemoryUpdateInput = objectType({
+    content: stringType().min(1).optional(),
+    kind: MemoryKind.optional(),
+    confidence: numberType().min(0).max(1).optional(),
+});
+/** Query string for GET /memory (server-side filters). */
+const MemoryListQuery = objectType({
+    scope: MemoryScope.optional(),
+    kind: MemoryKind.optional(),
+    source: MemorySourceKind.optional(),
+    q: stringType().optional(),
+});
+/** Response for GET /memory. */
+const MemoryListResponse = objectType({
+    items: arrayType(MemoryItemDto),
+});
+/** Response for POST /memory/refresh. */
+const MemoryRefreshResult = objectType({
+    learned: numberType().int(),
+    scanned: numberType().int(),
+});
+// ---------------------------------------------------------------------------
+// Snapshot record (used by CI export — no embedding, no internal IDs)
+// ---------------------------------------------------------------------------
+/** One line in `.devdigest/memory.jsonl`. Exactly 5 fields, no embedding. */
+const MemorySnapshotRecord = objectType({
+    content: stringType(),
+    kind: MemoryKind,
+    scope: MemoryScope,
+    confidence: numberType().min(0).max(1),
+    source: MemorySourceKind,
 });
 
 ;// CONCATENATED MODULE: ../server/src/vendor/shared/contracts/observability.ts
@@ -20785,6 +20898,7 @@ const ModelInfo = objectType({
  * Feature agents (A1–A6) and F2 import everything from here. The barrel is
  * stable — feature agents EXTEND with new files, they do not edit existing ones.
  */
+
 
 
 
@@ -34918,6 +35032,58 @@ function loadSkillBodies(devdigestDir, slugs, readFile = external_node_fs_namesp
     });
 }
 
+;// CONCATENATED MODULE: ./src/memory.ts
+
+
+/**
+ * Load memory rules from `.devdigest/memory.jsonl`.
+ *
+ * - File missing → []
+ * - Empty file → []
+ * - Malformed line → skip and continue (never throw)
+ * - Each valid line must be JSON with a `content` string field
+ *
+ * AC-9/R9. Mirrors loadSkillBodies but is forgiving (missing file is normal).
+ */
+function loadMemory(devdigestDir, readFile = external_node_fs_namespaceObject.readFileSync) {
+    const memoryPath = external_node_path_default().join(devdigestDir, "memory.jsonl");
+    let raw;
+    try {
+        raw = readFile(memoryPath, "utf8");
+    }
+    catch {
+        // File missing or unreadable — zero memory rows is normal
+        console.log(`[memory] ${memoryPath} not found — 0 rule(s) loaded`);
+        return [];
+    }
+    const results = [];
+    let skipped = 0;
+    for (const line of raw.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed)
+            continue;
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed !== null &&
+                typeof parsed === "object" &&
+                "content" in parsed &&
+                typeof parsed.content === "string") {
+                results.push(parsed.content);
+            }
+            else {
+                skipped++;
+            }
+        }
+        catch {
+            // Malformed line — skip and continue
+            skipped++;
+        }
+    }
+    console.log(`[memory] loaded ${results.length} rule(s) from ${memoryPath}` +
+        (skipped > 0 ? ` (skipped ${skipped} malformed/invalid line(s))` : ""));
+    return results;
+}
+
 ;// CONCATENATED MODULE: ./src/context.ts
 
 
@@ -35231,6 +35397,7 @@ function buildResultArtifact(input) {
 
 
 
+
 async function runCi(deps) {
     const readFile = deps.readFile ?? external_node_fs_namespaceObject.readFileSync;
     const readDir = deps.readDir ?? external_node_fs_namespaceObject.readdirSync;
@@ -35242,17 +35409,18 @@ async function runCi(deps) {
         // 1. Load + validate the manifest BEFORE it is used for anything (AC-20).
         const manifest = loadManifest(deps.devdigestDir, { readFile, readDir });
         const skills = loadSkillBodies(deps.devdigestDir, manifest.skills, readFile);
+        const memory = loadMemory(deps.devdigestDir, readFile);
         // 2. Resolve CI context (PR number/title/body/repo) from env + event payload.
         const ctx = resolvePrContext(deps.env, readFile);
         const githubToken = deps.env.GITHUB_TOKEN;
-        if (deps.postAs !== 'none' && !githubToken) {
+        if (deps.postAs !== "none" && !githubToken) {
             throw new RunnerError(`GITHUB_TOKEN is required to post as '${deps.postAs}'`);
         }
         // 3. Assemble the diff from the CI context. Strip DevDigest's own exported
         //    artifacts (`.devdigest/**`, the generated workflow) BEFORE parse: the
         //    minified runner bundle would otherwise fail the whole review with a
         //    GitHub 422 "diff too large", and reviewing our own config is noise.
-        const rawDiff = await fetchDiffImpl(ctx, githubToken ?? '', fetchImpl);
+        const rawDiff = await fetchDiffImpl(ctx, githubToken ?? "", fetchImpl);
         const diff = parseUnifiedDiff(stripIgnoredFiles(rawDiff));
         // 4. Run the SAME engine the studio uses. `reviewPullRequest` internally
         //    calls `assemblePrompt`/`wrapUntrusted` (diff → `<untrusted
@@ -35268,6 +35436,7 @@ async function runCi(deps) {
             llm: deps.llm,
             strategy: manifest.strategy,
             skills,
+            ...(memory.length > 0 ? { memory } : {}),
             prDescription: ctx.body,
             task: `Review PR #${ctx.prNumber}: ${ctx.title}`,
         });
@@ -35292,10 +35461,10 @@ async function runCi(deps) {
         });
         writeFile(deps.resultPath, `${JSON.stringify(artifact, null, 2)}\n`);
         // 7. Post per `post_as` (AC-24).
-        if (deps.postAs === 'github_review') {
+        if (deps.postAs === "github_review") {
             await postGithubReview(ctx, githubToken, payload, fetchImpl);
         }
-        else if (deps.postAs === 'pr_comment') {
+        else if (deps.postAs === "pr_comment") {
             await postPrComment(ctx, githubToken, payload.body, fetchImpl);
         }
         // 'none' → post nothing (exit-code only).
