@@ -12,6 +12,7 @@ import { SeverityChip } from "@/components/SeverityChip/SeverityChip";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
 import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
+import type { VcsUrlRepo } from "@/lib/utils";
 
 const VERDICT_COLOR: Record<string, string> = {
   request_changes: "var(--crit)",
@@ -28,7 +29,7 @@ export function ReviewRunAccordion({
   review,
   prId,
   defaultOpen = false,
-  repoFullName,
+  repo,
   headSha,
   targetRunId = null,
   targetNonce = 0,
@@ -37,7 +38,7 @@ export function ReviewRunAccordion({
   review: ReviewRecord;
   prId: string;
   defaultOpen?: boolean;
-  repoFullName?: string | null;
+  repo?: VcsUrlRepo | null;
   headSha?: string | null;
   /** When this matches review.run_id, the accordion opens and scrolls into view
    *  (driven from the Timeline: clicking an agent name navigates here). */
@@ -221,7 +222,7 @@ export function ReviewRunAccordion({
           <FindingsPanel
             findings={findings}
             prId={prId}
-            repoFullName={repoFullName}
+            repo={repo}
             headSha={headSha}
           />
         </div>

@@ -1,9 +1,20 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import evalMessages from "../../../../../../../../messages/en/eval.json";
+
+vi.mock("../../../../../../../lib/hooks/reviews", () => ({
+  useFindingReplies: () => ({ data: undefined, isFetching: false, refetch: vi.fn() }),
+  usePublishFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
+  useEditFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
+  useFindingAction: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreatePrComment: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 import { FindingCard } from "./FindingCard";
 
 afterEach(cleanup);
@@ -28,13 +39,16 @@ const FINDING: FindingRecord = {
 };
 
 function renderWithIntl(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <NextIntlClientProvider
-      locale="en"
-      messages={{ prReview: messages, eval: evalMessages }}
-    >
-      {ui}
-    </NextIntlClientProvider>,
+    <QueryClientProvider client={qc}>
+      <NextIntlClientProvider
+        locale="en"
+        messages={{ prReview: messages, eval: evalMessages }}
+      >
+        {ui}
+      </NextIntlClientProvider>
+    </QueryClientProvider>,
   );
 }
 

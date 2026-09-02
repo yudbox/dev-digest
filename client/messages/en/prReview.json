@@ -1,4 +1,15 @@
 {
+  "header": {
+    "viewOnGithub": "View on GitHub",
+    "viewOnAzureDevops": "View on Azure DevOps"
+  },
+  "diffUnavailable": {
+    "title": "Diff not available",
+    "clone_missing": "The repository hasn't been cloned locally yet — it should become available shortly.",
+    "clone_in_progress": "The repository is still being cloned locally — check back in a moment.",
+    "commits_missing": "The base or head commit for this PR isn't in the local clone yet.",
+    "diff_failed": "The diff couldn't be computed for this PR. Try refreshing the repository."
+  },
   "finding": {
     "accepted": "accepted",
     "dismissed": "dismissed",

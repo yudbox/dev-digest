@@ -1,8 +1,14 @@
 import type { Container } from '../../platform/container.js';
-import { type Repo } from '@devdigest/shared';
+import { type Repo, type RepoRef, type SecretKey, type VcsProvider } from '@devdigest/shared';
 import { NotFoundError } from '../../platform/errors.js';
 import { RepoRepository } from './repository.js';
-import { parseRepoUrl, withGitHubToken, toRepoDto } from './helpers.js';
+import {
+  parseRepoUrl,
+  withVcsToken,
+  buildCloneUrl,
+  toRepoDto,
+  type ParseRepoUrlOptions,
+} from './helpers.js';
 import {
   CLONE_JOB_KIND,
   CLONE_DEPTH,
@@ -12,6 +18,17 @@ import {
   INDEX_JOB_KIND,
   REFRESH_JOB_KIND,
 } from '../repo-intel/constants.js';
+
+/**
+ * Secret name holding the Azure DevOps PAT for private clones. Defined
+ * locally (not added to `constants.ts`, which is outside TASK-005's owned
+ * paths) — mirrors `GITHUB_TOKEN_SECRET` imported above.
+ */
+const AZURE_DEVOPS_TOKEN_SECRET: SecretKey = 'AZURE_DEVOPS_TOKEN';
+
+function secretKeyFor(provider: VcsProvider): SecretKey {
+  return provider === 'azure-devops' ? AZURE_DEVOPS_TOKEN_SECRET : GITHUB_TOKEN_SECRET;
+}
 
 /**
  * F1 — repos service. Business logic for the Repositories feature:
@@ -25,8 +42,13 @@ import {
 /** Payload enqueued for (and consumed by) the `clone` job. */
 export interface CloneJobPayload {
   repoId: string;
+  vcsProvider: VcsProvider;
   owner: string;
   name: string;
+  /** Azure DevOps only — middle segment of org/project/repo. */
+  project?: string;
+  /** Azure DevOps only — hosting base URL. */
+  baseUrl?: string;
   url: string;
 }
 
@@ -49,10 +71,17 @@ export class RepoService {
   }
 
   async runCloneJob(payload: CloneJobPayload): Promise<void> {
-    const { repoId, owner, name, url } = payload;
-    const token = await this.container.secrets.get(GITHUB_TOKEN_SECRET);
-    const cloneUrl = token ? withGitHubToken(url, token) : url;
-    const { path } = await this.container.git.clone({ owner, name }, cloneUrl, {
+    const { repoId, vcsProvider, owner, name, project, baseUrl, url } = payload;
+    const token = await this.container.secrets.get(secretKeyFor(vcsProvider));
+    const cloneUrl = token ? withVcsToken(url, vcsProvider, token) : url;
+    const ref: RepoRef & { provider: VcsProvider } = {
+      owner,
+      name,
+      project,
+      baseUrl,
+      provider: vcsProvider,
+    };
+    const { path } = await this.container.git.clone(ref, cloneUrl, {
       depth: CLONE_DEPTH,
     });
     await this.repo.updateClonePath(repoId, path);
@@ -79,26 +108,42 @@ export class RepoService {
   }
 
   /**
-   * Add a repo: parse the URL, dedupe within the workspace, persist, and enqueue
-   * the real clone (non-blocking). `created` is false when the repo already
-   * existed (the caller returns 200 instead of 201).
+   * Add a repo: parse the URL (auto-detecting the VCS provider, or honoring
+   * an explicit `vcs_provider`/`base_url` for an unrecognized host), dedupe
+   * within the workspace + provider, persist, and enqueue the real clone
+   * (non-blocking). `created` is false when the repo already existed (the
+   * caller returns 200 instead of 201).
    */
   async add(
     workspaceId: string,
     userId: string,
     url: string,
+    opts: ParseRepoUrlOptions = {},
   ): Promise<{ repo: Repo; created: boolean }> {
-    const { owner, name } = parseRepoUrl(url);
-    const fullName = `${owner}/${name}`;
+    const parsed = parseRepoUrl(url, opts);
+    const { provider, owner, name, project, baseUrl } = parsed;
+    const fullName = project ? `${owner}/${project}/${name}` : `${owner}/${name}`;
 
-    const existing = await this.repo.findByFullName(workspaceId, fullName);
+    const existing = await this.repo.findByFullName(workspaceId, provider, fullName);
     if (existing) return { repo: toRepoDto(existing), created: false };
 
-    const row = await this.repo.insert({ workspaceId, owner, name, fullName, createdBy: userId });
-    await this.container.jobs.enqueue(workspaceId, CLONE_JOB_KIND, {
-      repoId: row.id,
+    const row = await this.repo.insert({
+      workspaceId,
+      vcsProvider: provider,
       owner,
       name,
+      project,
+      baseUrl,
+      fullName,
+      createdBy: userId,
+    });
+    await this.container.jobs.enqueue(workspaceId, CLONE_JOB_KIND, {
+      repoId: row.id,
+      vcsProvider: provider,
+      owner,
+      name,
+      project,
+      baseUrl,
       url,
     } satisfies CloneJobPayload);
 
@@ -114,11 +159,24 @@ export class RepoService {
   async refresh(workspaceId: string, id: string): Promise<{ status: 'refreshing' }> {
     const repo = await this.repo.getById(workspaceId, id);
     if (!repo) throw new NotFoundError('Repo not found');
-    await this.container.jobs.enqueue(workspaceId, CLONE_JOB_KIND, {
-      repoId: repo.id,
+    const vcsProvider = repo.vcsProvider as VcsProvider;
+    // Clone URL is derived from the persisted provider + base_url + identity
+    // (AC-42) — no more hardcoded GitHub-only URL literal.
+    const url = buildCloneUrl({
+      vcsProvider,
       owner: repo.owner,
       name: repo.name,
-      url: `https://github.com/${repo.fullName}.git`,
+      project: repo.project,
+      baseUrl: repo.baseUrl,
+    });
+    await this.container.jobs.enqueue(workspaceId, CLONE_JOB_KIND, {
+      repoId: repo.id,
+      vcsProvider,
+      owner: repo.owner,
+      name: repo.name,
+      project: repo.project ?? undefined,
+      baseUrl: repo.baseUrl ?? undefined,
+      url,
     } satisfies CloneJobPayload);
     // T2.2 — also enqueue an incremental refresh. The two queue positions are
     // independent (p-queue doesn't FIFO across kinds), but `runIncremental` is

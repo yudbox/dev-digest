@@ -108,6 +108,12 @@ describe("CiService.exportCi action=files", () => {
         getById: vi.fn().mockResolvedValue(mockAgent),
         linkedSkills: vi.fn().mockResolvedValue([]),
       },
+      reposRepo: {
+        // TASK-009/AC-009-6 guard: no Azure DevOps repo by this name in these
+        // fixtures, so exportCi proceeds as GitHub — see service.test.ts's
+        // dedicated "CI-guard" describe block for the ADO-blocked case.
+        findByFullName: vi.fn().mockResolvedValue(undefined),
+      },
       ciRepo: {
         upsertInstallation,
         listInstallationsForAgent: vi.fn().mockResolvedValue({
@@ -159,7 +165,7 @@ describe("CiService.exportCi action=files", () => {
         .mockResolvedValue({ url: "https://github.com/owner/repo/pull/1" }),
     };
     const container = makeMockContainer(upsertInstallation);
-    (container as any).github = vi.fn().mockResolvedValue(mockGh);
+    (container as any).vcs = vi.fn().mockResolvedValue(mockGh);
 
     const service = new CiService(container);
     const result = await service.exportCi(
@@ -192,7 +198,7 @@ describe("CiService.exportCi action=files", () => {
       openPullRequest: vi.fn(),
     };
     const container = makeMockContainer(upsertInstallation);
-    (container as any).github = vi.fn().mockResolvedValue(mockGh);
+    (container as any).vcs = vi.fn().mockResolvedValue(mockGh);
 
     const service = new CiService(container);
     const result = await service.exportCi(
@@ -210,5 +216,91 @@ describe("CiService.exportCi action=files", () => {
 
     expect(mockGh.openPullRequest).not.toHaveBeenCalled();
     expect(result.pr_url).toBe("https://github.com/owner/repo/pull/99");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TASK-009/AC-009-6 — CI export/ingest is GitHub-only; an Azure DevOps repo
+// must get a managed 4xx, never a silent empty result or a 500 from a
+// GitHub-only call reaching an ADO full name.
+// ---------------------------------------------------------------------------
+
+describe("CiService — CI-guard for non-GitHub repos (R13/AC-009-6)", () => {
+  const mockAgent = {
+    id: "agent-1",
+    name: "Test Agent",
+    provider: "openrouter",
+    model: "gpt-4.1",
+    systemPrompt: "Review this PR.",
+    strategy: "auto",
+    ciFailOn: "critical",
+  };
+
+  it("exportCi throws ci_not_supported_for_provider (422) for a repo registered as azure-devops", async () => {
+    const findByFullName = vi.fn().mockResolvedValue({ id: "repo-1", vcsProvider: "azure-devops" });
+    const github = vi.fn();
+    const container = {
+      agentsRepo: {
+        getById: vi.fn().mockResolvedValue(mockAgent),
+        linkedSkills: vi.fn().mockResolvedValue([]),
+      },
+      reposRepo: { findByFullName },
+      ciRepo: {},
+      github,
+    } as unknown as Container;
+
+    const service = new CiService(container);
+
+    await expect(
+      service.exportCi(
+        "agent-1",
+        {
+          repo: "GES-IT/ges-azure-functions",
+          target: "gha",
+          action: "files",
+          post_as: "github_review",
+          triggers: ["opened"],
+          base: "main",
+        },
+        "workspace-1",
+      ),
+    ).rejects.toMatchObject({ code: "ci_not_supported_for_provider", statusCode: 422 });
+
+    expect(findByFullName).toHaveBeenCalledWith("workspace-1", "azure-devops", "GES-IT/ges-azure-functions");
+    // No GitHub call should ever be attempted once the guard fires.
+    expect(github).not.toHaveBeenCalled();
+  });
+
+  it("ingestAll skips an azure-devops installation instead of calling listWorkflowRuns", async () => {
+    const listWorkflowRuns = vi.fn();
+    const mockGh = { listWorkflowRuns, getPullRequest: vi.fn(), downloadArtifact: vi.fn() };
+    const findByFullName = vi.fn().mockResolvedValue({ id: "repo-1", vcsProvider: "azure-devops" });
+    const updateSyncState = vi.fn();
+    const container = {
+      reposRepo: { findByFullName },
+      ciRepo: {
+        listInstallationsAllWithWorkspace: vi.fn().mockResolvedValue([
+          {
+            id: "install-1",
+            agentId: "agent-1",
+            repo: "GES-IT/ges-azure-functions",
+            targetType: "gha",
+            installedAt: new Date(),
+            lastSyncedEtag: null,
+            lastSyncedAt: null,
+            workspaceId: "workspace-1",
+          },
+        ]),
+        updateSyncState,
+      },
+      vcs: vi.fn().mockResolvedValue(mockGh),
+    } as unknown as Container;
+
+    const service = new CiService(container);
+    const result = await service.ingestAll("workspace-1");
+
+    expect(listWorkflowRuns).not.toHaveBeenCalled();
+    expect(updateSyncState).not.toHaveBeenCalled();
+    expect(result.ingested).toBe(0);
   });
 });

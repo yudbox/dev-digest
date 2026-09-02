@@ -14,16 +14,17 @@ import { EvalCaseModal } from "@/components/evals/EvalCaseModal";
 import { KEY_TO_ACTION, SEVERITY_FILTERS } from "./constants";
 import { visibleFindings } from "./helpers";
 import { s } from "./styles";
+import type { VcsUrlRepo } from "@/lib/utils";
 
 export function FindingsPanel({
   findings,
   prId,
-  repoFullName,
+  repo,
   headSha,
 }: {
   findings: FindingRecord[];
   prId: string;
-  repoFullName?: string | null;
+  repo?: VcsUrlRepo | null;
   headSha?: string | null;
 }) {
   const t = useTranslations("prReview");
@@ -125,7 +126,7 @@ export function FindingsPanel({
               targeted={f.id === targetFindingId}
               defaultExpanded={i === 0}
               pending={action.isPending && action.variables?.findingId === f.id}
-              repoFullName={repoFullName}
+              repo={repo}
               headSha={headSha}
               onAction={(act, extra) => {
                 action.mutate({

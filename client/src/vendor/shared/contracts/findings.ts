@@ -99,3 +99,19 @@ export const FindingAction = z.object({
   reply: z.string().optional(),
 });
 export type FindingAction = z.infer<typeof FindingAction>;
+
+export const FindingReply = z.object({
+  id: z.string().uuid(),
+  body: z.string(),
+  author: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  is_own: z.boolean(),
+});
+export type FindingReply = z.infer<typeof FindingReply>;
+
+export const FindingRepliesResponse = z.object({
+  replies: z.array(FindingReply),
+  ado_thread_url: z.string().nullable(),
+});
+export type FindingRepliesResponse = z.infer<typeof FindingRepliesResponse>;

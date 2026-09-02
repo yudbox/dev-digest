@@ -100,3 +100,20 @@ export const FindingAction = z.object({
   note: z.string().optional(),
 });
 export type FindingAction = z.infer<typeof FindingAction>;
+
+/** One published ADO comment belonging to a finding's thread. */
+export const FindingReply = z.object({
+  id: z.string().uuid(),           // finding_replies.id (not the ADO comment id)
+  body: z.string(),
+  author: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  is_own: z.boolean(),             // true when the comment author matches the workspace owner
+});
+export type FindingReply = z.infer<typeof FindingReply>;
+
+export const FindingRepliesResponse = z.object({
+  replies: z.array(FindingReply),
+  ado_thread_url: z.string().nullable(),
+});
+export type FindingRepliesResponse = z.infer<typeof FindingRepliesResponse>;

@@ -112,14 +112,15 @@ export class ReviewRunExecutor {
     };
 
     let diff: UnifiedDiff;
+    let resolvedHeadSha: string | null;
     try {
-      diff = await runLog.step(
+      ({ diff, resolvedHeadSha } = await runLog.step(
         "Loading PR diff",
         () => loadDiff(this.container, this.repo, workspaceId, pull, repo),
         {
           kind: "tool",
         },
-      );
+      ));
     } catch (err) {
       runLog.error(`Failed to load PR diff: ${(err as Error).message}`);
       await failAll(`Failed to load PR diff: ${(err as Error).message}`);
@@ -143,9 +144,14 @@ export class ReviewRunExecutor {
       if (m) {
         const issueNumber = parseInt(m[2]!, 10);
         try {
-          const gh = await this.container.github();
+          const gh = await this.container.vcs(repo);
           linkedIssue = await gh.getIssue(
-            { owner: repo.owner, name: repo.name },
+            {
+              owner: repo.owner,
+              name: repo.name,
+              project: repo.project ?? undefined,
+              baseUrl: repo.baseUrl ?? undefined,
+            },
             issueNumber,
           );
           runLog.info(
@@ -207,6 +213,7 @@ export class ReviewRunExecutor {
             runId,
             runLog,
             intentText,
+            resolvedHeadSha,
           );
           logger?.info(
             {
@@ -244,6 +251,7 @@ export class ReviewRunExecutor {
     runId: string,
     parentLog: RunLogger,
     intent?: string,
+    resolvedHeadSha?: string | null,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -473,8 +481,13 @@ export class ReviewRunExecutor {
       );
 
       // Mark the commit this review ran against so the PR list can tell
-      // reviewed / needs-review (head moved) / stale apart.
-      await this.repo.markReviewed(pull.id, pull.headSha);
+      // reviewed / needs-review (head moved) / stale apart. Prefer the sha
+      // `loadDiff` actually just fetched and diffed against over the
+      // possibly-stale `pull.headSha` read from the DB before this run
+      // started (see `ensurePullHeadFetched`'s doc — a push landing between
+      // the last PR-list sync and this review must not be mislabeled as
+      // "reviewed" against its old head).
+      await this.repo.markReviewed(pull.id, resolvedHeadSha ?? pull.headSha);
 
       const durationMs = Date.now() - start;
 

@@ -5,14 +5,24 @@ import {
   SettingsUpdate,
   ConnTestRequest,
   type ConnTestResult,
+  type ConnTestProvider,
   type SecretsStatus,
   FEATURE_MODELS,
   FeatureModelChoice,
 } from "@devdigest/shared";
 import * as t from "../../db/schema.js";
 import { getContext } from "../_shared/context.js";
-import { GITHUB_PROVIDER, SECRET_KEY_BY_PROVIDER } from "./constants.js";
+import {
+  GITHUB_PROVIDER,
+  AZURE_DEVOPS_PROVIDER,
+  SECRET_KEY_BY_PROVIDER,
+  SECRETS_STATUS_FIELD_BY_PROVIDER,
+} from "./constants.js";
 import { rowsToSettings } from "./helpers.js";
+import {
+  testAzureDevOpsConnection,
+  testAzureDevOpsOrgConnection,
+} from "../../adapters/azure-devops/auth.js";
 
 /**
  * F1 — settings module.
@@ -69,13 +79,13 @@ export default async function settingsRoutes(appBase: FastifyInstance) {
     await getContext(container, req);
     const entries = await Promise.all(
       (
-        Object.entries(SECRET_KEY_BY_PROVIDER) as [
-          keyof SecretsStatus,
-          string,
-        ][]
+        Object.entries(SECRET_KEY_BY_PROVIDER) as [ConnTestProvider, string][]
       ).map(
         async ([provider, key]) =>
-          [provider, Boolean(await container.secrets.get(key))] as const,
+          [
+            SECRETS_STATUS_FIELD_BY_PROVIDER[provider],
+            Boolean(await container.secrets.get(key)),
+          ] as const,
       ),
     );
     return Object.fromEntries(entries) as SecretsStatus;
@@ -108,6 +118,7 @@ export default async function settingsRoutes(appBase: FastifyInstance) {
     },
     async (req): Promise<ConnTestResult> => {
       const { provider, key } = req.body;
+      const { workspaceId } = await getContext(container, req);
       try {
         // If the UI supplied a key, persist it (BYO key) before testing so the
         // test reflects — and the rest of the app can use — the new value.
@@ -123,9 +134,32 @@ export default async function settingsRoutes(appBase: FastifyInstance) {
           container.invalidateSecretCaches();
         }
         if (provider === GITHUB_PROVIDER) {
-          const gh = await container.github();
+          const gh = await container.vcs({ vcsProvider: GITHUB_PROVIDER });
           const login = await gh.currentLogin();
           return { provider, ok: true, message: `Connected as @${login}` };
+        }
+        if (provider === AZURE_DEVOPS_PROVIDER) {
+          const pat = await container.secrets.get(
+            SECRET_KEY_BY_PROVIDER[provider],
+          );
+          if (!pat) {
+            return {
+              provider,
+              ok: false,
+              message: "AZURE_DEVOPS_TOKEN is not configured",
+            };
+          }
+          // Prefer testing against a KNOWN org (an already-added Azure DevOps
+          // repo) — more reliable than the account-level profile endpoint,
+          // which some Microsoft Entra ID Conditional Access policies block
+          // for Basic-auth PATs even when the same PAT works fine per-org.
+          const repos = await container.reposRepo.list(workspaceId);
+          const adoRepo = repos.find((r) => r.vcsProvider === AZURE_DEVOPS_PROVIDER);
+          const result =
+            adoRepo && adoRepo.baseUrl
+              ? await testAzureDevOpsOrgConnection(pat, adoRepo.owner, adoRepo.baseUrl)
+              : await testAzureDevOpsConnection(pat);
+          return { provider, ok: result.ok, message: result.message };
         }
         const llm = await container.llm(provider);
         const models = await llm.listModels();

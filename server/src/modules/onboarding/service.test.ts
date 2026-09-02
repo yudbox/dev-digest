@@ -115,7 +115,7 @@ function makeContainer(opts: {
     contextService: {
       listDocsForRepo: vi.fn().mockResolvedValue([]),
     },
-    github: vi.fn().mockResolvedValue({
+    vcs: vi.fn().mockResolvedValue({
       getCommitActivity: vi.fn().mockResolvedValue({}),
     }),
     llm: vi.fn().mockResolvedValue(mockLlm),
@@ -237,7 +237,7 @@ describe("OnboardingService.generate()", () => {
 
   it("degrades to pure-percentile ranking when getCommitActivity throws (AC-13)", async () => {
     const container = makeContainer({});
-    (container.github as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (container.vcs as ReturnType<typeof vi.fn>).mockResolvedValue({
       getCommitActivity: vi.fn().mockRejectedValue(new Error("rate limited")),
     });
     const service = new OnboardingService(container);

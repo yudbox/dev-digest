@@ -23,6 +23,7 @@
     "@fastify/helmet": "^13.0.2",
     "@fastify/rate-limit": "^11.0.0",
     "@vscode/ripgrep": "^1.15.9",
+    "azure-devops-node-api": "^17.0.0",
     "dependency-cruiser": "^17.4.3",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.3",

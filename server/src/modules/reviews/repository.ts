@@ -155,6 +155,33 @@ export class ReviewRepository {
     return reviewRepo.setFindingAccepted(this.db, findingId, null);
   }
 
+  // ---- finding replies ----------------------------------------------------
+
+  insertFindingReply(values: {
+    findingId: string;
+    adoThreadId: number;
+    adoCommentId: number;
+    body: string;
+  }): Promise<reviewRepo.FindingReplyRow> {
+    return reviewRepo.insertFindingReply(this.db, values);
+  }
+
+  getFindingReplies(findingId: string): Promise<reviewRepo.FindingReplyRow[]> {
+    return reviewRepo.getFindingReplies(this.db, findingId);
+  }
+
+  getFindingReply(replyId: string): Promise<reviewRepo.FindingReplyRow | undefined> {
+    return reviewRepo.getFindingReply(this.db, replyId);
+  }
+
+  updateFindingReply(replyId: string, body: string): Promise<reviewRepo.FindingReplyRow | undefined> {
+    return reviewRepo.updateFindingReply(this.db, replyId, body);
+  }
+
+  deleteFindingReply(replyId: string): Promise<boolean> {
+    return reviewRepo.deleteFindingReply(this.db, replyId);
+  }
+
   // ---- intent -------------------------------------------------------------
 
   upsertIntent(prId: string, intent: Intent): Promise<void> {

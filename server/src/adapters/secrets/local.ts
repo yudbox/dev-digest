@@ -9,6 +9,8 @@ import type { SecretsProvider, SecretKey } from '@devdigest/shared';
  * UI), falling back to process.env when a key has not been set. Writes persist
  * to the same file (mode 0600) so keys survive restarts. GITHUB_TOKEN is the
  * canonical key; GITHUB_PAT is still read as a fallback for back-compat.
+ * AZURE_DEVOPS_TOKEN follows the same stored-then-env pattern (no legacy
+ * alias — it's a newer key with no prior name to fall back to).
  *
  * Stored values take precedence over env so a key entered in the UI wins.
  * Swap for a VaultSecretsProvider later without touching call sites.
@@ -38,6 +40,7 @@ export class LocalSecretsProvider implements SecretsProvider {
     const stored = (await this.load())[key as string];
     if (stored) return stored;
     if (key === 'GITHUB_TOKEN') return this.env.GITHUB_TOKEN ?? this.env.GITHUB_PAT;
+    if (key === 'AZURE_DEVOPS_TOKEN') return this.env.AZURE_DEVOPS_TOKEN;
     return this.env[key as string];
   }
 

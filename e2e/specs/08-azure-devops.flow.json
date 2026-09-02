@@ -1,0 +1,11 @@
+{
+  "name": "Settings API Keys renders the Azure DevOps PAT row alongside GitHub",
+  "description": "TASK-010/TASK-011 (SPEC-2026-08-25-azure-devops-integration) — Azure DevOps is a second VCS provider now, not just GitHub. Loads /settings/api-keys and confirms the Azure DevOps PAT row (added to KEY_ROWS) renders next to the GitHub row, proving the provider is reachable from the UI without requiring a live ADO PAT or repo (per this suite's own coverage principle: no external API calls). Read-only seeded data (no model call, no ADO network call).",
+  "steps": [
+    { "cmd": ["open", "{BASE}/settings/api-keys"], "label": "load the API Keys settings section" },
+    { "cmd": ["wait", "--url", "/settings/api-keys"], "label": "api-keys route reached" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "settings fetch settles" },
+    { "cmd": ["wait", "--text", "GitHub PAT (fine-grained)"], "label": "the existing GitHub PAT row still renders (no regression)" },
+    { "cmd": ["wait", "--text", "Azure DevOps PAT"], "label": "the new Azure DevOps PAT row renders" }
+  ]
+}

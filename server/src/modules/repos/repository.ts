@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm';
+import type { VcsProvider } from '@devdigest/shared';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 
@@ -11,8 +12,13 @@ export type RepoRow = typeof t.repos.$inferSelect;
 
 export interface InsertRepo {
   workspaceId: string;
+  vcsProvider: VcsProvider;
   owner: string;
   name: string;
+  /** Azure DevOps only — middle segment of org/project/repo. */
+  project?: string;
+  /** Azure DevOps only — hosting base URL. */
+  baseUrl?: string;
   fullName: string;
   createdBy: string;
 }
@@ -20,12 +26,26 @@ export interface InsertRepo {
 export class RepoRepository {
   constructor(private db: Db) {}
 
-  /** Find a repo in a workspace by its `owner/name` full name (dedupe on add). */
-  async findByFullName(workspaceId: string, fullName: string): Promise<RepoRow | undefined> {
+  /**
+   * Find a repo in a workspace by `(vcsProvider, fullName)` (dedupe on add).
+   * Provider is part of the lookup key — `github:acme/api` and
+   * `azure-devops:acme/api` are different repos and must not collide.
+   */
+  async findByFullName(
+    workspaceId: string,
+    vcsProvider: VcsProvider,
+    fullName: string,
+  ): Promise<RepoRow | undefined> {
     const [row] = await this.db
       .select()
       .from(t.repos)
-      .where(and(eq(t.repos.workspaceId, workspaceId), eq(t.repos.fullName, fullName)));
+      .where(
+        and(
+          eq(t.repos.workspaceId, workspaceId),
+          eq(t.repos.vcsProvider, vcsProvider),
+          eq(t.repos.fullName, fullName),
+        ),
+      );
     return row;
   }
 
@@ -46,8 +66,11 @@ export class RepoRepository {
       .insert(t.repos)
       .values({
         workspaceId: values.workspaceId,
+        vcsProvider: values.vcsProvider,
         owner: values.owner,
         name: values.name,
+        project: values.project,
+        baseUrl: values.baseUrl,
         fullName: values.fullName,
         createdBy: values.createdBy,
       })

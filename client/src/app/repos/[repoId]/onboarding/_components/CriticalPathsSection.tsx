@@ -3,15 +3,15 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import type { CriticalPathItem } from "@devdigest/shared";
-import { githubBlobUrl } from "@/lib/utils/githubUrls";
+import { vcsBlobUrl, type VcsUrlRepo } from "@/lib/utils/vcsUrls";
 
 interface Props {
   items: CriticalPathItem[];
-  repoFullName: string;
+  repo: VcsUrlRepo;
   defaultBranch: string;
 }
 
-export function CriticalPathsSection({ items, repoFullName, defaultBranch }: Props) {
+export function CriticalPathsSection({ items, repo, defaultBranch }: Props) {
   const t = useTranslations("onboarding.criticalPaths");
   return (
     <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
@@ -50,7 +50,7 @@ export function CriticalPathsSection({ items, repoFullName, defaultBranch }: Pro
             </p>
           </div>
           <a
-            href={githubBlobUrl(repoFullName, defaultBranch, item.file)}
+            href={vcsBlobUrl(repo, defaultBranch, item.file, undefined, undefined, "branch")}
             target="_blank"
             rel="noopener noreferrer"
             style={{

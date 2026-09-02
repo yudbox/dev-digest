@@ -4,6 +4,7 @@ import type {
   PrDetail,
   IssueMeta,
   PrReviewComment,
+  VcsProvider,
 } from './contracts/platform.js';
 
 /**
@@ -94,10 +95,14 @@ export interface Embedder {
   readonly dims: number;
 }
 
-// ---------- GitHub (Octokit REST, thin) ----------
+// ---------- VCS (GitHub via Octokit REST / Azure DevOps via SDK) ----------
 export interface RepoRef {
   owner: string;
   name: string;
+  /** Azure DevOps only: middle segment of the org/project/repo triple. Ignored by GitHub. */
+  project?: string;
+  /** Azure DevOps only: hosting base URL (e.g. `https://dev.azure.com`, or a self-hosted server). Ignored by GitHub. */
+  baseUrl?: string;
 }
 
 export interface GitHubReviewPayload {
@@ -116,6 +121,17 @@ export interface CreateReviewCommentInput {
   body: string;
   /** When set, post as a reply to that comment's thread instead of a new one. */
   inReplyTo?: number;
+  /**
+   * TASK-008 (SPEC-2026-08-25-azure-devops-integration, R32): the finding's
+   * severity and title, used ONLY by the Azure DevOps implementation to
+   * derive a stable `findingId` for idempotent thread publishing (R33) —
+   * hashing on `body` instead would break idempotency the moment a finding's
+   * wording is regenerated slightly on a re-run, since `body` is exactly the
+   * text that is expected to vary. GitHub's `publishComment`/
+   * `createReviewComment` ignore both fields entirely.
+   */
+  severity?: string;
+  title?: string;
 }
 
 export interface OpenPrPayload {
@@ -176,10 +192,22 @@ export interface ListWorkflowRunsResult {
   runs: WorkflowRun[];
 }
 
-export interface GitHubClient {
+/**
+ * VCS port — a discriminated multi-provider port, following the same pattern
+ * as `LLMProvider` (`readonly id: 'openai' | 'anthropic' | 'openrouter'`).
+ * `readonly id` lets `Container.vcs(repo)` dispatch the concrete
+ * implementation by `repo.vcsProvider` at runtime — a plain rename from
+ * `GitHubClient` would give no such discriminator.
+ *
+ * Not every method is meaningful for every provider (e.g. `listWorkflowRuns`
+ * has no Azure DevOps analogue — Azure Pipelines is out of scope). A provider
+ * that cannot support a method must throw an explicit `not_supported` error
+ * naming its `id` and the method — never a silent empty success.
+ */
+export interface VcsClient {
+  readonly id: VcsProvider;
   listPullRequests(repo: RepoRef): Promise<PrMeta[]>;
   getPullRequest(repo: RepoRef, n: number): Promise<PrDetail>;
-  postReview(repo: RepoRef, n: number, review: GitHubReviewPayload): Promise<{ id: string }>;
   /** List inline review comments on a PR (for the "Files changed" tab). */
   listReviewComments(repo: RepoRef, n: number): Promise<PrReviewComment[]>;
   /** Create one inline review comment (or reply) on a PR; returns the new comment. */
@@ -188,6 +216,40 @@ export interface GitHubClient {
     n: number,
     input: CreateReviewCommentInput,
   ): Promise<PrReviewComment>;
+  /**
+   * Publish one review comment, letting the implementation choose its native
+   * strategy (GitHub: an inline review comment via the same path as
+   * `createReviewComment`; Azure DevOps: idempotent thread create/update
+   * matched on a stable finding id). Replaces the old GitHub-only atomic
+   * batch `postReview` — Azure DevOps has no batch endpoint, so publishing is
+   * always one comment per call for both providers.
+   */
+  publishComment(
+    repo: RepoRef,
+    n: number,
+    input: CreateReviewCommentInput,
+  ): Promise<PrReviewComment>;
+  /**
+   * Edit the body of a previously published comment. Provider implementations
+   * that do not support editing throw `not_supported`.
+   */
+  editComment(
+    repo: RepoRef,
+    n: number,
+    threadId: number,
+    commentId: number,
+    body: string,
+  ): Promise<void>;
+  /**
+   * Delete a previously published comment. Provider implementations that do
+   * not support deletion throw `not_supported`.
+   */
+  deleteComment(
+    repo: RepoRef,
+    n: number,
+    threadId: number,
+    commentId: number,
+  ): Promise<void>;
   openPullRequest(repo: RepoRef, payload: OpenPrPayload): Promise<{ url: string }>;
   /**
    * Commit `files` onto `branch` as ONE atomic commit (Git Data API: blobs →
@@ -215,6 +277,13 @@ export interface GitHubClient {
   /** Download one workflow-run artifact as a raw zip Buffer (caller unzips). */
   downloadArtifact(repo: RepoRef, artifactId: number | string): Promise<Buffer>;
 }
+
+/**
+ * @deprecated Use `VcsClient`. Kept as a type alias so pre-existing imports
+ * of `GitHubClient` keep compiling while call sites migrate to `VcsClient`
+ * (see TASK-002 of SPEC-2026-08-25-azure-devops-integration).
+ */
+export type GitHubClient = VcsClient;
 
 // ---------- Git (simple-git, heavy) ----------
 export interface CloneOptions {
@@ -254,7 +323,28 @@ export interface GitCommit {
 
 export interface GitClient {
   clone(repo: RepoRef, url: string, opts?: CloneOptions): Promise<{ path: string }>;
-  fetchPullHead(repo: RepoRef, n: number): Promise<void>;
+  /**
+   * Fetch the PR's head (and, for providers where it comes bundled, base)
+   * commit into the local clone. Refspec is provider-specific: GitHub exposes
+   * `pull/<n>/head` directly; Azure DevOps has no such ref — `refs/pull/<n>/merge`
+   * is the confirmed working refspec there (TASK-000 spike,
+   * `adapters/azure-devops/SPIKE-NOTES.md` — a single fetch of that ref also
+   * brings the base commit along for free, since ADO's auto-generated merge
+   * commit's two parents are exactly the target/source commits). `repo.provider`
+   * is optional and defaults to `'github'` so every pre-existing `RepoRef`
+   * (which never set it) keeps today's exact behavior. `url`, when given, is
+   * an authenticated clone URL used ONLY for this one fetch call (never
+   * persisted) — required for Azure DevOps, whose `origin` remote is never
+   * allowed to carry embedded credentials (AC-005-1); ignored by GitHub,
+   * whose `origin` remote already carries the token from the original clone.
+   *
+   * Returns the local `pr-{n}` ref's resolved head sha (for Azure DevOps,
+   * the merge commit's SECOND parent — the real PR head, not the synthetic
+   * merge commit itself) — the caller's single source of truth for "what
+   * commit did we actually just fetch and diff against", so a diff/review
+   * never silently falls back to a possibly-stale persisted `head_sha`.
+   */
+  fetchPullHead(repo: RepoRef & { provider?: VcsProvider }, n: number, url?: string): Promise<string>;
   /**
    * Resync an already-cloned repo to the tip of `branch`: fetch from origin and
    * advance the local working tree to `origin/<branch>`. Unlike `clone`'s bare
@@ -274,7 +364,16 @@ export interface GitClient {
   blame(repo: RepoRef, path: string): Promise<BlameLine[]>;
   log(repo: RepoRef, path?: string): Promise<GitCommit[]>;
   readFile(repo: RepoRef, path: string): Promise<string>;
-  clonePathFor(repo: RepoRef): string;
+  /**
+   * Local clone directory for `repo`. Provider-aware to avoid a path
+   * collision (`github:acme/api` vs `azure-devops:acme/api` sharing the same
+   * `owner/name` pair are two different repos — SPEC-2026-08-25-azure-devops-integration
+   * P2): a set `repo.project` (Azure DevOps only) routes through a
+   * provider-segmented path; when `provider`/`project` are absent (every
+   * existing GitHub `RepoRef`), the path is byte-identical to before this
+   * field existed.
+   */
+  clonePathFor(repo: RepoRef & { provider?: VcsProvider }): string;
 }
 
 // ---------- CodeIndex (ripgrep + tree-sitter) ----------
@@ -325,6 +424,7 @@ export type SecretKey =
   | 'OPENAI_API_KEY'
   | 'ANTHROPIC_API_KEY'
   | 'GITHUB_TOKEN'
+  | 'AZURE_DEVOPS_TOKEN'
   | 'DATABASE_URL'
   | (string & {});
 

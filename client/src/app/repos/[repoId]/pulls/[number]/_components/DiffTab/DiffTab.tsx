@@ -3,18 +3,21 @@
 import React from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { SectionLabel, Button } from "@devdigest/ui";
+import { SectionLabel, Button, EmptyState } from "@devdigest/ui";
 import { DiffViewer, type DiffCommentApi } from "@/components/diff-viewer";
 import { SmartDiffViewer } from "@/components/smart-diff/SmartDiffViewer";
 import { usePrComments, useCreatePrComment } from "@/lib/hooks/reviews";
 import { useSmartDiff } from "@/lib/hooks/pulls";
 import { notify } from "@/lib/contexts/toast";
-import type { PrFile } from "@devdigest/shared";
+import type { PrFile, DiffUnavailable } from "@devdigest/shared";
 
 interface DiffTabProps {
   prId: string | null;
   filesCount: number;
   files: PrFile[];
+  /** Set only when the diff couldn't be computed locally (Azure DevOps
+   * diff-first path) — GitHub PRs never set this. */
+  diffUnavailable?: DiffUnavailable | null;
   /** Inline commenting is offered only on open PRs (GitHub rejects otherwise). */
   canComment?: boolean;
   smartOrder: boolean;
@@ -25,11 +28,13 @@ export function DiffTab({
   prId,
   filesCount,
   files,
+  diffUnavailable,
   canComment,
   smartOrder,
   onSmartOrderChange,
 }: DiffTabProps) {
   const t = useTranslations("prReview.smartDiff");
+  const tDiffUnavailable = useTranslations("prReview.diffUnavailable");
   const searchParams = useSearchParams();
   const targetFile = searchParams.get("file") ?? undefined;
   const targetLine = searchParams.get("line")
@@ -105,7 +110,13 @@ export function DiffTab({
       >
         Files changed · {filesCount} files
       </SectionLabel>
-      {smartOrder && smartDiff.data ? (
+      {diffUnavailable ? (
+        <EmptyState
+          icon="AlertTriangle"
+          title={tDiffUnavailable("title")}
+          body={tDiffUnavailable(diffUnavailable.reason)}
+        />
+      ) : smartOrder && smartDiff.data ? (
         <SmartDiffViewer
           smartDiff={smartDiff.data}
           files={files}

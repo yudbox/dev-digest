@@ -7,6 +7,7 @@ import {
   jsonb,
   timestamp,
   doublePrecision,
+  index,
 } from "drizzle-orm/pg-core";
 import { now } from "./_shared";
 import { workspaces } from "./core";
@@ -76,3 +77,20 @@ export const prBrief = pgTable("pr_brief", {
   json: jsonb("json").notNull(),
   headSha: text("head_sha"),
 });
+
+/** Stores published ADO thread+comment ids so replies can be read, edited, and deleted. */
+export const findingReplies = pgTable(
+  "finding_replies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    findingId: uuid("finding_id")
+      .notNull()
+      .references(() => findings.id, { onDelete: "cascade" }),
+    adoThreadId: integer("ado_thread_id").notNull(),
+    adoCommentId: integer("ado_comment_id").notNull(),
+    body: text("body").notNull(),
+    createdAt: now(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("finding_replies_finding_idx").on(t.findingId)],
+);

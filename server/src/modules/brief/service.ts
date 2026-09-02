@@ -88,9 +88,14 @@ export class BriefService {
         if (m) {
           const issueNumber = parseInt(m[2]!, 10);
           try {
-            const gh = await this.container.github();
+            const gh = await this.container.vcs(repoRow);
             linkedIssue = await gh.getIssue(
-              { owner: repoRow.owner, name: repoRow.name },
+              {
+                owner: repoRow.owner,
+                name: repoRow.name,
+                project: repoRow.project ?? undefined,
+                baseUrl: repoRow.baseUrl ?? undefined,
+              },
               issueNumber,
             );
             log.info(

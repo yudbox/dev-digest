@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../../../db/client.js";
 import * as t from "../../../db/schema.js";
 import type { Finding } from "@devdigest/shared";
@@ -267,4 +267,62 @@ export async function getLatestReviewData(
       ? (runTokensMap.get(review.runId) ?? null)
       : null,
   }));
+}
+
+// ---- finding replies -------------------------------------------------------
+
+export type FindingReplyRow = typeof t.findingReplies.$inferSelect;
+
+export async function insertFindingReply(
+  db: Db,
+  values: { findingId: string; adoThreadId: number; adoCommentId: number; body: string },
+): Promise<FindingReplyRow> {
+  const [row] = await db.insert(t.findingReplies).values(values).returning();
+  return row!;
+}
+
+export async function getFindingReplies(
+  db: Db,
+  findingId: string,
+): Promise<FindingReplyRow[]> {
+  return db
+    .select()
+    .from(t.findingReplies)
+    .where(eq(t.findingReplies.findingId, findingId))
+    .orderBy(t.findingReplies.createdAt);
+}
+
+export async function getFindingReply(
+  db: Db,
+  replyId: string,
+): Promise<FindingReplyRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(t.findingReplies)
+    .where(eq(t.findingReplies.id, replyId));
+  return row;
+}
+
+export async function updateFindingReply(
+  db: Db,
+  replyId: string,
+  body: string,
+): Promise<FindingReplyRow | undefined> {
+  const [row] = await db
+    .update(t.findingReplies)
+    .set({ body, updatedAt: sql`now()` })
+    .where(eq(t.findingReplies.id, replyId))
+    .returning();
+  return row;
+}
+
+export async function deleteFindingReply(
+  db: Db,
+  replyId: string,
+): Promise<boolean> {
+  const rows = await db
+    .delete(t.findingReplies)
+    .where(eq(t.findingReplies.id, replyId))
+    .returning({ id: t.findingReplies.id });
+  return rows.length > 0;
 }

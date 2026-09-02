@@ -29,7 +29,7 @@ import {
   useRepoNotFound,
 } from "../../../../../lib/contexts/repoContext";
 import { ApiError } from "../../../../../lib/api";
-import { githubPrUrl } from "../../../../../lib/utils/githubUrls";
+import { vcsPrUrl } from "../../../../../lib/utils/vcsUrls";
 import type { FindingRecord } from "@devdigest/shared";
 
 export default function PRDetailPage() {
@@ -98,9 +98,6 @@ export default function PRDetailPage() {
   const findingsCount = allFindings.length;
 
   const repoName = activeRepo?.full_name ?? repoId;
-  // The real "owner/repo" (null until the repo is loaded) — used to build
-  // github.com deep-links for the header and finding file references.
-  const repoFullName = activeRepo?.full_name ?? null;
   const crumb = [
     { label: repoName, mono: true, href: `/repos/${repoId}/pulls` },
     { label: "Pull Requests", href: `/repos/${repoId}/pulls` },
@@ -161,7 +158,8 @@ export default function PRDetailPage() {
         prId={prId}
         tab={tab}
         findingsCount={findingsCount}
-        githubUrl={repoFullName ? githubPrUrl(repoFullName, pr.number) : null}
+        vcsUrl={activeRepo ? vcsPrUrl(activeRepo, pr.number) : null}
+        vcsProvider={activeRepo?.vcs_provider}
         onSetTab={setTab}
         onRunsStarted={() => invalidateActiveRuns()}
       />
@@ -187,7 +185,7 @@ export default function PRDetailPage() {
             runs={runs}
             prRuns={prRuns}
             prCommits={pr.commits}
-            repoFullName={repoFullName}
+            repo={activeRepo}
             headSha={pr.head_sha}
             cancelMutation={cancel}
             onOpenTrace={(id) => setParam("trace", id)}
@@ -212,6 +210,7 @@ export default function PRDetailPage() {
             prId={prId}
             filesCount={pr.files_count}
             files={pr.files}
+            diffUnavailable={pr.diff_unavailable}
             canComment={pr.status === "open"}
             smartOrder={smartOrder}
             onSmartOrderChange={setSmartOrder}

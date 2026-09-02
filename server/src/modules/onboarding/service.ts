@@ -141,9 +141,14 @@ export class OnboardingService {
       // Hotness from GitHub commit activity — degrades to 0 on error (AC-13)
       let hotnessMap: Record<string, number> = {};
       try {
-        const gh = await this.container.github();
+        const gh = await this.container.vcs(repo);
         hotnessMap = await gh.getCommitActivity(
-          { owner: repo.owner, name: repo.name },
+          {
+            owner: repo.owner,
+            name: repo.name,
+            project: repo.project ?? undefined,
+            baseUrl: repo.baseUrl ?? undefined,
+          },
           candidates,
           HOTNESS_DAYS,
         );

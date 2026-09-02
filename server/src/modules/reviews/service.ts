@@ -234,7 +234,7 @@ export class ReviewService {
     if (!pull) return undefined;
     const repo = await this.repo.getRepo(pull.repoId);
     if (!repo) return undefined;
-    const diff = await loadDiff(
+    const { diff } = await loadDiff(
       this.container,
       this.repo,
       workspaceId,

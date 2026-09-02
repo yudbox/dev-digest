@@ -5,10 +5,22 @@ import { useTranslations } from "next-intl";
 import { Button, Icon, FormField, TextInput } from "@devdigest/ui";
 import { useTestConnection, useSecretsStatus } from "../../../../../../../lib/hooks";
 import { ApiError } from "../../../../../../../lib/api";
-import type { ConnTestProvider } from "../../../../../../../lib/types";
+import type { ConnTestProvider, SecretsStatus } from "../../../../../../../lib/types";
 import { SectionTitle } from "../SectionTitle";
 import { KEY_ROWS } from "./constants";
 import { s } from "./styles";
+
+/**
+ * `SecretsStatus`'s field names don't all match `ConnTestProvider` values
+ * verbatim — `'azure-devops'` (kebab-case) maps to `azureDevops`
+ * (camelCase). Mirrors the server's `SECRETS_STATUS_FIELD_BY_PROVIDER`
+ * (server/src/modules/settings/constants.ts). `KEY_ROWS` doesn't have an
+ * azure-devops row yet (that's a later UI task), but `provider` is typed as
+ * the full `ConnTestProvider` union, so this lookup must handle it.
+ */
+function secretsStatusKey(provider: ConnTestProvider): keyof SecretsStatus {
+  return provider === "azure-devops" ? "azureDevops" : provider;
+}
 
 /** "Configured / Not set" pill driven by GET /settings/secrets-status. */
 function StatusBadge({ configured }: { configured: boolean | undefined }) {
@@ -90,7 +102,7 @@ export function SettingsApiKeys() {
           label={t(row.labelKey)}
           provider={row.provider}
           hint={t(row.hintKey)}
-          configured={status?.[row.provider]}
+          configured={status?.[secretsStatusKey(row.provider)]}
         />
       ))}
     </div>
