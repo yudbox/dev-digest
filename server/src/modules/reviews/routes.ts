@@ -1,13 +1,22 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { RunRequest, FindingAction } from "@devdigest/shared";
+import { RunRequest, FindingAction, FindingRepliesResponse } from "@devdigest/shared";
 import type { RunEvent } from "@devdigest/shared";
 import { getContext } from "../_shared/context.js";
 import { IdParams } from "../_shared/schemas.js";
 import { NotFoundError } from "../../platform/errors.js";
 import { ReviewService } from "./service.js";
+import { AggregateService } from "./aggregate-service.js";
 import { EvalsService } from "../evals/service.js";
+import {
+  publishFindingReply,
+  getFindingReplies,
+  addFindingReply,
+  editFindingReply,
+  deleteFindingReply,
+} from "./findings.js";
+import { ReviewRepository } from "./repository.js";
 
 /**
  * reviews module.
@@ -44,7 +53,9 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
   const service = new ReviewService(container);
+  const aggregateService = new AggregateService(container);
   const evalsService = new EvalsService(app.container);
+  const repo = new ReviewRepository(container.db);
 
   // ---- Run a review (manual trigger) -------------------------------
   // Tight per-route limit: each call can fan out to expensive LLM runs.
@@ -116,6 +127,19 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
       const run = await service.getMultiAgentRun(workspaceId, req.params.id);
       if (!run) throw new NotFoundError("Multi-agent run not found");
       return run;
+    },
+  );
+
+  // ---- Aggregate: deduplicate findings across agents (transient, no DB write)
+  app.post(
+    "/multi-agent-runs/:id/aggregate",
+    {
+      schema: { params: IdParams },
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+    },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return aggregateService.aggregate(workspaceId, req.params.id);
     },
   );
 
@@ -248,6 +272,60 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
     async (req) => {
       const { workspaceId } = await getContext(container, req);
       return evalsService.prefillFromFinding(workspaceId, req.params.id);
+    },
+  );
+
+  // ---- Finding thread management (read / publish / reply / edit / delete) --
+
+  const ReplyBody = z.object({ body: z.string().min(1).max(10_000) });
+  const ReplyParams = z.object({ id: z.string().uuid(), replyId: z.string().uuid() });
+
+  // GET /findings/:id/replies — fetch stored replies for a finding
+  app.get(
+    "/findings/:id/replies",
+    { schema: { params: IdParams, response: { 200: FindingRepliesResponse } } },
+    async (req): Promise<FindingRepliesResponse> => {
+      const { workspaceId } = await getContext(container, req);
+      const user = await container.auth.currentUser(req);
+      return getFindingReplies(repo, workspaceId, req.params.id, container, user.email);
+    },
+  );
+
+  // POST /findings/:id/replies — initial publish (creates ADO thread) or reply-to-reply
+  app.post(
+    "/findings/:id/replies",
+    { schema: { params: IdParams, body: ReplyBody, response: { 200: FindingRepliesResponse } } },
+    async (req): Promise<FindingRepliesResponse> => {
+      const { workspaceId } = await getContext(container, req);
+      const user = await container.auth.currentUser(req);
+      const { body } = req.body as { body: string };
+      const existingReplies = await repo.getFindingReplies(req.params.id);
+      if (existingReplies.length === 0) {
+        return publishFindingReply(repo, workspaceId, req.params.id, body, container, user.email);
+      }
+      return addFindingReply(repo, workspaceId, req.params.id, body, container, user.email);
+    },
+  );
+
+  // PATCH /findings/:id/replies/:replyId — edit own comment
+  app.patch(
+    "/findings/:id/replies/:replyId",
+    { schema: { params: ReplyParams, body: ReplyBody, response: { 200: FindingRepliesResponse } } },
+    async (req): Promise<FindingRepliesResponse> => {
+      const { workspaceId } = await getContext(container, req);
+      const user = await container.auth.currentUser(req);
+      const { body } = req.body as { body: string };
+      return editFindingReply(repo, workspaceId, req.params.id, req.params.replyId, body, container, user.email);
+    },
+  );
+
+  // DELETE /findings/:id/replies/:replyId — delete own comment
+  app.delete(
+    "/findings/:id/replies/:replyId",
+    { schema: { params: ReplyParams } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return deleteFindingReply(repo, workspaceId, req.params.id, req.params.replyId, container);
     },
   );
 

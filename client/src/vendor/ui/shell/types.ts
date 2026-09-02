@@ -14,6 +14,8 @@ export interface RepoSummary {
   full_name: string;
   default_branch?: string;
   syncedLabel?: string;
+  /** Short provider label shown as a trailing hint in the switcher, e.g. "GitHub" / "Azure DevOps". */
+  providerLabel?: string;
 }
 
 export interface ShellContext {

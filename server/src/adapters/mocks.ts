@@ -7,7 +7,8 @@ import type {
   StructuredRequest,
   StructuredResult,
   Embedder,
-  GitHubClient,
+  VcsClient,
+  VcsProvider,
   RepoRef,
   PrMeta,
   PrDetail,
@@ -150,13 +151,21 @@ export interface MockGitHubOptions {
   etag?: string | null;
 }
 
-export class MockGitHubClient implements GitHubClient {
+export class MockVcsClient implements VcsClient {
+  readonly id: VcsProvider;
   public posted: { n: number; review: GitHubReviewPayload }[] = [];
   public openedPrs: OpenPrPayload[] = [];
   public committed: CommitFilesPayload[] = [];
   public createdComments: CreateReviewCommentInput[] = [];
+  public publishedComments: { n: number; input: CreateReviewCommentInput }[] =
+    [];
 
-  constructor(private opts: MockGitHubOptions = {}) {}
+  constructor(
+    private opts: MockGitHubOptions = {},
+    id: VcsProvider = "github",
+  ) {
+    this.id = id;
+  }
 
   async listPullRequests(_repo: RepoRef): Promise<PrMeta[]> {
     return (
@@ -248,8 +257,38 @@ export class MockGitHubClient implements GitHubClient {
       html_url: `https://github.com/mock/mock/pull/1#discussion_r${this.createdComments.length}`,
       in_reply_to_id: input.inReplyTo ?? null,
       is_outdated: false,
+      thread_id: this.id === "azure-devops" ? this.createdComments.length : null,
     };
   }
+
+  /**
+   * Mirrors `VcsClient.publishComment` — records the call separately from
+   * `createdComments` so tests can assert on either the low-level
+   * `createReviewComment` path or the provider-agnostic `publishComment` path.
+   */
+  async publishComment(
+    repo: RepoRef,
+    n: number,
+    input: CreateReviewCommentInput,
+  ): Promise<PrReviewComment> {
+    this.publishedComments.push({ n, input });
+    return this.createReviewComment(repo, n, input);
+  }
+
+  async editComment(
+    _repo: RepoRef,
+    _n: number,
+    _threadId: number,
+    _commentId: number,
+    _body: string,
+  ): Promise<void> {}
+
+  async deleteComment(
+    _repo: RepoRef,
+    _n: number,
+    _threadId: number,
+    _commentId: number,
+  ): Promise<void> {}
 
   async openPullRequest(
     _repo: RepoRef,
@@ -323,6 +362,14 @@ export class MockGitHubClient implements GitHubClient {
   }
 }
 
+/**
+ * @deprecated Use `MockVcsClient`. Kept as a value alias (not just a type
+ * alias — this is a concrete class, constructed via `new MockGitHubClient(...)`
+ * throughout the existing test suite) so no pre-existing test needs to change
+ * its import or constructor call.
+ */
+export const MockGitHubClient = MockVcsClient;
+
 // ---------- Mock Git ----------
 export interface MockGitOptions {
   diff?: string;
@@ -353,7 +400,9 @@ export class MockGitClient implements GitClient {
     this.cloned.push({ repo, url });
     return { path: this.clonePathFor(repo) };
   }
-  async fetchPullHead(): Promise<void> {}
+  async fetchPullHead(): Promise<string> {
+    return this.opts.head ?? "a1b2c3d4";
+  }
   async sync(repo: RepoRef, branch: string): Promise<{ head: string }> {
     this.syncs.push({ repo, branch });
     // After a sync, HEAD advances to syncedHead (or stays at head if unset).

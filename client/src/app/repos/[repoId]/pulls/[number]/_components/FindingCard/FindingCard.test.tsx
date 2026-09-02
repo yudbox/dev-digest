@@ -1,10 +1,22 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import evalMessages from "../../../../../../../../messages/en/eval.json";
 import { FindingCard } from "./FindingCard";
+
+vi.mock("../../../../../../lib/hooks/reviews", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../../../../lib/hooks/reviews")>();
+  return {
+    ...actual,
+    useFindingReplies: () => ({ data: undefined, isLoading: false, refetch: vi.fn() }),
+    usePublishFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
+    useEditFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
+    useDeleteFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
+  };
+});
 
 afterEach(cleanup);
 
@@ -28,13 +40,16 @@ const FINDING: FindingRecord = {
 };
 
 function renderWithIntl(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <NextIntlClientProvider
-      locale="en"
-      messages={{ prReview: messages, eval: evalMessages }}
-    >
-      {ui}
-    </NextIntlClientProvider>,
+    <QueryClientProvider client={qc}>
+      <NextIntlClientProvider
+        locale="en"
+        messages={{ prReview: messages, eval: evalMessages }}
+      >
+        {ui}
+      </NextIntlClientProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -76,18 +91,21 @@ describe("FindingCard (smoke, both themes)", () => {
     expect(button).toBeDisabled();
 
     const accepted: FindingRecord = { ...FINDING, accepted_at: "2026-01-01T00:00:00Z" };
+    const qc2 = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     rerender(
-      <NextIntlClientProvider
-        locale="en"
-        messages={{ prReview: messages, eval: evalMessages }}
-      >
-        <FindingCard
-          f={accepted}
-          defaultExpanded
-          onAction={() => {}}
-          onCreateEvalCase={onCreateEvalCase}
-        />
-      </NextIntlClientProvider>,
+      <QueryClientProvider client={qc2}>
+        <NextIntlClientProvider
+          locale="en"
+          messages={{ prReview: messages, eval: evalMessages }}
+        >
+          <FindingCard
+            f={accepted}
+            defaultExpanded
+            onAction={() => {}}
+            onCreateEvalCase={onCreateEvalCase}
+          />
+        </NextIntlClientProvider>
+      </QueryClientProvider>,
     );
     const enabledButton = screen.getByText("Turn into eval case").closest("button")!;
     expect(enabledButton).toBeEnabled();

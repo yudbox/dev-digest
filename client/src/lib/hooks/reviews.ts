@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, API_BASE } from "../api";
 import { notify } from "../contexts/toast";
 import type {
+  AggregateResponse,
   FindingActionKind,
   MultiAgentRun,
   MultiAgentRunSummary,
@@ -281,5 +282,87 @@ export function useMultiAgentRun(id: string | null | undefined) {
     queryKey: ["multi-agent-run", id],
     queryFn: () => api.get<MultiAgentRun>(`/multi-agent-runs/${id}`),
     enabled: !!id,
+  });
+}
+
+// ---- Finding thread (replies) ----
+
+import type { FindingRepliesResponse } from "@devdigest/shared";
+
+/** GET /findings/:id/replies */
+export function useFindingReplies(findingId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["finding-replies", findingId],
+    queryFn: () =>
+      api.get<FindingRepliesResponse>(`/findings/${findingId}/replies`),
+    enabled: !!findingId,
+    staleTime: 0,
+  });
+}
+
+/** POST /findings/:id/replies — publish initial comment or add to thread */
+export function usePublishFindingReply() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ findingId, body }: { findingId: string; body: string }) =>
+      api.post<FindingRepliesResponse>(`/findings/${findingId}/replies`, { body }),
+    onSuccess: (_d, { findingId }) => {
+      qc.invalidateQueries({ queryKey: ["finding-replies", findingId] });
+    },
+  });
+}
+
+/** PATCH /findings/:id/replies/:replyId */
+export function useEditFindingReply() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      findingId,
+      replyId,
+      body,
+    }: {
+      findingId: string;
+      replyId: string;
+      body: string;
+    }) =>
+      api.patch<FindingRepliesResponse>(
+        `/findings/${findingId}/replies/${replyId}`,
+        { body },
+      ),
+    onSuccess: (_d, { findingId }) => {
+      qc.invalidateQueries({ queryKey: ["finding-replies", findingId] });
+    },
+  });
+}
+
+/** POST /multi-agent-runs/:id/aggregate — no DB write, result lives in TanStack Query cache only. */
+export function useAggregateMutation(runId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<AggregateResponse>(`/multi-agent-runs/${runId}/aggregate`),
+    onSuccess: (data) => {
+      qc.setQueryData(["aggregate", runId], data);
+    },
+  });
+}
+
+/** DELETE /findings/:id/replies/:replyId */
+export function useDeleteFindingReply() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      findingId,
+      replyId,
+    }: {
+      findingId: string;
+      replyId: string;
+    }) =>
+      api.del<{ ok: boolean }>(
+        `/findings/${findingId}/replies/${replyId}`,
+      ),
+    onSuccess: (_d, { findingId }) => {
+      qc.invalidateQueries({ queryKey: ["finding-replies", findingId] });
+    },
   });
 }

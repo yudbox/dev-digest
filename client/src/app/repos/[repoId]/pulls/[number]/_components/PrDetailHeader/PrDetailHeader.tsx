@@ -1,18 +1,21 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Icon, Avatar, Badge, Button, Tabs } from "@devdigest/ui";
 import { RunReviewDropdown } from "../RunReviewDropdown";
 import { s } from "./styles";
-import type { PrDetail } from "@/lib/types";
+import type { PrDetail, VcsProvider } from "@/lib/types";
 
 interface PrDetailHeaderProps {
   pr: PrDetail;
   prId: string | null;
   tab: string;
   findingsCount: number;
-  /** github.com PR URL; null when the repo's full_name isn't known yet. */
-  githubUrl?: string | null;
+  /** Provider deep-link to the PR; null when the repo isn't loaded yet. */
+  vcsUrl?: string | null;
+  /** Picks the button label ("View on GitHub" vs. "View on Azure DevOps"). */
+  vcsProvider?: VcsProvider;
   onSetTab: (tab: string) => void;
   onRunsStarted?: (runIds: string[]) => void;
 }
@@ -22,10 +25,12 @@ export function PrDetailHeader({
   prId,
   tab,
   findingsCount,
-  githubUrl,
+  vcsUrl,
+  vcsProvider,
   onSetTab,
   onRunsStarted,
 }: PrDetailHeaderProps) {
+  const t = useTranslations("prReview");
   const statusColor =
     pr.status === "merged"
       ? "var(--ok)"
@@ -79,13 +84,14 @@ export function PrDetailHeader({
             kind="ghost"
             size="sm"
             icon="ExternalLink"
-            disabled={!githubUrl}
+            disabled={!vcsUrl}
             onClick={() =>
-              githubUrl &&
-              window.open(githubUrl, "_blank", "noopener,noreferrer")
+              vcsUrl && window.open(vcsUrl, "_blank", "noopener,noreferrer")
             }
           >
-            View on GitHub
+            {vcsProvider === "azure-devops"
+              ? t("header.viewOnAzureDevops")
+              : t("header.viewOnGithub")}
           </Button>
           {prId && (
             <RunReviewDropdown

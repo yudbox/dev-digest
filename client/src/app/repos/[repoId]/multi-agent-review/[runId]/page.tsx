@@ -12,12 +12,14 @@ import type { AgentColumn } from "@devdigest/shared";
 import { Icon } from "@devdigest/ui";
 import { AgentColumnCard } from "./_components/AgentColumnCard";
 import { WhereAgentsDisagree } from "./_components/WhereAgentsDisagree";
+import { AggregateTab } from "./_components/AggregateTab";
 import RunTraceDrawer from "../../pulls/[number]/_components/RunTraceDrawer";
 import { VerdictBanner } from "../../pulls/[number]/_components/VerdictBanner";
 import { FindingsPanel } from "../../pulls/[number]/_components/FindingsPanel";
 import { AppShell } from "../../../../../components/app-shell";
+import { useActiveRepo } from "../../../../../lib/contexts/repoContext";
 
-type ViewMode = "columns" | "tabs";
+type ViewMode = "columns" | "tabs" | "aggregate";
 
 export default function MultiAgentRunDetailPage() {
   const params = useParams<{ repoId: string; runId: string }>();
@@ -26,6 +28,7 @@ export default function MultiAgentRunDetailPage() {
   const base = `/repos/${repoId}/multi-agent-review`;
 
   const { data: run, isLoading } = useMultiAgentRun(runId);
+  const { activeRepo } = useActiveRepo();
   const qc = useQueryClient();
 
   // AC-19: subscribe via SSE to each agent_run that is still running.
@@ -47,9 +50,8 @@ export default function MultiAgentRunDetailPage() {
     }
   }, [events.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // head_sha and repo_full_name for file:line GitHub links (AC-34) — from run directly
+  // head_sha for file:line deep links (AC-34) — from run directly.
   const headSha = run?.head_sha ?? null;
-  const repoFullName = run?.repo_full_name ?? null;
 
   const [view, setView] = React.useState<ViewMode>("columns");
   const [selectedTab, setSelectedTab] = React.useState<string | null>(null);
@@ -183,7 +185,7 @@ export default function MultiAgentRunDetailPage() {
               overflow: "hidden",
             }}
           >
-            {(["columns", "tabs"] as ViewMode[]).map((m) => (
+            {(["columns", "tabs", "aggregate"] as ViewMode[]).map((m, i, arr) => (
               <button
                 key={m}
                 type="button"
@@ -194,13 +196,13 @@ export default function MultiAgentRunDetailPage() {
                   fontWeight: view === m ? 600 : 400,
                   cursor: "pointer",
                   border: "none",
-                  borderRight: m === "columns" ? "1px solid var(--border)" : "none",
+                  borderRight: i < arr.length - 1 ? "1px solid var(--border)" : "none",
                   background: view === m ? "var(--accent, #4f9cf9)" : "transparent",
                   color: view === m ? "#fff" : "var(--text-muted)",
                   transition: "background 0.12s, color 0.12s",
                 }}
               >
-                {m === "columns" ? "Columns" : "Tabs"}
+                {m === "columns" ? "Columns" : m === "tabs" ? "Tabs" : "Aggregate"}
               </button>
             ))}
           </div>
@@ -417,7 +419,7 @@ export default function MultiAgentRunDetailPage() {
                     <FindingsPanel
                       findings={tabFindings}
                       prId={run.pr_id}
-                      repoFullName={repoFullName}
+                      repo={activeRepo}
                       headSha={headSha}
                     />
                   )}
@@ -425,6 +427,11 @@ export default function MultiAgentRunDetailPage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* ---- AGGREGATE VIEW ---- */}
+        {view === "aggregate" && (
+          <AggregateTab run={run} repoId={repoId} />
         )}
 
         {/* WHERE AGENTS DISAGREE */}

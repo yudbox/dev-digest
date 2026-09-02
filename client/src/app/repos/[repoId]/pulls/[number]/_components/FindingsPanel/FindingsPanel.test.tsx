@@ -11,6 +11,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("../../../../../../../lib/hooks/reviews", () => ({
   useFindingAction: () => ({ mutate: vi.fn(), isPending: false }),
   useCreatePrComment: () => ({ mutate: vi.fn(), isPending: false }),
+  useFindingReplies: () => ({ data: undefined, isLoading: false, refetch: vi.fn() }),
+  usePublishFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
+  useEditFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const prefillMutate = vi.fn();

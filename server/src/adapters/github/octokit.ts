@@ -1,6 +1,6 @@
 import { Octokit } from "octokit";
 import type {
-  GitHubClient,
+  VcsClient,
   RepoRef,
   PrMeta,
   PrDetail,
@@ -26,10 +26,12 @@ function mapStatus(state: string, merged: boolean | undefined): PrStatus {
 }
 
 /**
- * GitHubClient over Octokit REST — thin. PAT auth (fine-grained).
- * Reads PR list/detail/files/commits/issue; posts reviews; opens PRs.
+ * GitHub implementation of the `VcsClient` port, over Octokit REST — thin.
+ * PAT auth (fine-grained). Reads PR list/detail/files/commits/issue; posts
+ * reviews; opens PRs.
  */
-export class OctokitGitHubClient implements GitHubClient {
+export class OctokitGitHubClient implements VcsClient {
+  readonly id = "github" as const;
   private octokit: Octokit;
   private readonly token: string;
 
@@ -153,7 +155,13 @@ export class OctokitGitHubClient implements GitHubClient {
     }
   }
 
-  async postReview(
+  /**
+   * Atomic batch-review path. No longer part of the `VcsClient` port (Azure
+   * DevOps has no batch endpoint — see `publishComment`); kept private as an
+   * implementation detail in case a future GitHub-specific caller wants the
+   * atomic multi-comment behavior back.
+   */
+  private async postReview(
     repo: RepoRef,
     n: number,
     review: GitHubReviewPayload,
@@ -206,6 +214,8 @@ export class OctokitGitHubClient implements GitHubClient {
       in_reply_to_id: c.in_reply_to_id ?? null,
       // GitHub drops `line` when the comment can no longer be placed on the diff.
       is_outdated: c.line == null,
+      // GitHub comments have no thread concept (Azure DevOps-only field).
+      thread_id: null,
     };
   }
 
@@ -263,6 +273,27 @@ export class OctokitGitHubClient implements GitHubClient {
         TIMEOUT,
       ),
     );
+  }
+
+  /**
+   * `VcsClient.publishComment` for GitHub: there is no thread/idempotency
+   * concept to layer on top, so this is a thin pass-through to the existing
+   * inline-comment path.
+   */
+  async publishComment(
+    repo: RepoRef,
+    n: number,
+    input: CreateReviewCommentInput,
+  ): Promise<PrReviewComment> {
+    return this.createReviewComment(repo, n, input);
+  }
+
+  async editComment(_repo: RepoRef, _n: number, _threadId: number, _commentId: number, _body: string): Promise<void> {
+    throw new Error("not_supported: editComment is not implemented for GitHub");
+  }
+
+  async deleteComment(_repo: RepoRef, _n: number, _threadId: number, _commentId: number): Promise<void> {
+    throw new Error("not_supported: deleteComment is not implemented for GitHub");
   }
 
   async openPullRequest(

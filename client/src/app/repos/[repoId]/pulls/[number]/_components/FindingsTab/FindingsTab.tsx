@@ -13,6 +13,7 @@ import type {
   RunSummary,
   PrCommit,
 } from "@devdigest/shared";
+import type { VcsUrlRepo } from "@/lib/utils";
 import type { UseMutationResult } from "@tanstack/react-query";
 
 interface FindingsTabProps {
@@ -24,8 +25,8 @@ interface FindingsTabProps {
   prRuns: RunSummary[] | undefined;
   prCommits: PrCommit[];
   cancelMutation: UseMutationResult<any, any, string, any>;
-  /** owner/repo + head sha — used to deep-link a finding's file:line to GitHub. */
-  repoFullName?: string | null;
+  /** used to deep-link a finding's file:line to GitHub/Azure DevOps. */
+  repo?: VcsUrlRepo | null;
   headSha?: string | null;
   onOpenTrace: (id: string) => void;
   onDelete: (id: string) => void;
@@ -41,7 +42,7 @@ export function FindingsTab({
   prRuns,
   prCommits,
   cancelMutation,
-  repoFullName,
+  repo,
   headSha,
   onOpenTrace,
   onDelete,
@@ -202,7 +203,7 @@ export function FindingsTab({
             review={review}
             prId={prId}
             defaultOpen={i === 0}
-            repoFullName={repoFullName}
+            repo={repo}
             headSha={headSha}
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}

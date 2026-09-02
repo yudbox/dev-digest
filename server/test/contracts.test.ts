@@ -207,6 +207,7 @@ describe('platform DTOs', () => {
         owner: 'acme',
         name: 'payments-api',
         full_name: 'acme/payments-api',
+        vcs_provider: 'github',
         default_branch: 'main',
         clone_path: null,
         last_polled_at: null,

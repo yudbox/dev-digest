@@ -22,6 +22,7 @@ export type {
   ModelInfo,
   Repo,
   RepoInput,
+  VcsProvider,
   PrMeta,
   PrDetail,
   PrFile,

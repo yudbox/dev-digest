@@ -100,3 +100,61 @@ export const FindingAction = z.object({
   note: z.string().optional(),
 });
 export type FindingAction = z.infer<typeof FindingAction>;
+
+/** One published ADO comment belonging to a finding's thread. */
+export const FindingReply = z.object({
+  id: z.string().uuid(),           // finding_replies.id (not the ADO comment id)
+  body: z.string(),
+  author: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  is_own: z.boolean(),             // true when the comment author matches the workspace owner
+});
+export type FindingReply = z.infer<typeof FindingReply>;
+
+export const FindingRepliesResponse = z.object({
+  replies: z.array(FindingReply),
+  ado_thread_url: z.string().nullable(),
+});
+export type FindingRepliesResponse = z.infer<typeof FindingRepliesResponse>;
+
+// ---------------------------------------------------------------------------
+// Aggregate tab — transient deduplication result (never written to DB)
+// ---------------------------------------------------------------------------
+
+/** One source finding that was fed into the aggregate pass. */
+export const AggregatedSource = z.object({
+  finding_id: z.string(),
+  review_id: z.string().nullable(),
+  run_id: z.string(),
+  agent_id: z.string(),
+  agent_name: z.string(),
+  severity: Severity,
+  file: z.string(),
+  start_line: z.number().int(),
+});
+export type AggregatedSource = z.infer<typeof AggregatedSource>;
+
+/** One deduplicated finding row in the aggregate table. */
+export const AggregatedFinding = z.object({
+  id: z.string(),
+  severity: Severity,
+  category: z.string(),
+  file: z.string(),
+  start_line: z.number().int(),
+  end_line: z.number().int(),
+  title: z.string(),
+  reviewer_comment: z.string(),
+  sources: z.array(AggregatedSource),
+});
+export type AggregatedFinding = z.infer<typeof AggregatedFinding>;
+
+/** Response from POST /multi-agent-runs/:id/aggregate */
+export const AggregateResponse = z.object({
+  multi_agent_run_id: z.string(),
+  generated_at: z.string(),
+  model: z.string(),
+  source_findings_total: z.number().int(),
+  groups: z.array(AggregatedFinding),
+});
+export type AggregateResponse = z.infer<typeof AggregateResponse>;
