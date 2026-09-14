@@ -42,7 +42,16 @@ function SeverityDots({ count, color }: { count: number; color: string }) {
   );
 }
 
-export function SeverityChip({ sev, count }: { sev: Severity; count: number }) {
+export function SeverityChip({
+  sev,
+  count,
+  onClick,
+}: {
+  sev: Severity;
+  count: number;
+  /** When provided, the chip becomes clickable (e.g. jump to a finding of this severity). */
+  onClick?: () => void;
+}) {
   if (count <= 0) return null;
 
   const meta = SEV[sev];
@@ -50,12 +59,34 @@ export function SeverityChip({ sev, count }: { sev: Severity; count: number }) {
 
   return (
     <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={
+        onClick
+          ? (e) => {
+              e.stopPropagation();
+              onClick();
+            }
+          : undefined
+      }
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                onClick();
+              }
+            }
+          : undefined
+      }
       style={{
         display: "flex",
         flexDirection: "column",
         alignItems: "stretch",
         gap: 4,
         minWidth: 28,
+        cursor: onClick ? "pointer" : undefined,
       }}
     >
       <span

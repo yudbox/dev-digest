@@ -247,10 +247,15 @@ export class RepoIntelService implements RepoIntel {
     }
 
     // changed symbols = declared in any changed file (dedup by name+file).
+    // `interface`/`type` decls are compile-time-only — they have no
+    // call_expression sites, so they'd always show up as disconnected
+    // nodes with zero callers. Blast radius is about runtime impact, so we
+    // only track symbols that can actually be invoked.
     const changedSymbols: BlastChangedSymbol[] = [];
     const seen = new Set<string>();
     for (const s of allSymbols) {
       if (!changedSet.has(s.path)) continue;
+      if (s.kind === 'interface' || s.kind === 'type') continue;
       const key = `${s.name}:${s.path}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -321,12 +326,16 @@ export class RepoIntelService implements RepoIntel {
 
     // Changed symbols = declared in a changed file. Skip the qualified
     // `Class.method` dual-emit (the bare form already covers the name).
+    // `interface`/`type` decls are compile-time-only — no call_expression
+    // sites, so they'd always show up as disconnected nodes with zero
+    // callers. Blast radius is about runtime impact.
     const declRows = await this.repo.getSymbolRows(repoId, changedFiles);
     const changedSymbols: BlastChangedSymbol[] = [];
     const nameSet = new Set<string>();
     const seenSym = new Set<string>();
     for (const s of declRows) {
       if (s.name.includes('.')) continue;
+      if (s.kind === 'interface' || s.kind === 'type') continue;
       const key = `${s.name}:${s.path}`;
       if (!seenSym.has(key)) {
         seenSym.add(key);

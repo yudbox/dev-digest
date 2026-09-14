@@ -18,6 +18,9 @@ import {
 import { s, chevronFor } from "../styles";
 import { CodeLine } from "../CodeLine";
 import { OutdatedComments } from "../OutdatedComments";
+import { SeverityChip } from "@/components/SeverityChip/SeverityChip";
+
+const JUMPABLE_SEVERITIES = ["CRITICAL", "WARNING", "SUGGESTION"] as const;
 
 /** Threads anchored to a given parsed line (RIGHT=new, LEFT=old). */
 function threadsForLine(
@@ -53,6 +56,45 @@ export function FileCard({
   );
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
 
+  // One count + jump-target line per severity present in this file — reuses
+  // the same SeverityChip already used for run-level counts (Test Quality
+  // Rev... "△ 3 · ◇ 2"), just scoped to this file's findings instead of a run.
+  const severityGroups = React.useMemo(() => {
+    if (!lineBadges || lineBadges.size === 0) return null;
+    const groups = {} as Record<
+      (typeof JUMPABLE_SEVERITIES)[number],
+      { count: number; line: number }
+    >;
+    for (const [line, b] of lineBadges) {
+      if (!JUMPABLE_SEVERITIES.includes(b.severity as never)) continue;
+      const sev = b.severity as (typeof JUMPABLE_SEVERITIES)[number];
+      const existing = groups[sev];
+      if (existing) {
+        existing.count += 1;
+        existing.line = Math.min(existing.line, line);
+      } else {
+        groups[sev] = { count: 1, line };
+      }
+    }
+    return Object.keys(groups).length > 0 ? groups : null;
+  }, [lineBadges]);
+
+  // Locally-controlled scroll target: starts from the URL-driven `targetLine`
+  // prop, but can be overridden by clicking one of the severity chips below.
+  const [localTargetLine, setLocalTargetLine] = React.useState(targetLine);
+  React.useEffect(() => setLocalTargetLine(targetLine), [targetLine]);
+
+  React.useEffect(() => {
+    if (!open || localTargetLine === undefined) return;
+    const id = `diff-line-${file.path}-${localTargetLine}`;
+    const raf = requestAnimationFrame(() => {
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [open, localTargetLine, file.path]);
+
   // Group this file's comments into threads, then split into ones we can anchor
   // to a rendered line vs. "outdated" (GitHub dropped the line / it's not here).
   const comments = commenting?.comments;
@@ -80,6 +122,25 @@ export function FileCard({
         <span className="mono" style={s.filePath}>
           {file.path}
         </span>
+        {severityGroups && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {JUMPABLE_SEVERITIES.map((sev) => {
+              const group = severityGroups[sev];
+              if (!group) return null;
+              return (
+                <SeverityChip
+                  key={sev}
+                  sev={sev}
+                  count={group.count}
+                  onClick={() => {
+                    setOpen(true);
+                    setLocalTargetLine(group.line);
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
         <span className="mono tnum" style={s.fileStat}>
           <span style={s.addText}>+{file.additions}</span>{" "}
           <span style={s.delText}>−{file.deletions}</span>
@@ -112,7 +173,7 @@ export function FileCard({
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
                 badge={lineBadges?.get(ln.newNo ?? ln.oldNo ?? -1)}
-                targetLine={targetLine}
+                targetLine={localTargetLine}
               />
             ))
           )}

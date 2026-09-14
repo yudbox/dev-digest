@@ -19,6 +19,7 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const router = useRouter();
   const [h, setH] = React.useState(false);
   const [anchorRect, setAnchorRect] = React.useState<DOMRect | null>(null);
+  const findingsCellRef = React.useRef<HTMLDivElement>(null);
   const st = STATUS_META[pr.status] ?? STATUS_META.needs_review!;
   const { size, lines } = sizeOf(pr);
   const reviewed = pr.score != null; // null score ⇒ PR has never been reviewed
@@ -67,14 +68,14 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
         )}
       </div>
       <div
-        style={s.findingsCell}
-        onMouseEnter={(e) => {
+        ref={findingsCellRef}
+        style={{ ...s.findingsCell, cursor: totalFindings > 0 ? "pointer" : undefined }}
+        onClick={(e) => {
+          if (totalFindings === 0) return;
           e.stopPropagation();
-          setAnchorRect(e.currentTarget.getBoundingClientRect());
-        }}
-        onMouseLeave={(e) => {
-          e.stopPropagation();
-          setAnchorRect(null);
+          setAnchorRect((prev) =>
+            prev ? null : findingsCellRef.current?.getBoundingClientRect() ?? null,
+          );
         }}
       >
         {!reviewed || totalFindings === 0 ? (
@@ -91,6 +92,8 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
             review={latestReview}
             isLoading={reviewsLoading}
             anchorRect={anchorRect}
+            onClose={() => setAnchorRect(null)}
+            triggerRef={findingsCellRef}
           />
         )}
       </div>
