@@ -10,6 +10,7 @@ export function toShellRepo(r: Repo): RepoSummary {
     full_name: r.full_name,
     default_branch: r.default_branch,
     syncedLabel: r.last_polled_at ? "synced" : "not synced",
+    providerLabel: r.vcs_provider === "azure-devops" ? "Azure DevOps" : "GitHub",
   };
 }
 

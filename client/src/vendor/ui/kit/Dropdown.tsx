@@ -30,8 +30,14 @@ function DropdownItem({ it, onClose }: { it: DropdownItemDef; onClose: () => voi
       }}
     >
       {I && <I size={14} style={{ color: "var(--text-muted)", flexShrink: 0 }} />}
-      <span style={{ flex: 1 }}>{it.label}</span>
-      {it.hint && <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{it.hint}</span>}
+      {/* `minWidth: 0` overrides the flex-item default of sizing to its
+          content's intrinsic minimum — without it, a long unbreakable
+          label (no spaces/hyphens, e.g. an Azure DevOps `org/project/repo`
+          full_name with underscores) refuses to shrink or wrap and pushes
+          the hint/remove button out of the row instead. `overflowWrap` then
+          lets it actually wrap within that now-shrinkable box. */}
+      <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{it.label}</span>
+      {it.hint && <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>{it.hint}</span>}
       {it.onRemove && (
         <span
           role="button"

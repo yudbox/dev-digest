@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { ReadingPathItem } from "@devdigest/shared";
-import { githubBlobUrl } from "@/lib/utils/githubUrls";
+import { vcsBlobUrl, type VcsUrlRepo } from "@/lib/utils/vcsUrls";
 import messages from "../../../../../../messages/en/onboarding.json";
 import { ReadingPathSection } from "./ReadingPathSection";
 
@@ -21,22 +21,29 @@ const ITEMS: ReadingPathItem[] = [
   { order: 2, file: "server/src/modules/index.ts", reason: "module registry", openUrl: "https://stale.example/unused" },
 ];
 
+const REPO: VcsUrlRepo = {
+  vcs_provider: "github",
+  full_name: "acme/devdigest",
+  owner: "acme",
+  name: "devdigest",
+};
+
 describe("ReadingPathSection", () => {
-  it("Open link points to githubBlobUrl with repo.defaultBranch, opens in a new tab (AC-28)", () => {
+  it("Open link points to vcsBlobUrl with repo.defaultBranch, opens in a new tab (AC-28)", () => {
     renderWithIntl(
-      <ReadingPathSection items={ITEMS} repoFullName="acme/devdigest" defaultBranch="main" />,
+      <ReadingPathSection items={ITEMS} repo={REPO} defaultBranch="main" />,
     );
     const links = screen.getAllByText("Open").map((el) => el.closest("a")!);
     expect(links[0]).toHaveAttribute(
       "href",
-      githubBlobUrl("acme/devdigest", "main", "server/src/app.ts"),
+      vcsBlobUrl(REPO, "main", "server/src/app.ts", undefined, undefined, "branch"),
     );
     expect(links[0]).toHaveAttribute("target", "_blank");
   });
 
   it("renders items in order with their reason", () => {
     renderWithIntl(
-      <ReadingPathSection items={ITEMS} repoFullName="acme/devdigest" defaultBranch="main" />,
+      <ReadingPathSection items={ITEMS} repo={REPO} defaultBranch="main" />,
     );
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("entrypoint")).toBeInTheDocument();

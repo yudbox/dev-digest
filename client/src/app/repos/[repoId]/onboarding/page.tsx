@@ -116,7 +116,7 @@ export default function OnboardingPage() {
               >
                 <CriticalPathsSection
                   items={data.sections.criticalPaths}
-                  repoFullName={activeRepo.full_name}
+                  repo={activeRepo}
                   defaultBranch={activeRepo.default_branch}
                 />
               </AccordionSection>
@@ -136,7 +136,7 @@ export default function OnboardingPage() {
               >
                 <ReadingPathSection
                   items={data.sections.readingPath}
-                  repoFullName={activeRepo.full_name}
+                  repo={activeRepo}
                   defaultBranch={activeRepo.default_branch}
                 />
               </AccordionSection>

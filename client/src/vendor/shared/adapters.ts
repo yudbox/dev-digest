@@ -4,6 +4,7 @@ import type {
   PrDetail,
   IssueMeta,
   PrReviewComment,
+  VcsProvider,
 } from './contracts/platform';
 
 /**
@@ -88,10 +89,14 @@ export interface Embedder {
   readonly dims: number;
 }
 
-// ---------- GitHub (Octokit REST, thin) ----------
+// ---------- VCS (GitHub via Octokit REST / Azure DevOps via SDK) ----------
 export interface RepoRef {
   owner: string;
   name: string;
+  /** Azure DevOps only: middle segment of the org/project/repo triple. Ignored by GitHub. */
+  project?: string;
+  /** Azure DevOps only: hosting base URL (e.g. `https://dev.azure.com`, or a self-hosted server). Ignored by GitHub. */
+  baseUrl?: string;
 }
 
 export interface GitHubReviewPayload {
@@ -110,6 +115,17 @@ export interface CreateReviewCommentInput {
   body: string;
   /** When set, post as a reply to that comment's thread instead of a new one. */
   inReplyTo?: number;
+  /**
+   * TASK-008 (SPEC-2026-08-25-azure-devops-integration, R32): the finding's
+   * severity and title, used ONLY by the Azure DevOps implementation to
+   * derive a stable `findingId` for idempotent thread publishing (R33) —
+   * hashing on `body` instead would break idempotency the moment a finding's
+   * wording is regenerated slightly on a re-run, since `body` is exactly the
+   * text that is expected to vary. GitHub's `publishComment`/
+   * `createReviewComment` ignore both fields entirely.
+   */
+  severity?: string;
+  title?: string;
 }
 
 export interface OpenPrPayload {
@@ -119,14 +135,31 @@ export interface OpenPrPayload {
   body: string;
 }
 
-export interface GitHubClient {
+/**
+ * VCS port — a discriminated multi-provider port, following the same pattern
+ * as `LLMProvider` (`readonly id: 'openai' | 'anthropic'`). `readonly id`
+ * lets the server dispatch the concrete implementation by
+ * `repo.vcsProvider` at runtime — a plain rename from `GitHubClient` would
+ * give no such discriminator.
+ */
+export interface VcsClient {
+  readonly id: VcsProvider;
   listPullRequests(repo: RepoRef): Promise<PrMeta[]>;
   getPullRequest(repo: RepoRef, n: number): Promise<PrDetail>;
-  postReview(repo: RepoRef, n: number, review: GitHubReviewPayload): Promise<{ id: string }>;
   /** List inline review comments on a PR (for the "Files changed" tab). */
   listReviewComments(repo: RepoRef, n: number): Promise<PrReviewComment[]>;
   /** Create one inline review comment (or reply) on a PR; returns the new comment. */
   createReviewComment(
+    repo: RepoRef,
+    n: number,
+    input: CreateReviewCommentInput,
+  ): Promise<PrReviewComment>;
+  /**
+   * Publish one review comment, letting the implementation choose its native
+   * strategy (GitHub: inline comment; Azure DevOps: idempotent thread
+   * create/update). Replaces the old GitHub-only atomic batch `postReview`.
+   */
+  publishComment(
     repo: RepoRef,
     n: number,
     input: CreateReviewCommentInput,
@@ -136,6 +169,12 @@ export interface GitHubClient {
   /** GET /user — for "posting as @user". */
   currentLogin(): Promise<string>;
 }
+
+/**
+ * @deprecated Use `VcsClient`. Kept as a type alias so pre-existing imports
+ * of `GitHubClient` keep compiling while call sites migrate to `VcsClient`.
+ */
+export type GitHubClient = VcsClient;
 
 // ---------- Git (simple-git, heavy) ----------
 export interface CloneOptions {
@@ -232,6 +271,7 @@ export type SecretKey =
   | 'OPENAI_API_KEY'
   | 'ANTHROPIC_API_KEY'
   | 'GITHUB_TOKEN'
+  | 'AZURE_DEVOPS_TOKEN'
   | 'DATABASE_URL'
   | (string & {});
 

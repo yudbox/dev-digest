@@ -52,8 +52,8 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
   },
   {
     id: "review_intent",
-    label: "PR Review · Intent",
-    description: "Derives a PR’s intent and scope before review.",
+    label: "Standard Model",
+    description: "Used for: PR Review and Aggregate.",
     defaultProvider: "openrouter",
     defaultModel: "deepseek/deepseek-v4-flash",
   },
@@ -117,6 +117,7 @@ export const ConnTestProvider = z.enum([
   "anthropic",
   "openrouter",
   "github",
+  "azure-devops",
 ]);
 export type ConnTestProvider = z.infer<typeof ConnTestProvider>;
 
@@ -142,20 +143,39 @@ export const SecretsStatus = z.object({
   anthropic: z.boolean(),
   openrouter: z.boolean(),
   github: z.boolean(),
+  azureDevops: z.boolean(),
 });
 export type SecretsStatus = z.infer<typeof SecretsStatus>;
+
+// ---- VCS provider discriminator ----
+/**
+ * Discriminates which VCS a `repos` row belongs to. Canonical source for the
+ * `VcsClient.id` type in `vendor/shared/adapters.ts` (imported from there,
+ * not redefined) and for the `repos.vcs_provider` column's allowed values.
+ */
+export const VcsProvider = z.enum(["github", "azure-devops"]);
+export type VcsProvider = z.infer<typeof VcsProvider>;
 
 // ---- Repos ----
 export const RepoInput = z.object({
   url: z.string().url(),
+  /** Required when the URL's host isn't auto-detected (see `provider_required`). */
+  vcs_provider: VcsProvider.optional(),
+  /** Required when `vcs_provider === 'azure-devops'` (self-hosted or cloud). */
+  base_url: z.string().url().optional(),
 });
 export type RepoInput = z.infer<typeof RepoInput>;
 
 export const Repo = z.object({
   id: z.string(),
   workspace_id: z.string(),
+  vcs_provider: VcsProvider,
   owner: z.string(),
   name: z.string(),
+  /** Azure DevOps only: middle segment of org/project/repo. Null for GitHub. */
+  project: z.string().nullish(),
+  /** Azure DevOps only: hosting base URL. Null for GitHub. */
+  base_url: z.string().nullish(),
   full_name: z.string(),
   default_branch: z.string(),
   clone_path: z.string().nullable(),
@@ -223,11 +243,31 @@ export const IssueMeta = z.object({
 });
 export type IssueMeta = z.infer<typeof IssueMeta>;
 
+/** Why `PrFile.patch` could not be computed for this PR (Azure DevOps diff-first path). */
+export const DiffUnavailableReason = z.enum([
+  "clone_missing",
+  "clone_in_progress",
+  "commits_missing",
+  "diff_failed",
+]);
+export type DiffUnavailableReason = z.infer<typeof DiffUnavailableReason>;
+
+export const DiffUnavailable = z.object({
+  reason: DiffUnavailableReason,
+});
+export type DiffUnavailable = z.infer<typeof DiffUnavailable>;
+
 export const PrDetail = PrMeta.extend({
   body: z.string().nullish(),
   files: z.array(PrFile),
   commits: z.array(PrCommit),
   linked_issue: IssueMeta.nullish(),
+  /**
+   * Present only when the diff could not be computed locally (Azure DevOps
+   * diff-first path). GitHub never sets this field. Optional so it adds no
+   * new REQUIRED provider-specific field to the shared contract.
+   */
+  diff_unavailable: DiffUnavailable.nullish(),
 });
 export type PrDetail = z.infer<typeof PrDetail>;
 
@@ -250,6 +290,8 @@ export const PrReviewComment = z.object({
   in_reply_to_id: z.number().int().nullable(),
   /** GitHub couldn't anchor it to the current diff (line == null). */
   is_outdated: z.boolean(),
+  /** Azure DevOps thread id this comment belongs to. Always null for GitHub. */
+  thread_id: z.number().int().nullish(),
 });
 export type PrReviewComment = z.infer<typeof PrReviewComment>;
 

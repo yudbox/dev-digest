@@ -9,6 +9,7 @@ export function RepoSwitcher({ ctx }: { ctx: ShellContext }) {
     ...(ctx.repos ?? []).map((r) => ({
       label: r.full_name,
       icon: "GitBranch" as const,
+      hint: r.providerLabel,
       onClick: () => ctx.onSelectRepo?.(r.id),
       ...(ctx.onRemoveRepo
         ? { onRemove: () => ctx.onRemoveRepo!(r.id), removeLabel: `Remove ${r.full_name}` }
@@ -63,7 +64,11 @@ export function RepoSwitcher({ ctx }: { ctx: ShellContext }) {
               {active?.full_name ?? "No repo selected"}
             </div>
             <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-              {active ? `${active.default_branch ?? "main"} · ${active.syncedLabel ?? "not synced"}` : "Add a repo to begin"}
+              {active
+                ? [active.providerLabel, active.default_branch ?? "main", active.syncedLabel ?? "not synced"]
+                    .filter(Boolean)
+                    .join(" · ")
+                : "Add a repo to begin"}
             </div>
           </div>
           <Icon.ChevronsUpDown size={14} style={{ color: "var(--text-muted)" }} />

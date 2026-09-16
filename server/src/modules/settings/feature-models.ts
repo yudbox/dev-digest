@@ -41,6 +41,16 @@ export async function getFeatureModelOverride(
 }
 
 /**
+ * Human-readable label overrides for the 422 error message.
+ * These diverge from the `FEATURE_MODELS[].label` values only when a feature
+ * is renamed or repurposed without a DB migration (see Q5 in SPEC-2026-09-02).
+ */
+const LABEL_OVERRIDES: Partial<Record<FeatureModelId, string>> = {
+  // review_intent is now also used by the Aggregate tab → renamed to "Standard Model"
+  review_intent: 'Standard Model',
+};
+
+/**
  * Resolve `id` to a concrete provider+model from the workspace's Settings.
  * Throws `ValidationError` (422) when no override is configured — callers must
  * direct the user to Settings → Feature Models to configure a model.
@@ -53,7 +63,7 @@ export async function resolveFeatureModelStrict(
   const override = await getFeatureModelOverride(container, workspaceId, id);
   if (override) return override;
   const def = FEATURE_MODELS.find((f) => f.id === id);
-  const label = def?.label ?? id;
+  const label = LABEL_OVERRIDES[id] ?? def?.label ?? id;
   throw new ValidationError(
     `No model selected for ${label} — choose one in Settings → Feature Models`,
   );

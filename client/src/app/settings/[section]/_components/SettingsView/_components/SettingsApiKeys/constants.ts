@@ -7,10 +7,11 @@ export interface KeyRowSpec {
   hintKey: string;
 }
 
-/** The provider key rows shown in API Keys (OpenAI / Anthropic / GitHub). */
+/** The provider key rows shown in API Keys (OpenAI / Anthropic / OpenRouter / GitHub / Azure DevOps). */
 export const KEY_ROWS: readonly KeyRowSpec[] = [
   { provider: "openai", labelKey: "apiKeys.openaiLabel", hintKey: "apiKeys.openaiHint" },
   { provider: "anthropic", labelKey: "apiKeys.anthropicLabel", hintKey: "apiKeys.anthropicHint" },
   { provider: "openrouter", labelKey: "apiKeys.openrouterLabel", hintKey: "apiKeys.openrouterHint" },
   { provider: "github", labelKey: "apiKeys.githubLabel", hintKey: "apiKeys.githubHint" },
+  { provider: "azure-devops", labelKey: "apiKeys.azureDevopsLabel", hintKey: "apiKeys.azureDevopsHint" },
 ];

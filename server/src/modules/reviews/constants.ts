@@ -13,3 +13,26 @@ export const REVIEW_STRATEGY = 'single-pass' as const;
 
 /** Max findings requested per review (task line). */
 export const MAX_FINDINGS_PER_REVIEW = 5;
+
+// ---------------------------------------------------------------------------
+// Aggregate endpoint constants (SPEC-2026-09-02-aggregate-tab)
+// ---------------------------------------------------------------------------
+
+/**
+ * Maximum gap in lines between two findings in the same file for them to be
+ * considered candidates for grouping (pre-grouping before LLM call).
+ */
+export const AGGREGATE_LINE_GAP = 10;
+
+/**
+ * Hard limit on the total number of source findings accepted by the aggregate
+ * endpoint. Requests above this limit return 422 without calling the LLM.
+ * (Realistic max: 5 agents × MAX_FINDINGS_PER_REVIEW = 25.)
+ */
+export const AGGREGATE_MAX_FINDINGS = 60;
+
+/**
+ * The FeatureModelId used by the aggregate service. Re-uses the existing
+ * "Standard Model" (review_intent) to avoid creating a new settings row.
+ */
+export const AGGREGATE_FEATURE_MODEL_ID = 'review_intent' as const;
