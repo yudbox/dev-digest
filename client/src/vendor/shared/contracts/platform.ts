@@ -18,6 +18,7 @@ export const FeatureModelId = z.enum([
   "conformance",
   "conventions",
   "eval",
+  "memory_distill",
 ]);
 export type FeatureModelId = z.infer<typeof FeatureModelId>;
 

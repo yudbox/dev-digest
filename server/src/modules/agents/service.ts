@@ -75,6 +75,7 @@ export class AgentsService {
         runs_count: s?.runsCount ?? 0,
         accept_rate_pct: s?.acceptRatePct ?? 0,
         avg_cost_usd: s?.avgCostUsd ?? null,
+        avg_duration_ms: s?.avgDurationMs ?? null,
       };
     });
   }
@@ -91,6 +92,7 @@ export class AgentsService {
       runs_count: s?.runsCount ?? 0,
       accept_rate_pct: s?.acceptRatePct ?? 0,
       avg_cost_usd: s?.avgCostUsd ?? null,
+      avg_duration_ms: s?.avgDurationMs ?? null,
     };
   }
 

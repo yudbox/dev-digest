@@ -161,67 +161,110 @@ export async function setFindingDismissed(
   return row;
 }
 
+export async function setFindingReplied(
+  db: Db,
+  findingId: string,
+  at: Date | null,
+): Promise<FindingRow | undefined> {
+  const [row] = await db
+    .update(t.findings)
+    .set({ repliedAt: at })
+    .where(eq(t.findings.id, findingId))
+    .returning();
+  return row;
+}
+
 // ---- smart diff data -------------------------------------------------------
 
 export interface LatestReviewData {
+  agentId: string | null;
   findings: Array<{
     id: string;
     file: string;
     title: string;
     severity: string;
     startLine: number;
+    acceptedAt: Date | null;
+    dismissedAt: Date | null;
   }>;
   reviewTokens: number | null;
 }
 
-/** Returns findings + token count from the most recent 'review' run for a PR.
- *  Returns empty findings + null tokens when no review has run yet. */
+/**
+ * Returns the latest findings per agent for a PR — one entry per distinct
+ * agent that has reviewed it, each containing only that agent's most recent
+ * review's findings. Returns [] when no review has run yet.
+ *
+ * This replaces the old "global LIMIT 1" query that silently discarded every
+ * agent's findings except whichever agent ran most recently overall.
+ */
 export async function getLatestReviewData(
   db: Db,
   prId: string,
-): Promise<LatestReviewData> {
-  const [review] = await db
+): Promise<LatestReviewData[]> {
+  const allReviews = await db
     .select()
     .from(t.reviews)
     .where(and(eq(t.reviews.prId, prId), eq(t.reviews.kind, "review")))
-    .orderBy(desc(t.reviews.createdAt))
-    .limit(1);
+    .orderBy(desc(t.reviews.createdAt));
 
-  if (!review) return { findings: [], reviewTokens: null };
+  if (allReviews.length === 0) return [];
 
-  const findings = await db
+  // Keep the most recent review per agent (DESC order → first-seen wins)
+  const latestByAgent = new Map<string, (typeof allReviews)[0]>();
+  for (const review of allReviews) {
+    const key = review.agentId ?? "_null";
+    if (!latestByAgent.has(key)) latestByAgent.set(key, review);
+  }
+
+  const latestReviews = [...latestByAgent.values()];
+  const reviewIds = latestReviews.map((r) => r.id);
+
+  const allFindings = await db
     .select({
       id: t.findings.id,
+      reviewId: t.findings.reviewId,
       file: t.findings.file,
       title: t.findings.title,
       severity: t.findings.severity,
       startLine: t.findings.startLine,
+      acceptedAt: t.findings.acceptedAt,
+      dismissedAt: t.findings.dismissedAt,
     })
     .from(t.findings)
-    .where(eq(t.findings.reviewId, review.id));
+    .where(inArray(t.findings.reviewId, reviewIds));
 
-  let reviewTokens: number | null = null;
-  if (review.runId) {
-    const [run] = await db
-      .select({
-        tokensIn: t.agentRuns.tokensIn,
-        tokensOut: t.agentRuns.tokensOut,
-      })
-      .from(t.agentRuns)
-      .where(eq(t.agentRuns.id, review.runId));
-    if (run) {
-      reviewTokens = (run.tokensIn ?? 0) + (run.tokensOut ?? 0);
-    }
-  }
+  const runIds = latestReviews.map((r) => r.runId).filter(Boolean) as string[];
+  const runRows =
+    runIds.length > 0
+      ? await db
+          .select({
+            id: t.agentRuns.id,
+            tokensIn: t.agentRuns.tokensIn,
+            tokensOut: t.agentRuns.tokensOut,
+          })
+          .from(t.agentRuns)
+          .where(inArray(t.agentRuns.id, runIds))
+      : [];
+  const runTokensMap = new Map(
+    runRows.map((r) => [r.id, (r.tokensIn ?? 0) + (r.tokensOut ?? 0)]),
+  );
 
-  return {
-    findings: findings.map((f) => ({
-      id: f.id,
-      file: f.file,
-      title: f.title,
-      severity: f.severity,
-      startLine: f.startLine,
-    })),
-    reviewTokens,
-  };
+  return latestReviews.map((review) => ({
+    agentId: review.agentId,
+    findings: allFindings
+      .filter((f) => f.reviewId === review.id)
+      .map((f) => ({
+        id: f.id,
+        file: f.file,
+        title: f.title,
+        severity: f.severity,
+        startLine: f.startLine,
+        acceptedAt: f.acceptedAt,
+        dismissedAt: f.dismissedAt,
+      })),
+    reviewTokens: review.runId
+      ? (runTokensMap.get(review.runId) ?? null)
+      : null,
+  }));
 }

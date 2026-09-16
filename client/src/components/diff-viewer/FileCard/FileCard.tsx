@@ -46,7 +46,10 @@ export function FileCard({
   file: PrFile;
   commenting?: DiffCommentApi;
   initialOpen?: boolean;
-  lineBadges?: Map<number, { severity: string; findingId: string }>;
+  lineBadges?: Map<
+    number,
+    { severity: string; findingId: string; accepted?: boolean }
+  >;
   targetLine?: number;
 }) {
   const t = useTranslations("shell");

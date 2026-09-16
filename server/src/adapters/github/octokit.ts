@@ -1,4 +1,4 @@
-import { Octokit } from 'octokit';
+import { Octokit } from "octokit";
 import type {
   GitHubClient,
   RepoRef,
@@ -11,15 +11,18 @@ import type {
   OpenPrPayload,
   CommitFilesPayload,
   IssueMeta,
-} from '@devdigest/shared';
-import { withRetry, withTimeout } from '../../platform/resilience.js';
+  ListWorkflowRunsOptions,
+  ListWorkflowRunsResult,
+  WorkflowRun,
+} from "@devdigest/shared";
+import { withRetry, withTimeout } from "../../platform/resilience.js";
 
 const TIMEOUT = 30_000;
 
 function mapStatus(state: string, merged: boolean | undefined): PrStatus {
-  if (merged) return 'merged';
-  if (state === 'closed') return 'closed';
-  return 'open';
+  if (merged) return "merged";
+  if (state === "closed") return "closed";
+  return "open";
 }
 
 /**
@@ -28,9 +31,19 @@ function mapStatus(state: string, merged: boolean | undefined): PrStatus {
  */
 export class OctokitGitHubClient implements GitHubClient {
   private octokit: Octokit;
+  private readonly token: string;
 
   constructor(token: string) {
-    this.octokit = new Octokit({ auth: token });
+    this.token = token;
+    this.octokit = new Octokit({
+      auth: token,
+      request: {
+        headers: {
+          accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      },
+    });
   }
 
   async listPullRequests(repo: RepoRef): Promise<PrMeta[]> {
@@ -42,15 +55,15 @@ export class OctokitGitHubClient implements GitHubClient {
           const res = await this.octokit.rest.pulls.list({
             owner: repo.owner,
             repo: repo.name,
-            state: 'all',
-            sort: 'updated',
-            direction: 'desc',
+            state: "all",
+            sort: "updated",
+            direction: "desc",
             per_page: 50,
           });
           return res.data.map((pr) => ({
             number: pr.number,
             title: pr.title,
-            author: pr.user?.login ?? 'unknown',
+            author: pr.user?.login ?? "unknown",
             branch: pr.head.ref,
             base: pr.base.ref,
             head_sha: pr.head.sha,
@@ -88,11 +101,14 @@ export class OctokitGitHubClient implements GitHubClient {
             pull_number: n,
             per_page: 100,
           });
-          const linkedIssue = await this.resolveLinkedIssue(repo, pr.body ?? '');
+          const linkedIssue = await this.resolveLinkedIssue(
+            repo,
+            pr.body ?? "",
+          );
           return {
             number: pr.number,
             title: pr.title,
-            author: pr.user?.login ?? 'unknown',
+            author: pr.user?.login ?? "unknown",
             branch: pr.head.ref,
             base: pr.base.ref,
             head_sha: pr.head.sha,
@@ -112,7 +128,7 @@ export class OctokitGitHubClient implements GitHubClient {
             commits: commits.map((c) => ({
               sha: c.sha,
               message: c.commit.message,
-              author: c.commit.author?.name ?? c.author?.login ?? 'unknown',
+              author: c.commit.author?.name ?? c.author?.login ?? "unknown",
               committed_at: c.commit.author?.date,
             })),
             linked_issue: linkedIssue,
@@ -124,7 +140,10 @@ export class OctokitGitHubClient implements GitHubClient {
   }
 
   /** linked issue via regex on PR body (#123 / closes #123). */
-  private async resolveLinkedIssue(repo: RepoRef, body: string): Promise<IssueMeta | undefined> {
+  private async resolveLinkedIssue(
+    repo: RepoRef,
+    body: string,
+  ): Promise<IssueMeta | undefined> {
     const m = body.match(/(?:closes|fixes|resolves)?\s*#(\d+)/i);
     if (!m?.[1]) return undefined;
     try {
@@ -179,9 +198,9 @@ export class OctokitGitHubClient implements GitHubClient {
       path: c.path,
       line: c.line ?? null,
       original_line: c.original_line ?? null,
-      side: c.side === 'LEFT' ? 'LEFT' : 'RIGHT',
+      side: c.side === "LEFT" ? "LEFT" : "RIGHT",
       body: c.body,
-      user: c.user?.login ?? 'unknown',
+      user: c.user?.login ?? "unknown",
       created_at: c.created_at,
       html_url: c.html_url,
       in_reply_to_id: c.in_reply_to_id ?? null,
@@ -190,7 +209,10 @@ export class OctokitGitHubClient implements GitHubClient {
     };
   }
 
-  async listReviewComments(repo: RepoRef, n: number): Promise<PrReviewComment[]> {
+  async listReviewComments(
+    repo: RepoRef,
+    n: number,
+  ): Promise<PrReviewComment[]> {
     return withRetry(() =>
       withTimeout(
         (async () => {
@@ -216,13 +238,14 @@ export class OctokitGitHubClient implements GitHubClient {
       withTimeout(
         (async () => {
           if (input.inReplyTo != null) {
-            const res = await this.octokit.rest.pulls.createReplyForReviewComment({
-              owner: repo.owner,
-              repo: repo.name,
-              pull_number: n,
-              comment_id: input.inReplyTo,
-              body: input.body,
-            });
+            const res =
+              await this.octokit.rest.pulls.createReplyForReviewComment({
+                owner: repo.owner,
+                repo: repo.name,
+                pull_number: n,
+                comment_id: input.inReplyTo,
+                body: input.body,
+              });
             return this.mapReviewComment(res.data);
           }
           const res = await this.octokit.rest.pulls.createReviewComment({
@@ -232,7 +255,7 @@ export class OctokitGitHubClient implements GitHubClient {
             commit_id: input.commitId,
             path: input.path,
             line: input.line,
-            side: input.side ?? 'RIGHT',
+            side: input.side ?? "RIGHT",
             body: input.body,
           });
           return this.mapReviewComment(res.data);
@@ -242,7 +265,10 @@ export class OctokitGitHubClient implements GitHubClient {
     );
   }
 
-  async openPullRequest(repo: RepoRef, payload: OpenPrPayload): Promise<{ url: string }> {
+  async openPullRequest(
+    repo: RepoRef,
+    payload: OpenPrPayload,
+  ): Promise<{ url: string }> {
     return withRetry(() =>
       withTimeout(
         (async () => {
@@ -270,56 +296,130 @@ export class OctokitGitHubClient implements GitHubClient {
         (async () => {
           const owner = repo.owner;
           const name = repo.name;
-          const g = this.octokit.rest.git;
+          const token = this.token;
 
-          // Parent commit: the target branch if it already exists, else the base.
+          // Use raw fetch — Octokit sends application/vnd.github.v3+json which
+          // GitHub rejects for fine-grained PATs on createTree. Direct fetch
+          // with the correct Accept header works reliably.
+          const headers = {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+          };
+
+          const gh = async (path: string, body: unknown) => {
+            const r = await fetch(
+              `https://api.github.com/repos/${owner}/${name}/${path}`,
+              {
+                method: "POST",
+                headers,
+                body: JSON.stringify(body),
+              },
+            );
+            const json = (await r.json()) as Record<string, unknown>;
+            if (!r.ok)
+              throw new Error(
+                `GitHub ${path} → ${r.status}: ${json.message as string}`,
+              );
+            return json;
+          };
+
+          const ghGet = async (path: string) => {
+            const r = await fetch(
+              `https://api.github.com/repos/${owner}/${name}/${path}`,
+              { headers },
+            );
+            const json = (await r.json()) as Record<string, unknown>;
+            if (!r.ok)
+              throw new Error(
+                `GitHub GET ${path} → ${r.status}: ${json.message as string}`,
+              );
+            return json;
+          };
+
+          const ghPatch = async (path: string, body: unknown) => {
+            const r = await fetch(
+              `https://api.github.com/repos/${owner}/${name}/${path}`,
+              {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify(body),
+              },
+            );
+            if (!r.ok) {
+              const j = (await r.json()) as Record<string, unknown>;
+              throw new Error(
+                `GitHub PATCH ${path} → ${r.status}: ${j.message as string}`,
+              );
+            }
+          };
+
+          // 1. Parent commit: target branch if exists, else base.
           let parentSha: string;
           let branchExists = false;
           try {
-            const ref = await g.getRef({ owner, repo: name, ref: `heads/${payload.branch}` });
-            parentSha = ref.data.object.sha;
+            const ref = await ghGet(`git/ref/heads/${payload.branch}`);
+            parentSha = (ref.object as { sha: string }).sha;
             branchExists = true;
           } catch {
-            const baseRef = await g.getRef({ owner, repo: name, ref: `heads/${payload.base}` });
-            parentSha = baseRef.data.object.sha;
+            const baseRef = await ghGet(`git/ref/heads/${payload.base}`);
+            parentSha = (baseRef.object as { sha: string }).sha;
           }
 
-          // New tree layered on the parent's tree (so unrelated files are kept).
-          const parentCommit = await g.getCommit({ owner, repo: name, commit_sha: parentSha });
-          const tree = await g.createTree({
-            owner,
-            repo: name,
-            base_tree: parentCommit.data.tree.sha,
-            tree: payload.files.map((f) => ({
-              path: f.path,
-              mode: '100644',
-              type: 'blob',
-              content: f.contents,
-            })),
-          });
+          // 2. Get base tree SHA from parent commit.
+          const parentCommit = await ghGet(`git/commits/${parentSha}`);
+          const baseTreeSha = (parentCommit.tree as { sha: string }).sha;
 
-          const commit = await g.createCommit({
-            owner,
-            repo: name,
+          // 3. Pre-create blobs for large files (>900 KB); inline the rest.
+          const INLINE_LIMIT = 900_000;
+          const treeEntries = await Promise.all(
+            payload.files.map(async (f) => {
+              const byteSize = Buffer.byteLength(f.contents, "utf8");
+              if (byteSize > INLINE_LIMIT) {
+                const blob = (await gh("git/blobs", {
+                  content: Buffer.from(f.contents, "utf8").toString("base64"),
+                  encoding: "base64",
+                })) as { sha: string };
+                return {
+                  path: f.path,
+                  mode: "100644",
+                  type: "blob",
+                  sha: blob.sha,
+                };
+              }
+              return {
+                path: f.path,
+                mode: "100644",
+                type: "blob",
+                content: f.contents,
+              };
+            }),
+          );
+
+          // 4. Create tree.
+          const tree = (await gh("git/trees", {
+            base_tree: baseTreeSha,
+            tree: treeEntries,
+          })) as { sha: string };
+
+          // 5. Create commit.
+          const commit = (await gh("git/commits", {
             message: payload.message,
-            tree: tree.data.sha,
+            tree: tree.sha,
             parents: [parentSha],
-          });
+          })) as { sha: string };
 
+          // 6. Update or create branch ref.
           if (branchExists) {
-            await g.updateRef({
-              owner,
-              repo: name,
-              ref: `heads/${payload.branch}`,
-              sha: commit.data.sha,
+            await ghPatch(`git/refs/heads/${payload.branch}`, {
+              sha: commit.sha,
               force: true,
             });
           } else {
-            await g.createRef({
-              owner,
-              repo: name,
+            await gh("git/refs", {
               ref: `refs/heads/${payload.branch}`,
-              sha: commit.data.sha,
+              sha: commit.sha,
             });
           }
           return { branch: payload.branch };
@@ -329,14 +429,17 @@ export class OctokitGitHubClient implements GitHubClient {
     );
   }
 
-  async findOpenPr(repo: RepoRef, branch: string): Promise<{ url: string } | null> {
+  async findOpenPr(
+    repo: RepoRef,
+    branch: string,
+  ): Promise<{ url: string } | null> {
     return withRetry(() =>
       withTimeout(
         (async () => {
           const res = await this.octokit.rest.pulls.list({
             owner: repo.owner,
             repo: repo.name,
-            state: 'open',
+            state: "open",
             head: `${repo.owner}:${branch}`,
             per_page: 1,
           });
@@ -351,7 +454,11 @@ export class OctokitGitHubClient implements GitHubClient {
   async getIssue(repo: RepoRef, n: number): Promise<IssueMeta> {
     const res = await withRetry(() =>
       withTimeout(
-        this.octokit.rest.issues.get({ owner: repo.owner, repo: repo.name, issue_number: n }),
+        this.octokit.rest.issues.get({
+          owner: repo.owner,
+          repo: repo.name,
+          issue_number: n,
+        }),
         TIMEOUT,
       ),
     );
@@ -375,7 +482,9 @@ export class OctokitGitHubClient implements GitHubClient {
     paths: string[],
     sinceDays: number,
   ): Promise<Record<string, number>> {
-    const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString();
+    const since = new Date(
+      Date.now() - sinceDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
     const result: Record<string, number> = {};
 
     await Promise.all(
@@ -401,5 +510,101 @@ export class OctokitGitHubClient implements GitHubClient {
     );
 
     return result;
+  }
+
+  async listWorkflowRuns(
+    repo: RepoRef,
+    opts: ListWorkflowRunsOptions = {},
+  ): Promise<ListWorkflowRunsResult> {
+    return withRetry(() =>
+      withTimeout(
+        (async () => {
+          try {
+            const res = opts.workflowFile
+              ? await this.octokit.rest.actions.listWorkflowRuns({
+                  owner: repo.owner,
+                  repo: repo.name,
+                  workflow_id: opts.workflowFile,
+                  per_page: 30,
+                  ...(opts.etag
+                    ? { headers: { "if-none-match": opts.etag } }
+                    : {}),
+                })
+              : await this.octokit.rest.actions.listWorkflowRunsForRepo({
+                  owner: repo.owner,
+                  repo: repo.name,
+                  per_page: 30,
+                  ...(opts.etag
+                    ? { headers: { "if-none-match": opts.etag } }
+                    : {}),
+                });
+            const etag =
+              (res.headers.etag as string | undefined) ?? opts.etag ?? null;
+            const runs = await Promise.all(
+              res.data.workflow_runs.map(async (run) => {
+                let artifacts: { id: number; name: string }[] = [];
+                try {
+                  const art =
+                    await this.octokit.rest.actions.listWorkflowRunArtifacts({
+                      owner: repo.owner,
+                      repo: repo.name,
+                      run_id: run.id,
+                      per_page: 20,
+                    });
+                  artifacts = art.data.artifacts.map((a) => ({
+                    id: a.id,
+                    name: a.name,
+                  }));
+                } catch {
+                  artifacts = [];
+                }
+                return {
+                  id: run.id,
+                  status: run.status ?? null,
+                  conclusion: run.conclusion ?? null,
+                  prNumber: run.pull_requests?.[0]?.number ?? null,
+                  headSha: run.head_sha ?? null,
+                  htmlUrl: run.html_url ?? null,
+                  artifacts,
+                } satisfies WorkflowRun;
+              }),
+            );
+            return { notModified: false, etag, runs };
+          } catch (err: unknown) {
+            // Octokit surfaces a conditional-request 304 as a RequestError.
+            if (
+              err &&
+              typeof err === "object" &&
+              "status" in err &&
+              (err as { status: number }).status === 304
+            ) {
+              return { notModified: true, etag: opts.etag ?? null, runs: [] };
+            }
+            throw err;
+          }
+        })(),
+        TIMEOUT,
+      ),
+    );
+  }
+
+  async downloadArtifact(
+    repo: RepoRef,
+    artifactId: number | string,
+  ): Promise<Buffer> {
+    return withRetry(() =>
+      withTimeout(
+        (async () => {
+          const res = await this.octokit.rest.actions.downloadArtifact({
+            owner: repo.owner,
+            repo: repo.name,
+            artifact_id: Number(artifactId),
+            archive_format: "zip",
+          });
+          return Buffer.from(res.data as ArrayBuffer);
+        })(),
+        TIMEOUT,
+      ),
+    );
   }
 }

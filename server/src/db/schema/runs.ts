@@ -29,6 +29,8 @@ export const agentRuns = pgTable('agent_runs', {
   score: integer('score'),
   /** Findings that tripped the agent's gate (severity ≥ ciFailOn). */
   blockers: integer('blockers'),
+  /** FK to multi_agent_runs batch this run belongs to (null for single-agent runs). */
+  multiAgentRunId: uuid('multi_agent_run_id').references(() => multiAgentRuns.id, { onDelete: 'set null' }),
 });
 
 /** Whole trace of one run as a SINGLE jsonb document. */

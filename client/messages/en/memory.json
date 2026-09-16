@@ -2,20 +2,23 @@
   "page": {
     "crumb": "Memory",
     "heading": "Memory",
-    "count": "{count, plural, one {# entry} other {# entries}} · pgvector · semantic",
-    "searchPlaceholder": "Search memory…",
-    "filterBadge": "filter",
+    "subtitle": "What your agents have learned about this codebase",
+    "addMemory": "+ Add memory",
+    "refresh": "Refresh",
+    "searchPlaceholder": "Search content…",
     "loadError": "Could not load memory.",
-    "empty": {
-      "title": "No memory matches",
-      "body": "Memory is created by the 'Learn' action on findings and by retrieval-backed agents. Adjust filters to see more."
-    },
-    "filters": {
-      "scope": "Scope",
-      "kind": "Kind",
-      "freshness": "Freshness",
-      "showStale": "Show stale (>60d)"
-    }
+    "emptyTitle": "No memories yet",
+    "emptyBody": "Add an explicit rule with '+ Add memory', or dismiss findings to let agents learn automatically.",
+    "refreshing": "Refreshing…",
+    "learned": "Learned {count} new rule(s)"
+  },
+  "col": {
+    "content": "CONTENT",
+    "kind": "KIND",
+    "scope": "SCOPE",
+    "source": "SOURCE",
+    "confidence": "CONF",
+    "used": "USED"
   },
   "scope": {
     "repo": "repo",
@@ -29,27 +32,38 @@
     "fact": "fact",
     "learning": "learning"
   },
-  "card": {
-    "neverUsed": "never used",
-    "usedToday": "used today",
-    "usedDayAgo": "used 1d ago",
-    "usedDaysAgo": "used {days}d ago"
+  "source": {
+    "explicit": "explicit",
+    "auto": "auto"
   },
-  "detail": {
+  "used": {
+    "never": "never",
+    "today": "today",
+    "daysAgo": "{n}d ago"
+  },
+  "menu": {
     "edit": "Edit",
     "delete": "Delete",
+    "provenance": "View provenance"
+  },
+  "provenance": {
+    "explicit": "Added by you",
+    "auto": "Learned from {count} dismiss(es)"
+  },
+  "modal": {
+    "addTitle": "Add memory rule",
+    "editTitle": "Edit memory rule",
     "contentLabel": "Content",
+    "contentPlaceholder": "e.g. Ignore unused variable warnings in test files",
     "kindLabel": "Kind",
     "scopeLabel": "Scope",
+    "repoLabel": "Repository",
     "save": "Save",
-    "cancel": "Cancel",
-    "stat": {
-      "confidence": "CONFIDENCE",
-      "scope": "SCOPE",
-      "updated": "UPDATED"
-    },
-    "sourceContexts": "Source contexts",
-    "noSources": "No source contexts recorded.",
-    "prLabel": "PR #{pr}"
+    "cancel": "Cancel"
+  },
+  "filter": {
+    "allScopes": "All scopes",
+    "allKinds": "All kinds",
+    "allSources": "All sources"
   }
 }

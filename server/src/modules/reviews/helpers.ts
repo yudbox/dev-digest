@@ -14,6 +14,7 @@ export interface ReviewDtoFinding extends Finding {
   review_id: string;
   accepted_at: string | null;
   dismissed_at: string | null;
+  replied_at: string | null;
 }
 
 export interface ReviewDto {
@@ -50,6 +51,7 @@ export function findingRowToDto(row: FindingRow): ReviewDtoFinding {
     review_id: row.reviewId,
     accepted_at: row.acceptedAt?.toISOString() ?? null,
     dismissed_at: row.dismissedAt?.toISOString() ?? null,
+    replied_at: row.repliedAt?.toISOString() ?? null,
   };
 }
 

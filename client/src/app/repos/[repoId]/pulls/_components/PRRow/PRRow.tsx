@@ -24,7 +24,9 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const { size, lines } = sizeOf(pr);
   const reviewed = pr.score != null; // null score ⇒ PR has never been reviewed
   const totalFindings =
-    (pr.findings_critical ?? 0) + (pr.findings_warning ?? 0) + (pr.findings_suggestion ?? 0);
+    (pr.findings_critical ?? 0) +
+    (pr.findings_warning ?? 0) +
+    (pr.findings_suggestion ?? 0);
 
   const { data: reviewsData, isLoading: reviewsLoading } = usePrReviews(
     anchorRect && totalFindings > 0 ? pr.id : undefined,
@@ -84,7 +86,11 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
           FINDINGS_FIELDS.map(({ sev, field }) => {
             const n = pr[field] ?? 0;
             if (!n) return null;
-            return <SeverityChip key={sev} sev={sev} count={n} />;
+            return (
+              <span key={sev} data-findings-chip>
+                <SeverityChip sev={sev} count={n} />
+              </span>
+            );
           })
         )}
         {anchorRect && totalFindings > 0 && (

@@ -16,6 +16,9 @@ export function VerdictBanner({
   findingsCount,
   blockers,
   agentName,
+  durationMs,
+  costUsd,
+  onViewTrace,
 }: {
   verdict: Verdict;
   summary: string | null;
@@ -23,6 +26,12 @@ export function VerdictBanner({
   findingsCount: number;
   blockers: number;
   agentName?: string | null;
+  /** Optional: elapsed time for this agent run (shown in multi-agent detail). */
+  durationMs?: number | null;
+  /** Optional: cost for this agent run. */
+  costUsd?: number | null;
+  /** Optional: callback to open the run trace drawer. */
+  onViewTrace?: () => void;
 }) {
   const t = useTranslations("prReview");
   const m = VERDICT_META[verdict] ?? VERDICT_META.comment;
@@ -46,6 +55,40 @@ export function VerdictBanner({
           )}
         </div>
         {summary && <p style={s.summary}>{summary}</p>}
+        {/* Optional time/cost/trace row (multi-agent detail only) */}
+        {(durationMs != null || costUsd != null || onViewTrace) && (
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>
+            {durationMs != null && (
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                {(durationMs / 1000).toFixed(1)}s
+              </span>
+            )}
+            {costUsd != null && (
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                ${costUsd.toFixed(3)}
+              </span>
+            )}
+            {onViewTrace && (
+              <button
+                type="button"
+                onClick={onViewTrace}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 11,
+                  color: "var(--accent-text, #4f9cf9)",
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
+                }}
+              >
+                View trace →
+              </button>
+            )}
+          </div>
+        )}
       </div>
       {score != null && (
         <div style={s.scoreCol}>

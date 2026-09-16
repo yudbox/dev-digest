@@ -140,6 +140,42 @@ export interface CommitFilesPayload {
   files: CommitFile[];
 }
 
+/** A reference to one uploaded artifact of a workflow run. */
+export interface WorkflowRunArtifact {
+  id: number;
+  name: string;
+}
+
+/**
+ * One GitHub Actions workflow run, thinned to what CI ingest needs. `status`
+ * is the run's lifecycle (`queued`/`in_progress`/`completed`); `conclusion` is
+ * the outcome once completed (`success`/`failure`/…, null while running).
+ */
+export interface WorkflowRun {
+  id: number;
+  status: string | null;
+  conclusion: string | null;
+  prNumber: number | null;
+  headSha: string | null;
+  htmlUrl: string | null;
+  artifacts: WorkflowRunArtifact[];
+}
+
+/** Options for a conditional `listWorkflowRuns` (If-None-Match). */
+export interface ListWorkflowRunsOptions {
+  /** Workflow file name to scope to (e.g. "devdigest-review.yml"). */
+  workflowFile?: string;
+  /** Stored ETag for a conditional request; 304 → `notModified`. */
+  etag?: string | null;
+}
+
+/** Result of `listWorkflowRuns` — either a 304 no-op or fresh runs + new ETag. */
+export interface ListWorkflowRunsResult {
+  notModified: boolean;
+  etag: string | null;
+  runs: WorkflowRun[];
+}
+
 export interface GitHubClient {
   listPullRequests(repo: RepoRef): Promise<PrMeta[]>;
   getPullRequest(repo: RepoRef, n: number): Promise<PrDetail>;
@@ -169,6 +205,15 @@ export interface GitHubClient {
    * Degrades gracefully: the service layer catches errors and falls back to hotness=0.
    */
   getCommitActivity(repo: RepoRef, paths: string[], sinceDays: number): Promise<Record<string, number>>;
+  /**
+   * List completed+in-flight workflow runs for a repo (thin), supporting a
+   * conditional (`If-None-Match`) request via `opts.etag`. On 304 returns
+   * `{ notModified: true, runs: [], etag }`; on 200 returns fresh runs + the
+   * new ETag. CI ingest uses this to pull only changed runs.
+   */
+  listWorkflowRuns(repo: RepoRef, opts?: ListWorkflowRunsOptions): Promise<ListWorkflowRunsResult>;
+  /** Download one workflow-run artifact as a raw zip Buffer (caller unzips). */
+  downloadArtifact(repo: RepoRef, artifactId: number | string): Promise<Buffer>;
 }
 
 // ---------- Git (simple-git, heavy) ----------

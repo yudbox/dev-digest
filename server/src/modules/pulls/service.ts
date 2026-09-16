@@ -10,7 +10,7 @@ export class PullsService {
   constructor(private reviewRepo: ReviewRepository) {}
 
   async buildSmartDiff(workspaceId: string, prId: string): Promise<SmartDiff> {
-    const [pr, prFiles, latestReview] = await Promise.all([
+    const [pr, prFiles, latestReviewData] = await Promise.all([
       this.reviewRepo.getPull(workspaceId, prId),
       this.reviewRepo.getPrFiles(prId),
       this.reviewRepo.getLatestReviewData(prId),
@@ -21,16 +21,25 @@ export class PullsService {
     // Group files by classifier role (no DB, pure CPU).
     const base = buildSmartDiff(prFiles);
 
+    // Union findings across all latest-per-agent results (AC-52/53).
+    // AC-54: filter out dismissed findings; suppress accepted ones from line badges
+    // so the diff stays clean for already-actioned items.
+    const allFindings = latestReviewData
+      .flatMap((r) => r.findings)
+      .filter((f) => !f.dismissedAt); // dismissed → hide entirely
+    const reviewTokens =
+      latestReviewData.find((r) => r.reviewTokens !== null)?.reviewTokens ??
+      null;
+
     // Build per-file index from review findings.
-    const findingsByFile = new Map<string, typeof latestReview.findings>();
-    for (const f of latestReview.findings) {
+    const findingsByFile = new Map<string, typeof allFindings>();
+    for (const f of allFindings) {
       const list = findingsByFile.get(f.file) ?? [];
       list.push(f);
       findingsByFile.set(f.file, list);
     }
 
-    const hasReview =
-      latestReview.findings.length > 0 || latestReview.reviewTokens !== null;
+    const hasReview = allFindings.length > 0 || reviewTokens !== null;
 
     // Enrich each file with finding_lines + severity_counts + line_findings from latest review.
     const enrichedGroups = base.groups.map((group) => ({
@@ -43,37 +52,44 @@ export class PullsService {
           WARNING: 2,
           SUGGESTION: 1,
         };
-        const lineMap = new Map<number, { severity: string; id: string }>();
+        // AC-54: accepted findings are suppressed from line badges (shown as
+        // "accepted" colour in the diff gutter, not as active warnings).
+        const activeFindings = findings.filter((f) => !f.acceptedAt);
+        const lineMap = new Map<number, { severity: string; id: string; accepted: boolean }>();
         for (const f of findings) {
+          const isAccepted = !!f.acceptedAt;
           const existing = lineMap.get(f.startLine);
-          if (
-            !existing ||
-            (severityRank[f.severity] ?? 0) >
-              (severityRank[existing.severity] ?? 0)
-          ) {
-            lineMap.set(f.startLine, { severity: f.severity, id: f.id });
+          const rank = isAccepted ? 0 : (severityRank[f.severity] ?? 0);
+          const existingRank = existing
+            ? existing.accepted
+              ? 0
+              : (severityRank[existing.severity] ?? 0)
+            : -1;
+          if (!existing || rank > existingRank) {
+            lineMap.set(f.startLine, { severity: f.severity, id: f.id, accepted: isAccepted });
           }
         }
         return {
           ...file,
-          finding_lines: [...new Set(findings.map((f) => f.startLine))].sort(
+          finding_lines: [...new Set(activeFindings.map((f) => f.startLine))].sort(
             (a, b) => a - b,
           ),
           severity_counts: hasReview
             ? {
-                critical: findings.filter((f) => f.severity === "CRITICAL")
+                critical: activeFindings.filter((f) => f.severity === "CRITICAL")
                   .length,
-                warning: findings.filter((f) => f.severity === "WARNING")
+                warning: activeFindings.filter((f) => f.severity === "WARNING")
                   .length,
-                suggestion: findings.filter((f) => f.severity === "SUGGESTION")
+                suggestion: activeFindings.filter((f) => f.severity === "SUGGESTION")
                   .length,
               }
             : null,
           line_findings: hasReview
-            ? [...lineMap.entries()].map(([line, { severity, id }]) => ({
+            ? [...lineMap.entries()].map(([line, { severity, id, accepted }]) => ({
                 id,
                 line,
                 severity,
+                accepted,
               }))
             : null,
         };
@@ -83,7 +99,7 @@ export class PullsService {
     return {
       ...base,
       groups: enrichedGroups,
-      review_tokens: latestReview.reviewTokens,
+      review_tokens: reviewTokens,
     };
   }
 }

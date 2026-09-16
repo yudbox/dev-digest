@@ -68,6 +68,7 @@ export interface AgentStats {
   runsCount: number;
   acceptRatePct: number;
   avgCostUsd: number | null;
+  avgDurationMs: number | null;
 }
 
 export class AgentsRepository {
@@ -337,6 +338,7 @@ export class AgentsRepository {
         agentId: t.agentRuns.agentId,
         runsCount: count(t.agentRuns.id).as("runs_count"),
         avgCost: avg(t.agentRuns.costUsd).as("avg_cost"),
+        avgDuration: avg(t.agentRuns.durationMs).as("avg_duration"),
       })
       .from(t.agentRuns)
       .where(eq(t.agentRuns.workspaceId, workspaceId))
@@ -364,6 +366,7 @@ export class AgentsRepository {
         agentId: t.agents.id,
         runsCount: runsAgg.runsCount,
         avgCost: runsAgg.avgCost,
+        avgDuration: runsAgg.avgDuration,
         resolved: findingsAgg.resolved,
         accepted: findingsAgg.accepted,
       })
@@ -381,6 +384,7 @@ export class AgentsRepository {
         acceptRatePct:
           resolved > 0 ? Math.round((accepted / resolved) * 100) : 0,
         avgCostUsd: row.avgCost == null ? null : Number(row.avgCost),
+        avgDurationMs: row.avgDuration == null ? null : Number(row.avgDuration),
       });
     }
     return result;
