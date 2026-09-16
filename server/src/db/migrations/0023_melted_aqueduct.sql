@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "ci_runs_github_url_key" ON "ci_runs" USING btree ("github_url");
