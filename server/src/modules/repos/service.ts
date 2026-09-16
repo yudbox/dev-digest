@@ -1,3 +1,5 @@
+import { access, constants } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { Container } from '../../platform/container.js';
 import { type Repo, type RepoRef, type SecretKey, type VcsProvider } from '@devdigest/shared';
 import { NotFoundError } from '../../platform/errors.js';
@@ -50,6 +52,8 @@ export interface CloneJobPayload {
   /** Azure DevOps only — hosting base URL. */
   baseUrl?: string;
   url: string;
+  /** Existing on-disk clone path. When present and valid, skip re-clone and just fetch. */
+  clonePath?: string;
 }
 
 export class RepoService {
@@ -71,7 +75,38 @@ export class RepoService {
   }
 
   async runCloneJob(payload: CloneJobPayload): Promise<void> {
-    const { repoId, vcsProvider, owner, name, project, baseUrl, url } = payload;
+    const { repoId, vcsProvider, owner, name, project, baseUrl, url, clonePath } = payload;
+
+    // If a clone already exists at the stored path (e.g. imported from Azure DevOps),
+    // just fetch from the already-configured remote instead of re-cloning from GitHub.
+    if (clonePath) {
+      const hasGit = await access(join(clonePath, '.git'), constants.F_OK)
+        .then(() => true)
+        .catch(() => false);
+      if (hasGit) {
+        const { simpleGit } = await import('simple-git');
+        try {
+          const sg = simpleGit(clonePath, { timeout: { block: 15000 } })
+            .env({ ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' });
+          // Embed credentials into the remote URL so git doesn't prompt.
+          const remoteUrl: string = (await sg.remote(['get-url', 'origin']) as string).trim();
+          const azureToken = await this.container.secrets.get(AZURE_DEVOPS_TOKEN_SECRET);
+          let fetchUrl = remoteUrl;
+          if (azureToken && remoteUrl.includes('dev.azure.com')) {
+            const u = new URL(remoteUrl);
+            u.username = 'pat';
+            u.password = azureToken;
+            fetchUrl = u.toString();
+          }
+          await sg.fetch([fetchUrl]);
+          console.info(`[clone-job] Fetched existing clone ${owner}/${name}`);
+        } catch (err) {
+          console.warn(`[clone-job] Fetch failed for ${owner}/${name} — using existing clone as-is`);
+        }
+        return;
+      }
+    }
+
     const token = await this.container.secrets.get(secretKeyFor(vcsProvider));
     const cloneUrl = token ? withVcsToken(url, vcsProvider, token) : url;
     const ref: RepoRef & { provider: VcsProvider } = {
@@ -81,9 +116,15 @@ export class RepoService {
       baseUrl,
       provider: vcsProvider,
     };
-    const { path } = await this.container.git.clone(ref, cloneUrl, {
-      depth: CLONE_DEPTH,
-    });
+    let path: string;
+    try {
+      ({ path } = await this.container.git.clone(ref, cloneUrl, {
+        depth: CLONE_DEPTH,
+      }));
+    } catch (err) {
+      console.warn(`[clone-job] Clone failed for ${owner}/${name} — repo kept with existing clone_path`, err);
+      return;
+    }
     await this.repo.updateClonePath(repoId, path);
 
     // T2.2 — kick off the indexer in the background. ENQUEUE (not call) so the
@@ -177,6 +218,7 @@ export class RepoService {
       project: repo.project ?? undefined,
       baseUrl: repo.baseUrl ?? undefined,
       url,
+      clonePath: repo.clonePath ?? undefined,
     } satisfies CloneJobPayload);
     // T2.2 — also enqueue an incremental refresh. The two queue positions are
     // independent (p-queue doesn't FIFO across kinds), but `runIncremental` is
