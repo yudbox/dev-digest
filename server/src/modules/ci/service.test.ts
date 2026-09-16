@@ -108,6 +108,9 @@ describe("CiService.exportCi action=files", () => {
         getById: vi.fn().mockResolvedValue(mockAgent),
         linkedSkills: vi.fn().mockResolvedValue([]),
       },
+      reposRepo: {
+        findByFullName: vi.fn().mockResolvedValue(null),
+      },
       ciRepo: {
         upsertInstallation,
         listInstallationsForAgent: vi.fn().mockResolvedValue({

@@ -59,6 +59,11 @@ function GroupSection({
         const prFile = fileMap.get(smartFile.path);
         if (!prFile) return null;
 
+        // A boilerplate file still deserves auto-expand if the last review
+        // actually flagged something in it — the collapse default is about
+        // reducing noise, not hiding real findings.
+        const hasFindings = !!smartFile.line_findings?.length;
+
         return (
           <div key={smartFile.path} style={s.fileWrapper}>
             {smartFile.pseudocode_summary && (
@@ -70,7 +75,11 @@ function GroupSection({
             <FileCard
               file={prFile}
               commenting={commenting}
-              initialOpen={targetFile === prFile.path ? true : !isBoilerplate}
+              initialOpen={
+                targetFile === prFile.path
+                  ? true
+                  : !isBoilerplate || hasFindings
+              }
               targetLine={targetFile === prFile.path ? targetLine : undefined}
               lineBadges={
                 smartFile.line_findings

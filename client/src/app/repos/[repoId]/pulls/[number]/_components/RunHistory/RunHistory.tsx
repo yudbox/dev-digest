@@ -3,8 +3,9 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
-import { Severity, type RunSummary, type PrCommit } from "@devdigest/shared";
+import { Severity, type RunSummary, type PrCommit, type ReviewRecord } from "@devdigest/shared";
 import { SeverityChip } from "@/components/SeverityChip/SeverityChip";
+import { FindingsPopover } from "../../../_components/FindingsPopover/FindingsPopover";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first
@@ -74,6 +75,51 @@ const commitRowStyle: React.CSSProperties = {
   background: "transparent",
 };
 
+/**
+ * Severity pills for one run row — click toggles the same FindingsPopover
+ * used on the PR list (see PRRow). Each row owns its own open/anchor state
+ * so opening one run's popover never affects another's.
+ */
+function RunFindingsChips({
+  review,
+  critical,
+  warning,
+  suggestion,
+}: {
+  review: ReviewRecord | undefined;
+  critical: number;
+  warning: number;
+  suggestion: number;
+}) {
+  const [anchorRect, setAnchorRect] = React.useState<DOMRect | null>(null);
+  const ref = React.useRef<HTMLDivElement>(null);
+  if (critical === 0 && warning === 0 && suggestion === 0) return null;
+
+  return (
+    <div
+      ref={ref}
+      style={{ display: "flex", alignItems: "flex-end", gap: 10, cursor: "pointer" }}
+      onClick={(e) => {
+        e.stopPropagation();
+        setAnchorRect((prev) => (prev ? null : ref.current?.getBoundingClientRect() ?? null));
+      }}
+    >
+      {critical > 0 && <SeverityChip sev={Severity.enum.CRITICAL} count={critical} />}
+      {warning > 0 && <SeverityChip sev={Severity.enum.WARNING} count={warning} />}
+      {suggestion > 0 && <SeverityChip sev={Severity.enum.SUGGESTION} count={suggestion} />}
+      {anchorRect && (
+        <FindingsPopover
+          review={review}
+          isLoading={false}
+          anchorRect={anchorRect}
+          onClose={() => setAnchorRect(null)}
+          triggerRef={ref}
+        />
+      )}
+    </div>
+  );
+}
+
 type TimelineItem =
   | { kind: "run"; ts: number; run: RunSummary }
   | { kind: "commit"; ts: number; commit: PrCommit };
@@ -88,12 +134,15 @@ function tsOf(s: string | null | undefined): number {
 export function RunHistory({
   runs,
   commits = [],
+  reviews = [],
   onOpenTrace,
   onGoToReview,
   onDelete,
 }: {
   runs: RunSummary[];
   commits?: PrCommit[];
+  /** Full review+findings records (same data as the Review runs accordions below), keyed by run_id to power each row's findings popover. */
+  reviews?: ReviewRecord[];
   /** Open the trace + log drawer for a run (the logs icon). */
   onOpenTrace: (runId: string) => void;
   /** Jump to this run's inline review accordion below (clicking the agent name). */
@@ -101,6 +150,11 @@ export function RunHistory({
   onDelete?: (runId: string) => void;
 }) {
   const t = useTranslations("prReview");
+  const reviewByRunId = React.useMemo(() => {
+    const map = new Map<string, ReviewRecord>();
+    for (const r of reviews) if (r.run_id) map.set(r.run_id, r);
+    return map;
+  }, [reviews]);
   if (runs.length === 0 && commits.length === 0) return null;
 
   const items: TimelineItem[] = [
@@ -191,17 +245,12 @@ export function RunHistory({
                 </div>
               )}
               {settled && (
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
-                  {(r.findings_critical ?? 0) > 0 && (
-                    <SeverityChip sev={Severity.enum.CRITICAL} count={r.findings_critical!} />
-                  )}
-                  {(r.findings_warning ?? 0) > 0 && (
-                    <SeverityChip sev={Severity.enum.WARNING} count={r.findings_warning!} />
-                  )}
-                  {(r.findings_suggestion ?? 0) > 0 && (
-                    <SeverityChip sev={Severity.enum.SUGGESTION} count={r.findings_suggestion!} />
-                  )}
-                </div>
+                <RunFindingsChips
+                  review={reviewByRunId.get(r.run_id)}
+                  critical={r.findings_critical ?? 0}
+                  warning={r.findings_warning ?? 0}
+                  suggestion={r.findings_suggestion ?? 0}
+                />
               )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>

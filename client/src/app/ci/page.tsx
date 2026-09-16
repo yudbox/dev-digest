@@ -458,6 +458,7 @@ function CiRunRow({
             isLoading={false}
             anchorRect={findingsAnchor.getBoundingClientRect()}
             onClose={() => setFindingsAnchor(null)}
+            triggerRef={{ current: findingsAnchor }}
           />
         )}
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>

@@ -179,11 +179,13 @@ export function FindingsPopover({
   isLoading,
   anchorRect,
   onClose,
+  triggerRef,
 }: {
   review: ReviewRecord | undefined;
   isLoading: boolean;
   anchorRect: DOMRect;
-  onClose?: () => void;
+  onClose: () => void;
+  triggerRef: React.RefObject<HTMLElement | null>;
 }) {
   const POPOVER_W = 380;
   const POPOVER_H = 420;
@@ -207,36 +209,49 @@ export function FindingsPopover({
     window.innerWidth - POPOVER_W - MARGIN,
   );
 
+  const popoverRef = React.useRef<HTMLDivElement>(null);
+
+  // Click/tap anywhere outside the popover AND outside the trigger closes it.
+  // The popover itself (scroll area included) is a safe zone — moving the
+  // mouse from the trigger icon into the popover, or scrolling inside it,
+  // never dismisses it. Only clicking elsewhere on the page does.
+  React.useEffect(() => {
+    function handlePointerDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (popoverRef.current?.contains(target)) return;
+      if (triggerRef.current?.contains(target)) return;
+      onClose();
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, triggerRef]);
+
   return createPortal(
-    <>
-      {/* Transparent overlay to catch outside clicks */}
-      {onClose && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 9998 }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-        />
-      )}
-      <div
-        style={{
-          position: "fixed",
-          top,
-          left,
-          zIndex: 9999,
-          width: 380,
-          maxHeight,
-          overflowY: "auto",
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border)",
-          borderRadius: 10,
-          boxShadow: "0 8px 32px rgba(0,0,0,.5)",
-        }}
-      >
-        {isLoading ? <PopoverSkeleton /> : <PopoverContent review={review} />}
-      </div>
-    </>,
+    <div
+      ref={popoverRef}
+      style={{
+        position: "fixed",
+        top,
+        left,
+        zIndex: 9999,
+        width: POPOVER_W,
+        maxHeight,
+        overflowY: "auto",
+        background: "var(--bg-elevated)",
+        border: "1px solid var(--border)",
+        borderRadius: 10,
+        boxShadow: "0 8px 32px rgba(0,0,0,.5)",
+      }}
+    >
+      {isLoading ? <PopoverSkeleton /> : <PopoverContent review={review} />}
+    </div>,
     document.body,
   );
 }

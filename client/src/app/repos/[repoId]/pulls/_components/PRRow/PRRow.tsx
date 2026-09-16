@@ -19,6 +19,7 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const router = useRouter();
   const [h, setH] = React.useState(false);
   const [anchorRect, setAnchorRect] = React.useState<DOMRect | null>(null);
+  const findingsCellRef = React.useRef<HTMLDivElement>(null);
   const st = STATUS_META[pr.status] ?? STATUS_META.needs_review!;
   const { size, lines } = sizeOf(pr);
   const reviewed = pr.score != null; // null score ⇒ PR has never been reviewed
@@ -69,31 +70,14 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
         )}
       </div>
       <div
-        style={s.findingsCell}
+        ref={findingsCellRef}
+        style={{ ...s.findingsCell, cursor: totalFindings > 0 ? "pointer" : undefined }}
         onClick={(e) => {
+          if (totalFindings === 0) return;
           e.stopPropagation();
-          if (totalFindings > 0) {
-            // Use the chip wrapper rect if available, else the clicked element
-            const chip = (e.target as HTMLElement).closest(
-              "[data-findings-chip]",
-            ) as HTMLElement | null;
-            const el = chip ?? (e.target as HTMLElement);
-            const rect = el.getBoundingClientRect();
-            console.log(
-              "[PRRow click] top=",
-              rect.top,
-              "bottom=",
-              rect.bottom,
-              "left=",
-              rect.left,
-              "clientY=",
-              e.clientY,
-              "el=",
-              el.tagName,
-              el.getAttribute("data-findings-chip"),
-            );
-            setAnchorRect((prev) => (prev ? null : rect));
-          }
+          setAnchorRect((prev) =>
+            prev ? null : findingsCellRef.current?.getBoundingClientRect() ?? null,
+          );
         }}
       >
         {!reviewed || totalFindings === 0 ? (
@@ -115,6 +99,7 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
             isLoading={reviewsLoading}
             anchorRect={anchorRect}
             onClose={() => setAnchorRect(null)}
+            triggerRef={findingsCellRef}
           />
         )}
       </div>
