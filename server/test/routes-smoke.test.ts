@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
-import { MockGitHubClient, MockLLMProvider } from '../src/adapters/mocks.js';
+import { MockGitHubClient, MockLLMProvider, MockAuthProvider } from '../src/adapters/mocks.js';
 
 /**
  * No-DB route smoke tests via app.inject(). `/health` and the validation/error
@@ -22,7 +22,10 @@ describe('routes (no DB)', () => {
   it('POST /settings/test-connection (github) returns structured ConnTestResult', async () => {
     const app = await buildApp({
       config,
-      overrides: { github: new MockGitHubClient({ login: 'octocat' }) },
+      overrides: {
+        auth: new MockAuthProvider(),
+        github: new MockGitHubClient({ login: 'octocat' }),
+      },
     });
     const res = await app.inject({
       method: 'POST',
@@ -41,6 +44,7 @@ describe('routes (no DB)', () => {
     const app = await buildApp({
       config,
       overrides: {
+        auth: new MockAuthProvider(),
         llm: { openai: new MockLLMProvider('openai', { models: [{ id: 'gpt-4.1', provider: 'openai' }] }) },
       },
     });

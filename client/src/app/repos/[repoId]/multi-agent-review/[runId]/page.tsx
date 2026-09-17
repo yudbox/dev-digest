@@ -12,13 +12,14 @@ import type { AgentColumn } from "@devdigest/shared";
 import { Icon } from "@devdigest/ui";
 import { AgentColumnCard } from "./_components/AgentColumnCard";
 import { WhereAgentsDisagree } from "./_components/WhereAgentsDisagree";
+import { AggregateTab } from "./_components/AggregateTab";
 import RunTraceDrawer from "../../pulls/[number]/_components/RunTraceDrawer";
 import { VerdictBanner } from "../../pulls/[number]/_components/VerdictBanner";
 import { FindingsPanel } from "../../pulls/[number]/_components/FindingsPanel";
 import { AppShell } from "../../../../../components/app-shell";
 import { useActiveRepo } from "../../../../../lib/contexts/repoContext";
 
-type ViewMode = "columns" | "tabs";
+type ViewMode = "columns" | "tabs" | "aggregate";
 
 export default function MultiAgentRunDetailPage() {
   const params = useParams<{ repoId: string; runId: string }>();
@@ -184,7 +185,7 @@ export default function MultiAgentRunDetailPage() {
               overflow: "hidden",
             }}
           >
-            {(["columns", "tabs"] as ViewMode[]).map((m) => (
+            {(["columns", "tabs", "aggregate"] as ViewMode[]).map((m, i, arr) => (
               <button
                 key={m}
                 type="button"
@@ -195,13 +196,13 @@ export default function MultiAgentRunDetailPage() {
                   fontWeight: view === m ? 600 : 400,
                   cursor: "pointer",
                   border: "none",
-                  borderRight: m === "columns" ? "1px solid var(--border)" : "none",
+                  borderRight: i < arr.length - 1 ? "1px solid var(--border)" : "none",
                   background: view === m ? "var(--accent, #4f9cf9)" : "transparent",
                   color: view === m ? "#fff" : "var(--text-muted)",
                   transition: "background 0.12s, color 0.12s",
                 }}
               >
-                {m === "columns" ? "Columns" : "Tabs"}
+                {m === "columns" ? "Columns" : m === "tabs" ? "Tabs" : "Aggregate"}
               </button>
             ))}
           </div>
@@ -426,6 +427,11 @@ export default function MultiAgentRunDetailPage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* ---- AGGREGATE VIEW ---- */}
+        {view === "aggregate" && (
+          <AggregateTab run={run} repoId={repoId} />
         )}
 
         {/* WHERE AGENTS DISAGREE */}

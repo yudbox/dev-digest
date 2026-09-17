@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, API_BASE } from "../api";
 import { notify } from "../contexts/toast";
 import type {
+  AggregateResponse,
   FindingActionKind,
   MultiAgentRun,
   MultiAgentRunSummary,
@@ -330,6 +331,18 @@ export function useEditFindingReply() {
       ),
     onSuccess: (_d, { findingId }) => {
       qc.invalidateQueries({ queryKey: ["finding-replies", findingId] });
+    },
+  });
+}
+
+/** POST /multi-agent-runs/:id/aggregate — no DB write, result lives in TanStack Query cache only. */
+export function useAggregateMutation(runId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<AggregateResponse>(`/multi-agent-runs/${runId}/aggregate`),
+    onSuccess: (data) => {
+      qc.setQueryData(["aggregate", runId], data);
     },
   });
 }

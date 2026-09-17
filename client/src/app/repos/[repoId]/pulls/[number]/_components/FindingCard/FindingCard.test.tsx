@@ -90,18 +90,21 @@ describe("FindingCard (smoke, both themes)", () => {
     expect(button).toBeDisabled();
 
     const accepted: FindingRecord = { ...FINDING, accepted_at: "2026-01-01T00:00:00Z" };
+    const qc2 = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     rerender(
-      <NextIntlClientProvider
-        locale="en"
-        messages={{ prReview: messages, eval: evalMessages }}
-      >
-        <FindingCard
-          f={accepted}
-          defaultExpanded
-          onAction={() => {}}
-          onCreateEvalCase={onCreateEvalCase}
-        />
-      </NextIntlClientProvider>,
+      <QueryClientProvider client={qc2}>
+        <NextIntlClientProvider
+          locale="en"
+          messages={{ prReview: messages, eval: evalMessages }}
+        >
+          <FindingCard
+            f={accepted}
+            defaultExpanded
+            onAction={() => {}}
+            onCreateEvalCase={onCreateEvalCase}
+          />
+        </NextIntlClientProvider>
+      </QueryClientProvider>,
     );
     const enabledButton = screen.getByText("Turn into eval case").closest("button")!;
     expect(enabledButton).toBeEnabled();

@@ -52,8 +52,8 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
   },
   {
     id: "review_intent",
-    label: "PR Review · Intent",
-    description: "Derives a PR\u2019s intent and scope before review.",
+    label: "Standard Model",
+    description: "Used for: PR Review and Aggregate.",
     defaultProvider: "openrouter",
     defaultModel: "deepseek/deepseek-v4-flash",
   },
