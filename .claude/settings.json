@@ -13,6 +13,18 @@
           }
         ]
       }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "transcript=$(jq -r '.transcript_path // empty'); if [ -n \"$transcript\" ] && [ -f \"$transcript\" ]; then claude -p \"Read the session transcript at $transcript. Apply the engineering-insights skill's criteria to the ENTIRE session recorded in that transcript: unexpected behavior encountered, a library quirk worked around, a root cause traced elsewhere, an architectural tradeoff decided, or a substantive 30+ minute session with a concrete problem and outcome. For each qualifying finding, determine which module it belongs to (client/, server/, reviewer-core/, e2e/, or mcp/) and append it to that module's insights/INSIGHTS.md if it is not already recorded there -- append-only, never rewrite or remove existing entries. If nothing in the session qualifies, do nothing and output nothing.\" --permission-mode acceptEdits --allowedTools 'Read,Edit,Write,Grep,Glob' >> .claude/session-insights-hook.log 2>&1; fi",
+            "timeout": 240,
+            "statusMessage": "Capturing session insights..."
+          }
+        ]
+      }
     ]
   }
 }
