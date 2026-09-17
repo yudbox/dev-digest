@@ -152,3 +152,53 @@ export const CuratorResult = z.object({
   dry_run: z.boolean(),
 });
 export type CuratorResult = z.infer<typeof CuratorResult>;
+
+// ---------------------------------------------------------------------------
+// Aggregate tab contracts (SPEC-2026-09-02-aggregate-tab)
+// ---------------------------------------------------------------------------
+
+/**
+ * Separator between the English and Russian parts of reviewer_comment.
+ * Copy only the EN part (before this separator) when inserting into a PR.
+ */
+export const REVIEWER_COMMENT_SEPARATOR = '\n\n---\n\n';
+
+/** One source finding that contributed to an aggregated row. */
+export const AggregatedSourceSchema = z.object({
+  finding_id: z.string(),
+  review_id: z.string(),
+  run_id: z.string(),
+  agent_id: z.string(),
+  agent_name: z.string(),
+  severity: Severity,
+  file: z.string(),
+  start_line: z.number().int(),
+});
+export type AggregatedSource = z.infer<typeof AggregatedSourceSchema>;
+
+/** One deduplicated finding row in the Aggregate tab. */
+export const AggregatedFindingSchema = z.object({
+  /** Deterministic hash of the sorted source finding_ids (AC-20). */
+  id: z.string(),
+  severity: Severity,
+  category: z.string(),
+  file: z.string(),
+  start_line: z.number().int(),
+  end_line: z.number().int(),
+  title: z.string(),
+  /** EN text + REVIEWER_COMMENT_SEPARATOR + RU text. Copy only EN. */
+  reviewer_comment: z.string(),
+  sources: z.array(AggregatedSourceSchema).min(1),
+});
+export type AggregatedFinding = z.infer<typeof AggregatedFindingSchema>;
+
+/** Response of POST /multi-agent-runs/:id/aggregate. */
+export const AggregateResponseSchema = z.object({
+  multi_agent_run_id: z.string(),
+  generated_at: z.string(),
+  /** provider/model string, e.g. "openai/gpt-4.1". */
+  model: z.string(),
+  source_findings_total: z.number().int(),
+  groups: z.array(AggregatedFindingSchema),
+});
+export type AggregateResponse = z.infer<typeof AggregateResponseSchema>;

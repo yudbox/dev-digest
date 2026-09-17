@@ -14,6 +14,7 @@ What is covered, what is not, and why.
 | `diff` | `flows/diff.json` | Diff view renders for the seeded PR |
 | `onboarding` | `flows/onboarding.json` | Onboarding wizard loads and first step renders |
 | `settings` | `flows/settings.json` | Settings page loads, provider selector visible |
+| `azure-devops` | `specs/08-azure-devops.flow.json` | Settings API Keys renders the Azure DevOps PAT row alongside GitHub (TASK-010/TASK-011) |
 
 ## What Is Not Covered
 
@@ -24,6 +25,7 @@ What is covered, what is not, and why.
 | Importing PRs | Requires GitHub API — non-deterministic |
 | Error states (API down, bad key) | Would require killing the server mid-flow — complex setup |
 | Mobile / responsive layout | agent-browser runs at desktop viewport only |
+| A real Azure DevOps repo end-to-end (add repo → poll PRs → review → publish comment) | Requires a live ADO PAT + a real org/project/repo — non-deterministic, same reasoning as the GitHub "creating a new repo" / "importing PRs" rows above. Covered instead by real-API integration tests (`*.azure-devops.it.test.ts`) run manually with human sign-off, not by this hermetic suite — see SPEC-2026-08-25-azure-devops-integration TASK-011/AC-011-4. |
 
 ## Coverage Principles
 

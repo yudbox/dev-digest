@@ -5,7 +5,9 @@
  *   - CiRepository (own DB tables)
  *   - container.agentsRepo / container.skillsRepo (read-only cross-module)
  *   - assembleFiles (pure generators — no I/O except runner bundle read)
- *   - container.github() (GitHub API adapter)
+ *   - container.vcs() (GitHub API adapter — CI export/ingest is GitHub-only;
+ *     see TASK-009 of SPEC-2026-08-25-azure-devops-integration for the
+ *     `ci_not_supported_for_provider` guard, not yet added in this phase)
  *
  * Onion Architecture: Application layer. No Drizzle queries here — all DB
  * access goes through CiRepository or the shared repos on container.
@@ -21,7 +23,7 @@ import type {
   CiRefreshResult,
 } from "@devdigest/shared";
 import { CiResultArtifact } from "@devdigest/shared";
-import { NotFoundError } from "../../platform/errors.js";
+import { AppError, NotFoundError } from "../../platform/errors.js";
 import { assembleFiles } from "./generators/index.js";
 import type { CiRepository } from "./repository.js";
 import { extractFirstFileFromZip } from "./zip.js";
@@ -30,6 +32,22 @@ import { buildMemorySnapshot } from "../memory/snapshot.js";
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for unit tests)
 // ---------------------------------------------------------------------------
+
+/**
+ * TASK-009/R13 — CI export/ingest generates GitHub Actions workflow files and
+ * talks to `container.vcs({ vcsProvider: "github" })` directly; there is no
+ * Azure Pipelines equivalent (out of scope — see SPEC-2026-08-25). A repo
+ * addressed by an ADO full name must fail with a managed 4xx here, not a
+ * confusing GitHub 404 from the hardcoded github-only call below, and not a
+ * silent empty result.
+ */
+export function ciNotSupportedForProviderError(): AppError {
+  return new AppError(
+    "ci_not_supported_for_provider",
+    "CI export and ingest are only supported for GitHub repositories today (Azure DevOps Pipelines integration is out of scope).",
+    422,
+  );
+}
 
 /**
  * Derive CI run status from artifact presence + finding count.
@@ -89,6 +107,15 @@ export class CiService {
     const agent = await this.container.agentsRepo.getById(workspaceId, agentId);
     if (!agent) throw new NotFoundError("Agent not found");
 
+    // TASK-009/AC-009-6 — fail fast, before assembling anything, if `input.repo`
+    // is a repo registered in this workspace under Azure DevOps.
+    const adoRepo = await this.container.reposRepo.findByFullName(
+      workspaceId,
+      "azure-devops",
+      input.repo,
+    );
+    if (adoRepo) throw ciNotSupportedForProviderError();
+
     // Load linked skills (cross-module read via container.agentsRepo)
     const linkedSkills = await this.container.agentsRepo.linkedSkills(agentId);
     const skills = linkedSkills.map((ls) => ({
@@ -101,8 +128,11 @@ export class CiService {
     // TASK-006: build memory snapshot for the target repo
     let memoryContent = "";
     if (input.repo) {
+      // CI export/ingest is GitHub-only today (Azure Pipelines out of scope —
+      // see TASK-009 of SPEC-2026-08-25-azure-devops-integration).
       const repoRow = await this.container.reposRepo.findByFullName(
         workspaceId,
+        "github",
         input.repo,
       );
       if (repoRow) {
@@ -145,7 +175,7 @@ export class CiService {
     // open_pr path: commit files → open PR → upsert installation
     const [owner, name] = input.repo.split("/") as [string, string];
     const repoRef = { owner, name };
-    const gh = await this.container.github();
+    const gh = await this.container.vcs({ vcsProvider: "github" });
 
     await gh.commitFiles(repoRef, {
       branch: "devdigest/ci",
@@ -234,9 +264,22 @@ export class CiService {
     let ingested = 0;
 
     for (const installation of installations) {
+      // TASK-009/R13 defense-in-depth: `exportCi`'s guard above means no ADO
+      // installation should ever exist, but `ingestAll` batches EVERY
+      // installation in the DB with no per-repo caller to return a 4xx to —
+      // so instead of `listWorkflowRuns` throwing `not_supported` (or, worse,
+      // silently succeeding with an empty run list that looks like "nothing
+      // new"), skip that one installation and keep processing the rest.
+      const adoRepo = await this.container.reposRepo.findByFullName(
+        installation.workspaceId,
+        "azure-devops",
+        installation.repo,
+      );
+      if (adoRepo) continue;
+
       const [owner, name] = installation.repo.split("/") as [string, string];
       const repoRef = { owner, name };
-      const gh = await this.container.github();
+      const gh = await this.container.vcs({ vcsProvider: "github" });
 
       const result = await gh.listWorkflowRuns(repoRef, {
         etag: installation.lastSyncedEtag ?? undefined,

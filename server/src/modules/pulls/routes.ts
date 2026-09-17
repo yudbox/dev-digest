@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type {
   PrMeta,
   PrDetail,
-  GitHubClient,
+  VcsClient,
   PrReviewComment,
   SmartDiff,
 } from "@devdigest/shared";
@@ -13,6 +13,8 @@ import * as t from "../../db/schema.js";
 import { getContext } from "../_shared/context.js";
 import { IdParams } from "../_shared/schemas.js";
 import { AppError, NotFoundError } from "../../platform/errors.js";
+import { tryLoadLocalDiff } from "../_shared/diff/diff-loader.js";
+import { splitUnifiedDiffByFile } from "../_shared/diff/split-by-file.js";
 import {
   deriveReviewStatus,
   rollupSeverities,
@@ -51,9 +53,9 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         );
       if (!repo) throw new NotFoundError("Repo not found");
 
-      let gh: GitHubClient | null = null;
+      let gh: VcsClient | null = null;
       try {
-        gh = await container.github();
+        gh = await container.vcs(repo);
       } catch (err) {
         app.log.warn(
           { err },
@@ -68,6 +70,8 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
           const pulls = await gh.listPullRequests({
             owner: repo.owner,
             name: repo.name,
+            project: repo.project ?? undefined,
+            baseUrl: repo.baseUrl ?? undefined,
           });
           for (const pr of pulls) {
             await container.db
@@ -125,7 +129,12 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         for (const r of needStats) {
           try {
             const detail = await gh.getPullRequest(
-              { owner: repo.owner, name: repo.name },
+              {
+                owner: repo.owner,
+                name: repo.name,
+                project: repo.project ?? undefined,
+                baseUrl: repo.baseUrl ?? undefined,
+              },
               r.number,
             );
             await container.db
@@ -271,15 +280,71 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         .where(eq(t.repos.id, pr.repoId));
       if (!repo) throw new NotFoundError("Repo not found");
 
-      // Local-first: refresh detail from GitHub when a token is configured;
-      // otherwise serve the persisted files/commits/body (seeded or previously
-      // imported) so PR detail works offline.
+      // Local-first: refresh detail from the provider when a token is
+      // configured; otherwise serve the persisted files/commits/body (seeded
+      // or previously imported) so PR detail works offline.
       try {
-        const gh = await container.github();
-        const detail = await gh.getPullRequest(
-          { owner: repo.owner, name: repo.name },
+        const gh = await container.vcs(repo);
+        const providerDetail = await gh.getPullRequest(
+          {
+            owner: repo.owner,
+            name: repo.name,
+            project: repo.project ?? undefined,
+            baseUrl: repo.baseUrl ?? undefined,
+          },
           pr.number,
         );
+
+        // TASK-007 (R25) — diff-first: overlay each provider-reported file's
+        // `patch` (and additions/deletions) with the LOCAL `git diff`'s
+        // version when available. The provider's FILE LIST stays
+        // authoritative — NOT replaced by the local diff's file list.
+        // Empirically confirmed against a real multi-iteration ADO PR (org
+        // GES-IT PR #6327, 9 iterations): a naive two-dot `git diff
+        // base^1..base^2` reports 134 files because it also picks up the
+        // target branch's own unrelated churn since the PR's branch point,
+        // while ADO's `iterations/{id}/changes` and the correct three-dot
+        // `git diff base...head` (this loader's actual `diffRefsFor` — merge-
+        // base semantics, same as the GitHub path) both agree on the TRUE
+        // 7-file PR diff. Trusting the local diff's file list as
+        // authoritative would have silently INFLATED the Files-changed tab
+        // with unrelated files — the provider's list was correct all along;
+        // the only real defect was ADO's `item.path` carrying a leading `/`
+        // that `git diff`'s `+++ b/path` line never has, which prevented ANY
+        // overlay match (fixed in `mappers.ts#stripLeadingSlash`).
+        const local = await tryLoadLocalDiff(container, repo, {
+          number: pr.number,
+          base: providerDetail.base,
+          headSha: providerDetail.head_sha,
+        });
+        const splitPatches = local.diff ? splitUnifiedDiffByFile(local.diff.raw) : null;
+        const localFilesByPath = new Map((local.diff?.files ?? []).map((f) => [f.path, f]));
+
+        const files = providerDetail.files.map((f) => {
+          const splitPatch = splitPatches?.get(f.path);
+          if (splitPatch == null) return f;
+          const localFile = localFilesByPath.get(f.path);
+          return {
+            path: f.path,
+            patch: splitPatch,
+            additions: localFile?.additions ?? f.additions,
+            deletions: localFile?.deletions ?? f.deletions,
+          };
+        });
+        const anyPatchMissing = files.some((f) => !f.patch);
+        const diffUnavailable =
+          anyPatchMissing && local.unavailableReason
+            ? { reason: local.unavailableReason }
+            : undefined;
+
+        const detail: PrDetail = {
+          ...providerDetail,
+          files,
+          files_count: files.length,
+          additions: files.reduce((sum, f) => sum + f.additions, 0),
+          deletions: files.reduce((sum, f) => sum + f.deletions, 0),
+          diff_unavailable: diffUnavailable,
+        };
 
         await container.db.delete(t.prFiles).where(eq(t.prFiles.prId, pr.id));
         if (detail.files.length > 0) {
@@ -394,9 +459,9 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
     async (req): Promise<PrReviewComment[]> => {
       const { workspaceId } = await getContext(container, req);
       const { pr, repo } = await resolvePrAndRepo(req.params.id, workspaceId);
-      let gh: GitHubClient;
+      let gh: VcsClient;
       try {
-        gh = await container.github();
+        gh = await container.vcs(repo);
       } catch (err) {
         app.log.warn(
           { err },
@@ -406,7 +471,12 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
       try {
         return await gh.listReviewComments(
-          { owner: repo.owner, name: repo.name },
+          {
+            owner: repo.owner,
+            name: repo.name,
+            project: repo.project ?? undefined,
+            baseUrl: repo.baseUrl ?? undefined,
+          },
           pr.number,
         );
       } catch (err) {
@@ -426,19 +496,34 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       const { workspaceId } = await getContext(container, req);
       const { pr, repo } = await resolvePrAndRepo(req.params.id, workspaceId);
       const input = req.body;
-      let gh: GitHubClient;
+      let gh: VcsClient;
       try {
-        gh = await container.github();
+        gh = await container.vcs(repo);
       } catch {
         throw new AppError(
-          "github_unavailable",
-          "Connect a GitHub token to post comments.",
+          "vcs_unavailable",
+          repo.vcsProvider === "azure-devops"
+            ? "Connect an Azure DevOps token to post comments."
+            : "Connect a GitHub token to post comments.",
           400,
         );
       }
       try {
-        return await gh.createReviewComment(
-          { owner: repo.owner, name: repo.name },
+        // TASK-008 (SPEC-2026-08-25-azure-devops-integration, Q1):
+        // `publishComment` is the one entrypoint both providers implement —
+        // GitHub's inline-comment path and Azure DevOps' idempotent-thread
+        // path both live behind it. `createReviewComment` still exists on
+        // the port for callers that specifically want a NON-idempotent
+        // create, but this route always wants "publish this finding", so it
+        // calls the shared entrypoint directly rather than picking a
+        // provider-specific method here.
+        return await gh.publishComment(
+          {
+            owner: repo.owner,
+            name: repo.name,
+            project: repo.project ?? undefined,
+            baseUrl: repo.baseUrl ?? undefined,
+          },
           pr.number,
           {
             commitId: pr.headSha,
@@ -452,12 +537,15 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
           },
         );
       } catch (err) {
-        // GitHub rejects comments on lines outside the diff / on closed PRs (422).
+        // GitHub rejects comments on lines outside the diff / on closed PRs
+        // (422); Azure DevOps rejects non-English bodies (ValidationError,
+        // see adapters/azure-devops/threads.ts) and various thread-shape
+        // errors. Either way the provider's own message is the useful part.
         const msg =
           err instanceof Error
             ? err.message
-            : "Failed to post the comment to GitHub.";
-        throw new AppError("github_comment_failed", msg, 400, {
+            : "Failed to post the comment.";
+        throw new AppError("comment_publish_failed", msg, 400, {
           cause: String(err),
         });
       }

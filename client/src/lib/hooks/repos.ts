@@ -3,7 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
-import type { Repo } from "../types";
+import type { Repo, RepoInput } from "../types";
 
 export function useRepos() {
   return useQuery({
@@ -12,10 +12,16 @@ export function useRepos() {
   });
 }
 
+/**
+ * TASK-010 (SPEC-2026-08-25-azure-devops-integration, R51) — `RepoInput` now
+ * carries `vcs_provider`/`base_url` alongside `url`, needed when the server
+ * can't auto-detect the provider from the URL's host (throws
+ * `provider_required`) — see AddRepoView's manual provider picker.
+ */
 export function useAddRepo() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (url: string) => api.post<Repo>("/repos", { url }),
+    mutationFn: (input: RepoInput) => api.post<Repo>("/repos", input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["repos"] }),
   });
 }

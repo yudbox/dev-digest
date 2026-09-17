@@ -204,6 +204,7 @@ describe('platform DTOs', () => {
       Repo.parse({
         id: 'r1',
         workspace_id: 'w1',
+        vcs_provider: 'github',
         owner: 'acme',
         name: 'payments-api',
         full_name: 'acme/payments-api',

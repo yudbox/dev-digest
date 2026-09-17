@@ -5,18 +5,17 @@ import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import evalMessages from "../../../../../../../../messages/en/eval.json";
-import { FindingCard } from "./FindingCard";
 
-vi.mock("../../../../../../lib/hooks/reviews", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../../../../lib/hooks/reviews")>();
-  return {
-    ...actual,
-    useFindingReplies: () => ({ data: undefined, isLoading: false, refetch: vi.fn() }),
-    usePublishFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
-    useEditFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
-    useDeleteFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
-  };
-});
+vi.mock("../../../../../../../lib/hooks/reviews", () => ({
+  useFindingReplies: () => ({ data: undefined, isFetching: false, refetch: vi.fn() }),
+  usePublishFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
+  useEditFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
+  useFindingAction: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreatePrComment: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+import { FindingCard } from "./FindingCard";
 
 afterEach(cleanup);
 

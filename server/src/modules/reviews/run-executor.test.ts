@@ -17,15 +17,18 @@ import { RunBus } from "../../platform/sse.js";
 
 vi.mock("./diff-loader.js", () => ({
   loadDiff: vi.fn().mockResolvedValue({
-    files: [
-      {
-        path: "src/a.ts",
-        additions: 1,
-        deletions: 0,
-        hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 2 }],
-      },
-    ],
-    raw: "diff --git a/src/a.ts b/src/a.ts",
+    diff: {
+      files: [
+        {
+          path: "src/a.ts",
+          additions: 1,
+          deletions: 0,
+          hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 2 }],
+        },
+      ],
+      raw: "diff --git a/src/a.ts b/src/a.ts",
+    },
+    resolvedHeadSha: "deadbeef",
   }),
 }));
 

@@ -1,0 +1,71 @@
+{
+  "_note": "Structural fixture captured empirically in TASK-000 (spike, no product code) against a real Azure DevOps Cloud PR (org GES-IT, project Big_Commerce_Remediation, repo ges-azure-functions, PR #6327) via azure-devops-node-api v17.0.0's GitApi.getPullRequestIterationChanges(). All real file paths, hashes and PAT are redacted/replaced with placeholders — only field names, types, and the exact numeric enum values observed are preserved. See ../SPIKE-NOTES.md for narrative + citations.",
+  "sdkVersion": "azure-devops-node-api@17.0.0",
+  "endpoint": "GET .../pullRequests/{prId}/iterations/{iterationId}/changes?$top=2000&$skip=0",
+  "responseTopLevelKeys": ["changeEntries"],
+  "paginationFieldsObservedOnThisResponse": {
+    "nextTop": "absent (not an own key) — only 7 changed files, below $top=2000",
+    "nextSkip": "absent (not an own key) — same reason",
+    "gotcha": "GitPullRequestIterationChanges declares nextTop?/nextSkip? as optional numbers, but when there is no next page the SDK does not set them to 0 — they are simply omitted (undefined). A pagination loop must check falsiness (`while (result.nextSkip)`), not strict `=== 0`, or it will read `undefined` as 'not yet done' if written as `while (nextSkip !== 0)`."
+  },
+  "changeEntryShape": {
+    "keys": ["changeTrackingId", "changeId", "item", "changeType"],
+    "changeTrackingId": {
+      "present": true,
+      "type": "number",
+      "note": "Present on every entry in this response (values 1,2,3,4,6 — not contiguous, gaps exist because it's a per-PR-lifetime counter across all iterations, not per-page). Confirms AC-000-2 / R21 / R38: changeTrackingId IS available directly on iterations/{id}/changes entries."
+    },
+    "changeType": {
+      "present": true,
+      "type": "number (VersionControlChangeType bitflag enum, NOT a string)",
+      "observedValues": { "1": "Add", "2": "Edit" },
+      "gotcha": "Plan/spec text refers to 'changeType' generically; the real wire value is ADO's numeric VersionControlChangeType enum (Add=1, Edit=2, Delete=16, Rename=8, ...), not a string like 'add'/'edit'. Mapper in TASK-006 must compare against the numeric enum, not a string literal."
+    },
+    "item": {
+      "keys": ["objectId", "originalObjectId (only present on Edit entries)", "path"],
+      "note": "path is a real repo-relative file path (redacted here). objectId = blob SHA of the new content; originalObjectId = blob SHA of the old content (only present when changeType is Edit, i.e. there was a prior version)."
+    }
+  },
+  "pullRequestStatusField": {
+    "restJsonRawValue": "\"active\" (string) — confirmed via GET .../pullrequests/{id}?api-version=7.1 (raw REST)",
+    "sdkValue": "1 (number) — confirmed via GitApi.getPullRequest()",
+    "gotcha": "Raw REST JSON and the azure-devops-node-api SDK disagree on wire shape for the SAME field: the plain REST API returns PullRequestStatus as a lowercase string ('active'/'completed'/'abandoned'), but the SDK's GitPullRequestSimple.status is typed and returned as the numeric PullRequestStatus enum (Active=1, Abandoned=2, Completed=3). Since TASK-006 mandates using the SDK (not hand-rolled REST), the mapper must compare against the numeric enum constants from azure-devops-node-api's GitInterfaces, not against the strings named in the plan's own AC-19 prose."
+  },
+  "threadShape": {
+    "keys": [
+      "pullRequestThreadContext",
+      "id",
+      "publishedDate",
+      "lastUpdatedDate",
+      "comments",
+      "status (sometimes absent)",
+      "threadContext",
+      "properties (sometimes absent)",
+      "identities",
+      "isDeleted",
+      "_links"
+    ],
+    "threadContext_vs_pullRequestThreadContext": {
+      "threadContext": {
+        "presentOn": "7 of 21 real threads on PR #6327",
+        "keys_when_present": ["filePath", "rightFileStart", "rightFileEnd"],
+        "shape": { "rightFileStart": { "line": "number", "offset": "number" }, "rightFileEnd": { "line": "number", "offset": "number" } },
+        "note": "This is the RESOLVED/current position of a file-anchored comment — always populated for line comments regardless of how they were created (UI or API)."
+      },
+      "pullRequestThreadContext": {
+        "presentAsKey": "always (key exists on every thread object)",
+        "valueWhenSet": "9 of 21 threads had a non-null value; 12 were literally null",
+        "shapeWhenSet": {
+          "iterationContext": { "firstComparingIteration": "number", "secondComparingIteration": "number" },
+          "changeTrackingId": "number — OPTIONAL, present on only 2 of the 9 non-null threads"
+        },
+        "gotcha_for_TASK-008": "R-D's plan assumption that 'changeTrackingId lives in pullRequestThreadContext, not threadContext' is CONFIRMED empirically. But changeTrackingId is NOT always present even when pullRequestThreadContext itself is set — iterationContext alone (without changeTrackingId) is the more common case on this real PR's human-authored comments. TASK-008's graceful-degradation path must handle 'pullRequestThreadContext present but no changeTrackingId', not just 'pullRequestThreadContext entirely absent'. All threads inspected here were created by human reviewers via the ADO web UI, not via API — this dataset does NOT demonstrate what DevDigest's own future API-created threads (which would set iterationContext explicitly at creation time) would look like; that remains to be validated live in TASK-008."
+      }
+    },
+    "commentType": {
+      "type": "number (ADO CommentType enum), NOT the string 'text' the spec's AC-35 filter describes",
+      "observedValues": { "1": "Text (real human comment)", "3": "System (auto-generated, e.g. PR update notices)" },
+      "gotcha_for_TASK-008": "Spec's AC-35 says 'filter commentType != \"text\"' assuming a string enum. The real wire/SDK value is numeric: Text=1, CodeChange=2, System=3 (ADO's CommentType enum). The correct filter is `commentType !== CommentType.Text` (i.e. `!== 1`), not a string comparison. This is a literal divergence between the spec's prose and the real API — flagged here per the instruction not to silently paper over it."
+    }
+  }
+}

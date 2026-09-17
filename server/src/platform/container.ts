@@ -1,7 +1,8 @@
 import type {
   AuthProvider,
   SecretsProvider,
-  GitHubClient,
+  VcsClient,
+  VcsProvider,
   GitClient,
   CodeIndex,
   Embedder,
@@ -14,6 +15,7 @@ import { runBus, type RunBus } from "./sse.js";
 import { LocalSecretsProvider } from "../adapters/secrets/local.js";
 import { LocalNoAuthProvider } from "../adapters/auth/local.js";
 import { OctokitGitHubClient } from "../adapters/github/octokit.js";
+import { AzureDevOpsClient } from "../adapters/azure-devops/client.js";
 import { SimpleGitClient } from "../adapters/git/simple-git.js";
 import { RipgrepCodeIndex } from "../adapters/codeindex/ripgrep.js";
 import { OpenAIProvider } from "../adapters/llm/openai.js";
@@ -50,7 +52,18 @@ import { OnboardingService } from "../modules/onboarding/service.js";
 export interface ContainerOverrides {
   secrets?: SecretsProvider;
   auth?: AuthProvider;
-  github?: GitHubClient;
+  /**
+   * @deprecated Use `vcs: { github: ... }` instead. Kept so the many existing
+   * test files that already pass `overrides: { github: new MockGitHubClient() }`
+   * keep compiling AND behaving identically — `Container.vcs()` falls back to
+   * this field when `provider === 'github'` and `vcs.github` wasn't given.
+   */
+  github?: VcsClient;
+  /**
+   * Pre-built VCS clients by provider id (skip secret lookup). The preferred
+   * injection point going forward — `{ vcs: { github: ..., 'azure-devops': ... } }`.
+   */
+  vcs?: Partial<Record<VcsProvider, VcsClient>>;
   git?: GitClient;
   codeIndex?: CodeIndex;
   embedder?: Embedder;
@@ -72,10 +85,11 @@ export class Container {
   readonly runBus: RunBus;
 
   private _git?: GitClient;
-  private _github?: GitHubClient;
   private _codeIndex?: CodeIndex;
   private _embedder?: Embedder;
   private llmCache = new Map<string, LLMProvider>();
+  /** VCS client cache, keyed by `repo.vcsProvider` — same pattern as `llmCache`. */
+  private vcsCache = new Map<string, VcsClient>();
 
   // Shared repositories for cross-cutting entities (agents, reviews/pulls,
   // runs). Constructed here, in the composition root, so consuming modules use
@@ -200,13 +214,46 @@ export class Container {
     return this._priceBook;
   }
 
-  async github(): Promise<GitHubClient> {
-    if (this.overrides.github) return this.overrides.github;
-    if (this._github) return this._github;
-    const token = await this.secrets.get("GITHUB_TOKEN");
-    if (!token) throw new ConfigError("GITHUB_TOKEN is not configured");
-    this._github = new OctokitGitHubClient(token);
-    return this._github;
+  /**
+   * Resolve the `VcsClient` for a repo, dispatching by `repo.vcsProvider` —
+   * same cached-by-key pattern as `llm(id)` below. `repo.vcsProvider` is
+   * typed as `string` here (not the narrower `VcsProvider`) because callers
+   * pass Drizzle `repos` rows straight through: the column is TEXT+CHECK at
+   * the DB layer (see TASK-001), not a TS-level literal union, so widening
+   * the parameter avoids an `as VcsProvider` cast at every call site — the
+   * cast happens once, here, in the composition root.
+   */
+  async vcs(repo: { vcsProvider: string }): Promise<VcsClient> {
+    const provider = repo.vcsProvider as VcsProvider;
+    const injected =
+      this.overrides.vcs?.[provider] ??
+      (provider === "github" ? this.overrides.github : undefined);
+    if (injected) return injected;
+    const cached = this.vcsCache.get(provider);
+    if (cached) return cached;
+    const client = await this.buildVcs(provider);
+    this.vcsCache.set(provider, client);
+    return client;
+  }
+
+  private async buildVcs(provider: VcsProvider): Promise<VcsClient> {
+    if (provider === "github") {
+      const token = await this.secrets.get("GITHUB_TOKEN");
+      if (!token) throw new ConfigError("GITHUB_TOKEN is not configured");
+      return new OctokitGitHubClient(token);
+    }
+    if (provider === "azure-devops") {
+      // TASK-006 — composition root is the ONLY place `new AzureDevOpsClient`
+      // may appear (Architecture Notes: "Composition root неприкосновенен").
+      // Construction takes only the workspace-level PAT — org/baseUrl vary
+      // per repo and are resolved per-call from the `RepoRef` the caller
+      // passes to each `VcsClient` method (see `AzureDevOpsClient`'s own
+      // docstring for why this differs from GitHub's single-host client).
+      const token = await this.secrets.get("AZURE_DEVOPS_TOKEN");
+      if (!token) throw new ConfigError("AZURE_DEVOPS_TOKEN is not configured");
+      return new AzureDevOpsClient(token);
+    }
+    throw new ConfigError(`Unknown vcs_provider: ${provider as string}`);
   }
 
   /** Resolve an LLM provider by id; constructs from the secret key, cached. */
@@ -267,7 +314,7 @@ export class Container {
    */
   invalidateSecretCaches(): void {
     this.llmCache.clear();
-    this._github = undefined;
+    this.vcsCache.clear();
     this._embedder = undefined;
   }
 }

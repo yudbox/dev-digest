@@ -445,7 +445,7 @@ export class EvalsService {
     const repoRow = await this.container.reviewRepo.getRepo(pull.repoId);
     if (!repoRow) throw new NotFoundError('Repo not found for this finding');
 
-    const diff = await loadDiff(this.container, this.container.reviewRepo, workspaceId, pull, repoRow);
+    const { diff } = await loadDiff(this.container, this.container.reviewRepo, workspaceId, pull, repoRow);
     // sliceDiff's own fallback returns the WHOLE raw diff when the file isn't
     // found — that does not match the "file missing → empty input_diff" edge
     // case, so check presence explicitly first.

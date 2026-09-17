@@ -25,8 +25,13 @@ export default async function pollingRoutes(appBase: FastifyInstance) {
       .where(and(eq(t.repos.workspaceId, workspaceId), eq(t.repos.id, req.params.id)));
     if (!repo) throw new NotFoundError('Repo not found');
 
-    const gh = await container.github();
-    const pulls = await gh.listPullRequests({ owner: repo.owner, name: repo.name });
+    const gh = await container.vcs(repo);
+    const pulls = await gh.listPullRequests({
+      owner: repo.owner,
+      name: repo.name,
+      project: repo.project ?? undefined,
+      baseUrl: repo.baseUrl ?? undefined,
+    });
     let synced = 0;
     for (const pr of pulls) {
       await container.db
