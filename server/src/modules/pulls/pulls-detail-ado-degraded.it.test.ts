@@ -11,8 +11,7 @@ import type { PrDetail } from "@devdigest/shared";
  * TASK-007 (AC-007-4) — hermetic (mocked `VcsClient`, real Postgres via
  * testcontainers) coverage of the diff-unavailable degradation path, so this
  * behavior is verified in ordinary CI without requiring a real Azure DevOps
- * PAT (unlike `pulls-detail.azure-devops.it.test.ts`, which covers the
- * happy path against the real API/clone).
+ * PAT.
  */
 const hasDocker = await dockerAvailable();
 const d = hasDocker ? describe : describe.skip;
