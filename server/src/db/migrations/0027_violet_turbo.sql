@@ -1,0 +1,1 @@
+ALTER TABLE "skills" ALTER COLUMN "repo_id" DROP NOT NULL;

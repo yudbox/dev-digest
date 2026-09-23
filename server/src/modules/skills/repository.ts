@@ -21,8 +21,8 @@ export type { SkillRow };
 
 export interface InsertSkill {
   workspaceId: string;
-  /** Optional for the same pre-existing reason as InsertAgent.repoId — see
-   * agents/repository.ts comment. The DB column is NOT NULL (migration 0015). */
+  /** Skills are workspace-level, not repo-scoped (see schema comment) — omit
+   * unless a future feature actually ties a skill to one repo. */
   repoId?: string;
   name: string;
   description: string;
@@ -184,8 +184,7 @@ export class SkillsRepository {
       .insert(t.skills)
       .values({
         workspaceId: values.workspaceId,
-        // repoId: see InsertSkill comment above.
-        repoId: values.repoId!,
+        repoId: values.repoId ?? null,
         name: values.name,
         description: values.description,
         type: values.type as "rubric" | "convention" | "security" | "custom",

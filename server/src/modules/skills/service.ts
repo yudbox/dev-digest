@@ -1,7 +1,5 @@
-import { eq } from "drizzle-orm";
 import type { Container } from "../../platform/container.js";
 import type { Skill, SkillSource, SkillType } from "@devdigest/shared";
-import * as t from "../../db/schema.js";
 import { SkillsRepository } from "./repository.js";
 import type { SkillRow, SkillStats, SkillVersionRow } from "./repository.js";
 import { THREAT_LEVEL } from "./scanner.js";
@@ -81,14 +79,8 @@ export class SkillsService {
   }
 
   async create(workspaceId: string, input: CreateSkillInput): Promise<Skill> {
-    const [repo] = await this.container.db
-      .select({ id: t.repos.id })
-      .from(t.repos)
-      .where(eq(t.repos.workspaceId, workspaceId))
-      .limit(1);
     const row = await this.repo.insert({
       workspaceId,
-      repoId: repo?.id,
       name: input.name,
       description: input.description ?? "",
       type: input.type,
