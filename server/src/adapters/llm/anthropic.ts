@@ -38,12 +38,21 @@ function splitSystem(messages: ChatMessage[]): {
  *   schema, tool_choice forces it), parse tool_use.input, Zod validate + reprompt.
  * - embed: NOT supported (throws) — use the OpenAI Embedder for vectors.
  */
+export interface AnthropicProviderOptions {
+  /** Injected cost estimator; defaults to the static pricing table. Callers
+   *  (the composition root) can wire in `PriceBook.estimate` to fall back to
+   *  live OpenRouter prices for models the static table doesn't know yet. */
+  estimateCost?: (model: string, tokensIn: number, tokensOut: number) => number | null;
+}
+
 export class AnthropicProvider implements LLMProvider {
   readonly id = 'anthropic' as const;
   private client: Anthropic;
+  private estimateCost: (model: string, tokensIn: number, tokensOut: number) => number | null;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, opts: AnthropicProviderOptions = {}) {
     this.client = new Anthropic({ apiKey });
+    this.estimateCost = opts.estimateCost ?? estimateCost;
   }
 
   async listModels(): Promise<ModelInfo[]> {
@@ -82,7 +91,7 @@ export class AnthropicProvider implements LLMProvider {
       model: req.model,
       tokensIn,
       tokensOut,
-      costUsd: estimateCost(req.model, tokensIn, tokensOut),
+      costUsd: this.estimateCost(req.model, tokensIn, tokensOut),
     };
   }
 
@@ -132,7 +141,7 @@ export class AnthropicProvider implements LLMProvider {
           model: req.model,
           tokensIn,
           tokensOut,
-          costUsd: estimateCost(req.model, tokensIn, tokensOut),
+          costUsd: this.estimateCost(req.model, tokensIn, tokensOut),
           raw: lastRaw,
           attempts: attempt,
         };
