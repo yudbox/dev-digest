@@ -157,16 +157,23 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         }
       }
 
-      // Latest-review rollup per PR (score + findings severity counts), so the
-      // list can show a SCORE ring and FINDINGS breakdown. Computed on read from
-      // reviews/findings (no FK denorm); the list is small, so two IN-queries +
-      // JS grouping is cheap.
+      // Latest-review rollup per PR (score) + per-agent-latest findings rollup
+      // (severity totals), so the list can show a SCORE ring and FINDINGS
+      // breakdown. Computed on read from reviews/findings (no FK denorm); the
+      // list is small, so a few IN-queries + JS grouping is cheap.
+      //
+      // `score` reflects the single most-recent review overall (whichever
+      // agent produced it) — unchanged. `findings_*` reflect the SUM across
+      // every unique agent's own most-recent run on this PR (same aggregation
+      // principle as `last_run_cost_usd` below): if agent A ran once (3
+      // findings) and agent B ran three times (latest run: 4 findings), the
+      // list shows 3 + 4 = 7 — one run per agent, not every run ever made.
       const prIds = rows.map((r) => r.id);
       const latestReviewByPr = new Map<
         string,
         { id: string; score: number | null }
       >();
-      const sevByReview = new Map<string, SeverityCounts>();
+      const sevByPr = new Map<string, SeverityCounts>();
       // Total accumulated cost across all agent runs per PR — SUM so errored runs
       // (cost_usd = null) don't zero out the column when they happen to be the latest run.
       const lastRunCostByPr = new Map<string, number | null>();
@@ -193,6 +200,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
           .select({
             id: t.reviews.id,
             prId: t.reviews.prId,
+            agentId: t.reviews.agentId,
             score: t.reviews.score,
           })
           .from(t.reviews)
@@ -200,35 +208,56 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
             and(inArray(t.reviews.prId, prIds), eq(t.reviews.kind, "review")),
           )
           .orderBy(desc(t.reviews.createdAt));
-        // Rows are newest-first → first seen per PR is the latest review.
+        // Rows are newest-first → first seen per PR is the overall latest
+        // review (score); first seen per (PR, agent) pair is that agent's
+        // own latest review (findings aggregation base).
+        const latestReviewIdPerAgent = new Map<string, Map<string, string>>();
         for (const rv of reviewRows) {
           if (!latestReviewByPr.has(rv.prId))
             latestReviewByPr.set(rv.prId, { id: rv.id, score: rv.score });
+
+          const agentKey = rv.agentId ?? "unknown";
+          let byAgent = latestReviewIdPerAgent.get(rv.prId);
+          if (!byAgent) {
+            byAgent = new Map();
+            latestReviewIdPerAgent.set(rv.prId, byAgent);
+          }
+          if (!byAgent.has(agentKey)) byAgent.set(agentKey, rv.id);
         }
-        const latestIds = [...latestReviewByPr.values()].map((v) => v.id);
-        if (latestIds.length > 0) {
+
+        // Flatten to reviewId → prId so findings from every agent's latest
+        // run can be summed back into a single per-PR total.
+        const reviewIdToPrId = new Map<string, string>();
+        for (const [prId, byAgent] of latestReviewIdPerAgent) {
+          for (const reviewId of byAgent.values())
+            reviewIdToPrId.set(reviewId, prId);
+        }
+        const aggregateIds = [...reviewIdToPrId.keys()];
+        if (aggregateIds.length > 0) {
           const findingRows = await container.db
             .select({
               reviewId: t.findings.reviewId,
               severity: t.findings.severity,
             })
             .from(t.findings)
-            .where(inArray(t.findings.reviewId, latestIds));
-          const byReview = new Map<string, { severity: string }[]>();
+            .where(inArray(t.findings.reviewId, aggregateIds));
+          const byPr = new Map<string, { severity: string }[]>();
           for (const f of findingRows) {
-            const list = byReview.get(f.reviewId) ?? [];
+            const prId = reviewIdToPrId.get(f.reviewId);
+            if (!prId) continue;
+            const list = byPr.get(prId) ?? [];
             list.push({ severity: f.severity });
-            byReview.set(f.reviewId, list);
+            byPr.set(prId, list);
           }
-          for (const [reviewId, fs] of byReview)
-            sevByReview.set(reviewId, rollupSeverities(fs));
+          for (const [prId, fs] of byPr)
+            sevByPr.set(prId, rollupSeverities(fs));
         }
       }
 
       const now = Date.now();
       return rows.map((r) => {
         const review = latestReviewByPr.get(r.id);
-        const sev = review ? sevByReview.get(review.id) : undefined;
+        const sev = review ? sevByPr.get(r.id) : undefined;
         return {
           id: r.id,
           number: r.number,
