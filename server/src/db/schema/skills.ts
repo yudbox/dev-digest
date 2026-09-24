@@ -17,9 +17,13 @@ export const skills = pgTable("skills", {
   workspaceId: uuid("workspace_id")
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
-  repoId: uuid("repo_id")
-    .references(() => repos.id, { onDelete: "cascade" })
-    .notNull(),
+  // Skills are workspace-level (the Skills Lab is not scoped to a repo — see
+  // client/CLAUDE.md route map), so repo_id is nullable. It was NOT NULL until
+  // this migration; the service layer never had a real repo to attach a skill
+  // to and was papering over the constraint with an arbitrary "first repo in
+  // the workspace" pick, which produced NULL (and a 500) whenever that lookup
+  // came back empty.
+  repoId: uuid("repo_id").references(() => repos.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description").notNull(),
   type: text("type", {

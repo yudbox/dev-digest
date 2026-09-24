@@ -84,6 +84,14 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     app.log.warn({ err: (err as Error).message }, 'stale-run reaping failed (non-fatal)');
   }
 
+  // Warm the OpenRouter PriceBook before accepting requests. It otherwise
+  // populates lazily on first use (fire-and-forget), which loses the cost on
+  // any review run that lands in the gap right after a (re)start — dev.sh /
+  // `tsx watch` restarts on every file save, so that gap is hit constantly.
+  // `refresh()` never throws (degrades to the static pricing table + null on
+  // failure), so this can't block boot on a bad network/missing key.
+  await container.priceBook.refresh();
+
   // Security headers (X-Content-Type-Options, X-Frame-Options, …). The API
   // serves JSON only, so the default CSP is fine.
   await app.register(helmet);

@@ -25,7 +25,7 @@ What is covered, what is not, and why.
 | Importing PRs | Requires GitHub API — non-deterministic |
 | Error states (API down, bad key) | Would require killing the server mid-flow — complex setup |
 | Mobile / responsive layout | agent-browser runs at desktop viewport only |
-| A real Azure DevOps repo end-to-end (add repo → poll PRs → review → publish comment) | Requires a live ADO PAT + a real org/project/repo — non-deterministic, same reasoning as the GitHub "creating a new repo" / "importing PRs" rows above. Covered instead by real-API integration tests (`*.azure-devops.it.test.ts`) run manually with human sign-off, not by this hermetic suite — see SPEC-2026-08-25-azure-devops-integration TASK-011/AC-011-4. |
+| A real Azure DevOps repo end-to-end (add repo → poll PRs → review → publish comment) | Requires a live ADO PAT + a real org/project/repo — non-deterministic, same reasoning as the GitHub "creating a new repo" / "importing PRs" rows above. Covered by mock-based unit tests of the ADO adapter (`server/src/adapters/azure-devops/*.test.ts`) and the hermetic `pulls-detail-ado-degraded.it.test.ts`. The former real-API `*.azure-devops.it.test.ts` suites were removed (2026-09-23): they read the owner's PAT and wrote threads into a real work PR on every pre-commit run. |
 
 ## Coverage Principles
 
