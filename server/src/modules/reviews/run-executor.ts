@@ -4,7 +4,6 @@ import type {
   Review,
   RunTrace,
   UnifiedDiff,
-  IssueMeta,
   MemoryPulled,
 } from "@devdigest/shared";
 import { reviewPullRequest, countBlockers } from "@devdigest/reviewer-core";
@@ -21,6 +20,7 @@ import { REVIEW_STRATEGY } from "./constants.js";
 import { taskLine } from "./helpers.js";
 import { loadDiff } from "./diff-loader.js";
 import { deriveIntent } from "./intent-deriver.js";
+import { gatherIntentContext } from "./intent-context.js";
 import { resolveFeatureModelStrict } from "../settings/feature-models.js";
 import type { FeatureModelId } from "@devdigest/shared";
 
@@ -136,35 +136,6 @@ export class ReviewRunExecutor {
       return;
     }
 
-    // Best-effort: fetch linked issue for richer intent context.
-    // Parse "Closes #N" / "Fixes #N" / "Resolves #N" from PR body.
-    let linkedIssue: IssueMeta | undefined;
-    if (pull.body) {
-      const m = pull.body.match(/(Closes|Fixes|Resolves)\s+#(\d+)/i);
-      if (m) {
-        const issueNumber = parseInt(m[2]!, 10);
-        try {
-          const gh = await this.container.vcs(repo);
-          linkedIssue = await gh.getIssue(
-            {
-              owner: repo.owner,
-              name: repo.name,
-              project: repo.project ?? undefined,
-              baseUrl: repo.baseUrl ?? undefined,
-            },
-            issueNumber,
-          );
-          runLog.info(
-            `Intent: linked issue #${issueNumber} fetched — "${linkedIssue?.title}"`,
-          );
-        } catch {
-          runLog.info(
-            `Intent: linked issue #${issueNumber} fetch failed — skipping`,
-          );
-        }
-      }
-    }
-
     let intentText: string | undefined;
     try {
       intentText = await runLog.step(
@@ -177,7 +148,14 @@ export class ReviewRunExecutor {
             pull,
             diff,
             runLog,
-            linkedIssue,
+            () =>
+              gatherIntentContext(
+                this.container,
+                repo,
+                pull,
+                resolvedHeadSha,
+                runLog,
+              ),
           ),
         { kind: "tool" },
       );

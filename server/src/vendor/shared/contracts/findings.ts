@@ -68,6 +68,20 @@ export const Finding = z.object({
 });
 export type Finding = z.infer<typeof Finding>;
 
+/**
+ * FindingRecord — a persisted `Finding` row: adds the DB identity + action
+ * timestamps so the UI can render accept/dismiss state and the `review_id`
+ * it belongs to. Used both by `GET /pulls/:id/reviews` and by Smart Diff's
+ * `line_findings` (see `brief.ts`), so both surfaces render the exact same
+ * finding shape.
+ */
+export const FindingRecord = Finding.extend({
+  review_id: z.string(),
+  accepted_at: z.string().nullable(),
+  dismissed_at: z.string().nullable(),
+});
+export type FindingRecord = z.infer<typeof FindingRecord>;
+
 /** Review — the consolidated structured output of a single agent run. */
 export const Review = z.object({
   verdict: Verdict,

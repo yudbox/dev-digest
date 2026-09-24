@@ -3,10 +3,10 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
-import messages from "../../../../../../../../messages/en/prReview.json";
-import evalMessages from "../../../../../../../../messages/en/eval.json";
+import messages from "@messages/en/prReview.json";
+import evalMessages from "@messages/en/eval.json";
 
-vi.mock("../../../../../../../lib/hooks/reviews", () => ({
+vi.mock("@/lib/hooks/reviews", () => ({
   useFindingReplies: () => ({ data: undefined, isFetching: false, refetch: vi.fn() }),
   usePublishFindingReply: () => ({ mutate: vi.fn(), isPending: false }),
   useEditFindingReply: () => ({ mutate: vi.fn(), isPending: false }),

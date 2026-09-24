@@ -149,8 +149,11 @@ export class BriefService {
       }
 
       // Smart-diff stats (no bodies)
-      if (smartDiff?.groups?.length) {
-        const statsLines = smartDiff.groups.map((g) => {
+      // Smart-diff always returns all five groups; empty ones carry no signal
+      // for the Brief prompt, so only groups with files are listed.
+      const nonEmptyGroups = smartDiff?.groups?.filter((g) => g.files.length > 0) ?? [];
+      if (nonEmptyGroups.length) {
+        const statsLines = nonEmptyGroups.map((g) => {
           const files = g.files.length;
           const add = g.files.reduce((s, f) => s + f.additions, 0);
           const del = g.files.reduce((s, f) => s + f.deletions, 0);

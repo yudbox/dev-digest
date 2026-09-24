@@ -3,8 +3,10 @@
 
 import type { SmartDiff, SmartDiffRole } from "@devdigest/shared";
 import {
-  BOILERPLATE_PATTERNS,
-  WIRING_PATTERNS,
+  ROLE_PATTERNS,
+  ROLE_CHECK_ORDER,
+  DEFAULT_ROLE,
+  ROLE_DISPLAY_ORDER,
   TOO_BIG_THRESHOLD,
 } from "./classifier-patterns.js";
 
@@ -17,26 +19,22 @@ export interface ClassifiableFile {
   deletions: number;
 }
 
-/** Classify a single file path into a SmartDiffRole. */
+/** Classify a single file path into a SmartDiffRole: the first role in
+ *  `ROLE_CHECK_ORDER` whose patterns match, else `DEFAULT_ROLE`. All roles,
+ *  patterns and orders live in `classifier-patterns.ts`.
+ *  Pure/deterministic: same path always yields the same role, no I/O. */
 export function classifyFile(path: string): SmartDiffRole {
-  for (const re of BOILERPLATE_PATTERNS) {
-    if (re.test(path)) return "boilerplate";
+  for (const role of ROLE_CHECK_ORDER) {
+    if (ROLE_PATTERNS[role].some((re) => re.test(path))) return role;
   }
-  for (const re of WIRING_PATTERNS) {
-    if (re.test(path)) return "wiring";
-  }
-  return "core";
+  return DEFAULT_ROLE;
 }
-
-const ROLE_ORDER: SmartDiffRole[] = ["core", "wiring", "boilerplate"];
 
 /** Group files by role and produce a SmartDiffBase (no tokens, no finding data). */
 export function buildSmartDiff(files: ClassifiableFile[]): SmartDiffBase {
-  const byRole = new Map<SmartDiffRole, ClassifiableFile[]>([
-    ["core", []],
-    ["wiring", []],
-    ["boilerplate", []],
-  ]);
+  const byRole = new Map<SmartDiffRole, ClassifiableFile[]>(
+    ROLE_DISPLAY_ORDER.map((role) => [role, []]),
+  );
 
   for (const f of files) {
     byRole.get(classifyFile(f.path))!.push(f);
@@ -47,7 +45,9 @@ export function buildSmartDiff(files: ClassifiableFile[]): SmartDiffBase {
     0,
   );
 
-  const groups = ROLE_ORDER.filter((role) => byRole.get(role)!.length > 0).map(
+  // All five groups, always, in display order — an empty group is still
+  // returned (files: []) so the UI can show its role label with "0 files".
+  const groups = ROLE_DISPLAY_ORDER.map(
     (role) => ({
       role,
       files: byRole.get(role)!.map((f) => ({
@@ -55,8 +55,7 @@ export function buildSmartDiff(files: ClassifiableFile[]): SmartDiffBase {
         pseudocode_summary: null,
         additions: f.additions,
         deletions: f.deletions,
-        finding_lines: [] as number[],
-        severity_counts: null,
+        line_findings: null as null,
       })),
     }),
   );

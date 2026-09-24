@@ -24,7 +24,7 @@ import { buildCloneUrl, withVcsToken } from "../../repos/helpers.js";
  * documented cross-module import of a stateless helper.
  */
 
-type RepoRow = typeof schema.repos.$inferSelect;
+export type RepoRow = typeof schema.repos.$inferSelect;
 /** Minimal structural shape needed to reconstruct a diff from persisted
  * `pr_files` — deliberately NOT `ReviewRepository` (a `reviews`-module type),
  * so this shared file has no dependency on any feature module's repository. */
@@ -33,8 +33,10 @@ interface PrFilesReader {
 }
 
 /** Build the provider-aware `RepoRef` (+`provider` discriminator) `GitClient`
- * needs for path resolution (`clonePathFor`) and refspec dispatch. */
-function buildRepoRef(repoRow: RepoRow) {
+ * needs for path resolution (`clonePathFor`) and refspec dispatch. Exported
+ * so `reviews/intent-context.ts` can build the same ref to call
+ * `GitClient.readFileAtRef` for the Intent plan/spec read (AC-41). */
+export function buildRepoRef(repoRow: RepoRow) {
   return {
     owner: repoRow.owner,
     name: repoRow.name,

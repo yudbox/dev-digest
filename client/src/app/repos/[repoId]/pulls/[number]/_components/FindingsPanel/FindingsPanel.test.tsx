@@ -2,13 +2,13 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord, EvalCaseInput } from "@devdigest/shared";
-import messages from "../../../../../../../../messages/en/prReview.json";
-import evalMessages from "../../../../../../../../messages/en/eval.json";
+import messages from "@messages/en/prReview.json";
+import evalMessages from "@messages/en/eval.json";
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
-vi.mock("../../../../../../../lib/hooks/reviews", () => ({
+vi.mock("@/lib/hooks/reviews", () => ({
   useFindingAction: () => ({ mutate: vi.fn(), isPending: false }),
   useCreatePrComment: () => ({ mutate: vi.fn(), isPending: false }),
   useFindingReplies: () => ({ data: undefined, isFetching: false, refetch: vi.fn() }),

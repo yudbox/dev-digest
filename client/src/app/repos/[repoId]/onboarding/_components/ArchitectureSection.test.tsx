@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { ArchitectureSection as ArchitectureSectionType } from "@devdigest/shared";
-import messages from "../../../../../../messages/en/onboarding.json";
+import messages from "@messages/en/onboarding.json";
 
 // MermaidDiagram lazily imports the real `mermaid` package and renders async
 // SVG via ref.innerHTML — mock the component at the boundary so drill-down

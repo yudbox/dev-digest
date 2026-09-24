@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { Agent } from "@devdigest/shared";
-import evalMessages from "../../../../messages/en/eval.json";
+import evalMessages from "@messages/en/eval.json";
 import type { EvalBatchRow } from "../RunsTable/helpers";
 
 vi.mock("next/navigation", () => ({

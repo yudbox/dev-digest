@@ -164,7 +164,12 @@ export function useFindingAction() {
         note ? { note } : reply ? { reply } : undefined,
       ),
     onSuccess: (_d, { prId }) => {
-      if (prId) qc.invalidateQueries({ queryKey: ["reviews", prId] });
+      if (prId) {
+        qc.invalidateQueries({ queryKey: ["reviews", prId] });
+        // AC-26/AC-017: any finding action must refresh the Files-changed
+        // tab's markers/cards/counters too (its only data source).
+        qc.invalidateQueries({ queryKey: ["smart-diff", prId] });
+      }
     },
   });
 }
