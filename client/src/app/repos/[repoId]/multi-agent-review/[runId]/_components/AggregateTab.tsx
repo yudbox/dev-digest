@@ -2,7 +2,7 @@
 
 import React from "react";
 import type { AggregateResponse, AggregatedFinding, MultiAgentRun } from "@devdigest/shared";
-import { useAggregateMutation } from "../../../../../../lib/hooks/reviews";
+import { useAggregateMutation } from "@/lib/hooks/reviews";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface AggregateTabProps {

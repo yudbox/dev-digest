@@ -3,7 +3,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { EvalCase, EvalDashboard } from "@devdigest/shared";
-import evalMessages from "../../../../messages/en/eval.json";
+import evalMessages from "@messages/en/eval.json";
 
 const CASES: EvalCase[] = [
   {

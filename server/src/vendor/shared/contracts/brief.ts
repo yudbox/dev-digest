@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FindingRecord } from "./findings.js";
 
 /**
  * PR Brief building blocks: Intent, Blast radius, Risks, PR History,
@@ -95,7 +96,13 @@ export const PrHistory = z.object({
 export type PrHistory = z.infer<typeof PrHistory>;
 
 // ---- Smart Diff ----
-export const SmartDiffRole = z.enum(["core", "wiring", "boilerplate"]);
+export const SmartDiffRole = z.enum([
+  "core",
+  "tests",
+  "wiring",
+  "docs",
+  "boilerplate",
+]);
 export type SmartDiffRole = z.infer<typeof SmartDiffRole>;
 
 export const SmartDiffFile = z.object({
@@ -103,25 +110,13 @@ export const SmartDiffFile = z.object({
   pseudocode_summary: z.string().nullish(),
   additions: z.number().int(),
   deletions: z.number().int(),
-  finding_lines: z.array(z.number().int()),
-  severity_counts: z
-    .object({
-      critical: z.number().int(),
-      warning: z.number().int(),
-      suggestion: z.number().int(),
-    })
-    .nullish(),
-  /** Per-line findings for inline badges. null = no review has run yet. */
-  line_findings: z
-    .array(
-      z.object({
-        id: z.string(),
-        line: z.number().int(),
-        severity: z.string(),
-        accepted: z.boolean().optional(),
-      }),
-    )
-    .nullish(),
+  /**
+   * All non-dismissed findings of this file from each agent's latest review,
+   * as full FindingRecords (including accepted ones). No per-line reduction —
+   * every finding on a line is included. `null` = no review has run yet for
+   * this PR; `[]` = a review has run but this file has no findings.
+   */
+  line_findings: z.array(FindingRecord).nullable(),
 });
 export type SmartDiffFile = z.infer<typeof SmartDiffFile>;
 

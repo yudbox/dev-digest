@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Finding, Verdict } from './findings';
+import { FindingRecord, Verdict } from './findings';
 import { Intent, SmartDiff } from './brief';
 
 /**
@@ -7,17 +7,11 @@ import { Intent, SmartDiff } from './brief';
  * Review/Finding/Intent/SmartDiff contracts with the persisted/transport shapes
  * the reviewer endpoints return. A2 owns this file; the barrel re-exports it.
  *
- * Distinct from `Finding` (the raw LLM-output unit): `FindingRecord` adds the
- * persisted row identity + action timestamps so the UI can render accept/dismiss
- * state and the `review_id` it belongs to.
+ * `FindingRecord` (the persisted-row shape) lives in `./findings`, next to
+ * `Finding` which it extends — it is also reused by Smart Diff's
+ * `line_findings` (`brief.ts`), so it can't live only here without a circular
+ * `brief.ts` <-> `review-api.ts` import.
  */
-
-export const FindingRecord = Finding.extend({
-  review_id: z.string(),
-  accepted_at: z.string().nullable(),
-  dismissed_at: z.string().nullable(),
-});
-export type FindingRecord = z.infer<typeof FindingRecord>;
 
 /** A persisted review with its kept findings + grounding summary. */
 export const ReviewRecord = z.object({

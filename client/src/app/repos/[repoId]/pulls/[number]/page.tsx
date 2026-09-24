@@ -8,14 +8,14 @@
 import React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Skeleton, ErrorState } from "@devdigest/ui";
-import { AppShell } from "../../../../../components/app-shell";
+import { AppShell } from "@/components/app-shell";
 import { RepoNotFound } from "@/components/repo-not-found";
 import { PrDetailHeader } from "./_components/PrDetailHeader";
 import { OverviewTab } from "./_components/OverviewTab";
 import { FindingsTab } from "./_components/FindingsTab";
 import { DiffTab } from "./_components/DiffTab";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
-import { usePullDetail, usePulls } from "../../../../../lib/hooks";
+import { usePullDetail, usePulls } from "@/lib/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   usePrReviews,
@@ -23,13 +23,13 @@ import {
   usePrActiveRuns,
   usePrRuns,
   useDeleteRun,
-} from "../../../../../lib/hooks/reviews";
+} from "@/lib/hooks/reviews";
 import {
   useActiveRepo,
   useRepoNotFound,
-} from "../../../../../lib/contexts/repoContext";
-import { ApiError } from "../../../../../lib/api";
-import { vcsPrUrl } from "../../../../../lib/utils/vcsUrls";
+} from "@/lib/contexts/repoContext";
+import { ApiError } from "@/lib/api";
+import { vcsPrUrl } from "@/lib/utils/vcsUrls";
 import type { FindingRecord } from "@devdigest/shared";
 
 export default function PRDetailPage() {
@@ -71,6 +71,17 @@ export default function PRDetailPage() {
   const invalidateRunHistory = () => {
     if (prId) qc.invalidateQueries({ queryKey: ["pr-runs", prId] });
   };
+  // When the last live run settles, the new findings must reach Files changed
+  // (group counter, file dots, markers) whichever tab is open — the Findings
+  // tab's own onRunDone only fires while that tab is mounted.
+  const wasRunning = React.useRef(false);
+  React.useEffect(() => {
+    if (wasRunning.current && !reviewRunning && prId) {
+      qc.invalidateQueries({ queryKey: ["smart-diff", prId] });
+      qc.invalidateQueries({ queryKey: ["reviews", prId] });
+    }
+    wasRunning.current = reviewRunning;
+  }, [reviewRunning, prId, qc]);
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
@@ -214,6 +225,8 @@ export default function PRDetailPage() {
             canComment={pr.status === "open"}
             smartOrder={smartOrder}
             onSmartOrderChange={setSmartOrder}
+            repo={activeRepo}
+            headSha={pr.head_sha}
           />
         )}
       </div>

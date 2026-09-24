@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type ShellContext } from "@devdigest/ui";
-import { useTheme } from "../../../lib/contexts/theme";
-import { useActiveRepo } from "../../../lib/contexts/repoContext";
-import { usePulls, useDeleteRepo } from "../../../lib/hooks";
+import { useTheme } from "@/lib/contexts/theme";
+import { useActiveRepo } from "@/lib/contexts/repoContext";
+import { usePulls, useDeleteRepo } from "@/lib/hooks";
 import { activeKeyFor, toShellRepo } from "../helpers";
 
 interface ShellContextOptions {

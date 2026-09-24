@@ -38,8 +38,28 @@ export function PrDetailHeader({
         ? "var(--stale)"
         : "var(--warn)";
 
+  // This header is sticky at top:0 and its height varies (a long PR title
+  // wraps). Publish the live height as `--pr-header-h` so content below that
+  // is also sticky (e.g. Smart Diff group headers) can pin right under it.
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  React.useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const publish = () =>
+      root.style.setProperty("--pr-header-h", `${el.offsetHeight}px`);
+    publish();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--pr-header-h");
+    };
+  }, []);
+
   return (
-    <div style={s.root}>
+    <div ref={rootRef} style={s.root}>
       <div style={s.titleRow}>
         <div style={s.titleCol}>
           <h1 style={s.h1}>

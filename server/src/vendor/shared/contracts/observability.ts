@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { Severity } from './findings.js';
-import { FindingRecord } from './review-api.js';
+import { Severity, FindingRecord } from './findings.js';
 
 /**
  * A5 — Observability / Multi-agent contracts (L07).

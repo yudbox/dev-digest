@@ -2,9 +2,19 @@
  *  Zero LLM calls: reads only from the DB via ReviewRepository. */
 
 import type { SmartDiff } from "@devdigest/shared";
+import { FindingRecord } from "@devdigest/shared";
 import { NotFoundError } from "../../platform/errors.js";
 import type { ReviewRepository } from "../reviews/repository.js";
+import { findingRowToDto } from "../reviews/service.js";
 import { buildSmartDiff } from "./classifier.js";
+
+/** Severity rank used only to order `line_findings` within a file
+ *  (critical first) — this is display ordering, not a filter. */
+const SEVERITY_RANK: Record<string, number> = {
+  CRITICAL: 3,
+  WARNING: 2,
+  SUGGESTION: 1,
+};
 
 export class PullsService {
   constructor(private reviewRepo: ReviewRepository) {}
@@ -21,12 +31,17 @@ export class PullsService {
     // Group files by classifier role (no DB, pure CPU).
     const base = buildSmartDiff(prFiles);
 
-    // Union findings across all latest-per-agent results (AC-52/53).
-    // AC-54: filter out dismissed findings; suppress accepted ones from line badges
-    // so the diff stays clean for already-actioned items.
+    // AC-10: "a review has run" means at least one agent has a latest review
+    // for this PR — NOT "there is at least one finding" (a clean review with
+    // 0 findings must still return `[]`, not `null`, for every file).
+    const hasReview = latestReviewData.length > 0;
+
+    // Union findings across all latest-per-agent results (AC-10), excluding
+    // dismissed ones. Accepted findings ARE included (with their accepted
+    // state) — no per-line reduction, every finding is kept.
     const allFindings = latestReviewData
       .flatMap((r) => r.findings)
-      .filter((f) => !f.dismissedAt); // dismissed → hide entirely
+      .filter((f) => !f.dismissedAt);
     const reviewTokens =
       latestReviewData.find((r) => r.reviewTokens !== null)?.reviewTokens ??
       null;
@@ -39,59 +54,27 @@ export class PullsService {
       findingsByFile.set(f.file, list);
     }
 
-    const hasReview = allFindings.length > 0 || reviewTokens !== null;
-
-    // Enrich each file with finding_lines + severity_counts + line_findings from latest review.
+    // Enrich each file with the full `line_findings` from the latest review.
     const enrichedGroups = base.groups.map((group) => ({
       ...group,
       files: group.files.map((file) => {
         const findings = findingsByFile.get(file.path) ?? [];
-        // Pick the most severe badge per line (critical > warning > suggestion).
-        const severityRank: Record<string, number> = {
-          CRITICAL: 3,
-          WARNING: 2,
-          SUGGESTION: 1,
-        };
-        // AC-54: accepted findings are suppressed from line badges (shown as
-        // "accepted" colour in the diff gutter, not as active warnings).
-        const activeFindings = findings.filter((f) => !f.acceptedAt);
-        const lineMap = new Map<number, { severity: string; id: string; accepted: boolean }>();
-        for (const f of findings) {
-          const isAccepted = !!f.acceptedAt;
-          const existing = lineMap.get(f.startLine);
-          const rank = isAccepted ? 0 : (severityRank[f.severity] ?? 0);
-          const existingRank = existing
-            ? existing.accepted
-              ? 0
-              : (severityRank[existing.severity] ?? 0)
-            : -1;
-          if (!existing || rank > existingRank) {
-            lineMap.set(f.startLine, { severity: f.severity, id: f.id, accepted: isAccepted });
-          }
-        }
+        const lineFindings: FindingRecord[] | null = hasReview
+          ? [...findings]
+              .sort((a, b) => {
+                if (a.startLine !== b.startLine) return a.startLine - b.startLine;
+                const rankDiff =
+                  (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0);
+                if (rankDiff !== 0) return rankDiff;
+                return a.id.localeCompare(b.id);
+              })
+              // Validated + stripped through the FindingRecord response
+              // schema (drops server-only fields like `replied_at`).
+              .map((f) => FindingRecord.parse(findingRowToDto(f)))
+          : null;
         return {
           ...file,
-          finding_lines: [...new Set(activeFindings.map((f) => f.startLine))].sort(
-            (a, b) => a - b,
-          ),
-          severity_counts: hasReview
-            ? {
-                critical: activeFindings.filter((f) => f.severity === "CRITICAL")
-                  .length,
-                warning: activeFindings.filter((f) => f.severity === "WARNING")
-                  .length,
-                suggestion: activeFindings.filter((f) => f.severity === "SUGGESTION")
-                  .length,
-              }
-            : null,
-          line_findings: hasReview
-            ? [...lineMap.entries()].map(([line, { severity, id, accepted }]) => ({
-                id,
-                line,
-                severity,
-                accepted,
-              }))
-            : null,
+          line_findings: lineFindings,
         };
       }),
     }));

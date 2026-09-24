@@ -282,6 +282,21 @@ export class SimpleGitClient implements GitClient {
   async readFile(repo: RepoRef, path: string): Promise<string> {
     return readFile(join(this.clonePathFor(repo), path), 'utf8');
   }
+
+  /** `ref` must be a resolved sha or a local `pr-{n}` ref (optionally
+   *  `^1`/`^2` parent-selected) — never arbitrary user input passed through
+   *  to `git show`. `path` must be relative, with no `..` traversal. */
+  private static readonly REF_PATTERN = /^[0-9a-f]{7,40}$|^pr-\d+(\^\d)?$/;
+
+  async readFileAtRef(repo: VcsRepoRef, ref: string, path: string): Promise<string> {
+    if (!SimpleGitClient.REF_PATTERN.test(ref)) {
+      throw new Error(`readFileAtRef: invalid ref '${ref}'`);
+    }
+    if (path.startsWith('/') || path.includes('..')) {
+      throw new Error(`readFileAtRef: invalid path '${path}'`);
+    }
+    return this.git(repo).show([`${ref}:${path}`]);
+  }
 }
 
 function parseBlamePorcelain(raw: string): BlameLine[] {

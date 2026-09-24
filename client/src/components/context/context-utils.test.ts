@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getDocType, BADGE_COLORS, DOC_TYPE_I18N } from "./context-utils";
-import contextEn from "../../../messages/en/context.json";
+import contextEn from "@messages/en/context.json";
 
 describe("getDocType()", () => {
   // AC-007

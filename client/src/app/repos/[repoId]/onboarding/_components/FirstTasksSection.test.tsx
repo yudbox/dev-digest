@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FirstTask } from "@devdigest/shared";
-import messages from "../../../../../../messages/en/onboarding.json";
+import messages from "@messages/en/onboarding.json";
 import { FirstTasksSection } from "./FirstTasksSection";
 
 afterEach(cleanup);
