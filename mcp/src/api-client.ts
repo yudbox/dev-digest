@@ -27,7 +27,10 @@ export class DevDigestClient {
     method: string,
     path: string,
     body?: unknown,
-  ): Promise<{ ok: true; data: T } | { ok: false; result: McpResult }> {
+  ): Promise<
+    | { ok: true; data: T }
+    | { ok: false; status: number | null; result: McpResult }
+  > {
     const url = `${this.baseUrl}${path}`;
     let response: Response;
 
@@ -40,6 +43,7 @@ export class DevDigestClient {
     } catch {
       return {
         ok: false,
+        status: null,
         result: mcpError(
           `Cannot reach DevDigest API at ${this.baseUrl}. Is the server running?`,
         ),
@@ -48,19 +52,34 @@ export class DevDigestClient {
 
     if (response.status === 404) {
       const text = await response.text().catch(() => "");
-      return { ok: false, result: mcpError(text || `Not found: ${path}`) };
+      return {
+        ok: false,
+        status: 404,
+        result: mcpError(text || `Not found: ${path}`),
+      };
     }
 
     if (!response.ok) {
       return {
         ok: false,
+        status: response.status,
         result: mcpError(
           `DevDigest API error: ${response.status}. Check server logs.`,
         ),
       };
     }
 
-    const data = (await response.json()) as T;
-    return { ok: true, data };
+    try {
+      const data = (await response.json()) as T;
+      return { ok: true, data };
+    } catch {
+      return {
+        ok: false,
+        status: response.status,
+        result: mcpError(
+          `DevDigest API at ${this.baseUrl} returned invalid JSON for ${path}.`,
+        ),
+      };
+    }
   }
 }

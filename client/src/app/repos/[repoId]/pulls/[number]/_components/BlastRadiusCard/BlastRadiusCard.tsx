@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type { BlastRadiusResult } from "@devdigest/shared";
+import type { VcsUrlRepo } from "@/lib/utils/vcsUrls";
 import { SummaryBar } from "./SummaryBar";
 import { SymbolList } from "./SymbolList";
 import { PriorPrsAccordion } from "./PriorPrsAccordion";
@@ -13,16 +13,21 @@ import { buildCronSet, buildSymbolRows } from "./helpers";
 interface BlastRadiusCardProps {
   blastRadius: BlastRadiusResult | undefined;
   isLoading: boolean;
+  /** Repo + PR head sha for caller deep-links; links are omitted while absent. */
+  repo?: VcsUrlRepo | null;
+  headSha?: string | null;
   className?: string;
 }
 
 export function BlastRadiusCard({
   blastRadius,
   isLoading,
+  repo,
+  headSha,
   className = "",
 }: BlastRadiusCardProps) {
   const t = useTranslations("prReview.blastRadius");
-  const params = useParams<{ repoId: string; number: string }>();
+  const tb = useTranslations("blast");
   const [graphOpen, setGraphOpen] = useState(false);
 
   if (isLoading) {
@@ -66,6 +71,7 @@ export function BlastRadiusCard({
         endpointCount={blastRadius.impactedEndpoints.length}
         cronCount={cronSet.size}
         degraded={blastRadius.degraded ?? false}
+        reason={blastRadius.reason}
         onOpenGraph={() => setGraphOpen(true)}
       />
 
@@ -75,12 +81,14 @@ export function BlastRadiusCard({
         </p>
       )}
 
+      {!blastRadius.degraded && blastRadius.callers.length === 0 && (
+        <p className="m-0 text-xs text-[var(--text-muted)]">
+          {tb("noDownstream", { count: blastRadius.changedSymbols.length })}
+        </p>
+      )}
+
       <div className="flex-1 overflow-y-auto">
-        <SymbolList
-          rows={symbolRows}
-          repoId={params.repoId}
-          prNumber={params.number}
-        />
+        <SymbolList rows={symbolRows} repo={repo} headSha={headSha} />
       </div>
 
       <PriorPrsAccordion priorPrs={blastRadius.priorPrs ?? []} />

@@ -13,6 +13,7 @@ import {
 } from "@/lib/hooks/pulls";
 import { usePrRuns, usePrReviews } from "@/lib/hooks/reviews";
 import type { RunSummary } from "@devdigest/shared";
+import type { VcsUrlRepo } from "@/lib/utils/vcsUrls";
 import { BlastRadiusCard } from "../BlastRadiusCard";
 import { BriefCard } from "../BriefCard";
 import { ReviewFocusList } from "../BriefCard/ReviewFocusList";
@@ -23,9 +24,12 @@ import type { CSSProperties } from "react";
 interface OverviewTabProps {
   prBody: string | null | undefined;
   prId: string | null | undefined;
+  /** Repo + PR head sha — used to deep-link blast-radius callers to the VCS. */
+  repo?: VcsUrlRepo | null;
+  headSha?: string | null;
 }
 
-export function OverviewTab({ prBody, prId }: OverviewTabProps) {
+export function OverviewTab({ prBody, prId, repo, headSha }: OverviewTabProps) {
   const { repoId, number } = useParams<{ repoId: string; number: string }>();
   const router = useRouter();
   const { data: intent, isLoading } = usePullIntent(prId);
@@ -108,6 +112,8 @@ export function OverviewTab({ prBody, prId }: OverviewTabProps) {
             <BlastRadiusCard
               blastRadius={blastRadius}
               isLoading={blastLoading}
+              repo={repo}
+              headSha={headSha}
               className="flex-1 overflow-y-auto"
             />
           </ErrorBoundary>

@@ -1,8 +1,7 @@
 import type { Container } from "../../platform/container.js";
-import type { BlastRadiusResult, Provider } from "@devdigest/shared";
+import type { BlastRadiusResult } from "@devdigest/shared";
 import { NotFoundError } from "../../platform/errors.js";
 import { BlastRepository } from "./repository.js";
-import { resolveFeatureModelStrict } from "../settings/feature-models.js";
 
 export class BlastService {
   private readonly repo: BlastRepository;
@@ -28,6 +27,7 @@ export class BlastService {
         impactedEndpoints: [],
         degraded: true,
         reason: "no_data",
+        summary: buildSummary(0, 0, 0, 0),
       };
     }
 
@@ -58,34 +58,26 @@ export class BlastService {
       }),
     );
 
-    let summary: string | undefined;
-    try {
-      const { provider, model } = await resolveFeatureModelStrict(
-        this.container,
-        workspaceId,
-        "review_intent",
-      );
-      const llm = await this.container.llm(provider as Provider);
-      const result = await llm.complete({
-        model,
-        messages: [
-          {
-            role: "system",
-            content: "You summarize code impact maps in one concise sentence.",
-          },
-          {
-            role: "user",
-            content: `Blast radius: ${blastResult.changedSymbols.map((s) => s.name).join(", ")} changed. ${blastResult.callers.length} callers, ${blastResult.impactedEndpoints.length} endpoints affected. Summarize in one sentence.`,
-          },
-        ],
-        maxTokens: 150,
-        temperature: 0.2,
-      });
-      summary = result.text.trim();
-    } catch {
-      // LLM failure must not block the response
-    }
+    const cronCount = new Set(
+      Object.values(blastResult.factsByFile ?? {}).flatMap((f) => f.crons),
+    ).size;
+    const summary = buildSummary(
+      blastResult.changedSymbols.length,
+      blastResult.callers.length,
+      blastResult.impactedEndpoints.length,
+      cronCount,
+    );
 
     return { ...blastResult, priorPrs, summary };
   }
+}
+
+/** Deterministic one-line summary built from the map's counts — no LLM. */
+function buildSummary(
+  symbols: number,
+  callers: number,
+  endpoints: number,
+  crons: number,
+): string {
+  return `${symbols} symbols · ${callers} callers · ${endpoints} endpoints · ${crons} crons`;
 }

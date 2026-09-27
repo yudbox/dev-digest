@@ -20,9 +20,10 @@ export async function getConventions(
     `/repos/${repo_id}/conventions`,
   );
 
-  if (!result.ok) {
+  if (!result.ok && result.status === 404) {
     return mcpError(`Repository '${repo_id}' not found. Check the repo_id.`);
   }
+  if (!result.ok) return result.result;
 
   const conventions = result.data
     .filter((c) => c.accepted === true)

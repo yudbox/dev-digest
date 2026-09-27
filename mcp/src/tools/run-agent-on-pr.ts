@@ -51,11 +51,12 @@ export async function runAgentOnPr(
     "GET",
     `/agents/${agent_id}`,
   );
-  if (!agentCheck.ok) {
+  if (!agentCheck.ok && agentCheck.status === 404) {
     return mcpError(
       `Agent '${agent_id}' not found. Call list_agents to get valid IDs.`,
     );
   }
+  if (!agentCheck.ok) return agentCheck.result;
 
   // Step 1: POST /pulls/:pr_id/review { agentId }
   const startResult = await client.request<{ runs: Array<{ run_id: string }> }>(
@@ -64,12 +65,13 @@ export async function runAgentOnPr(
     { agentId: agent_id },
   );
 
-  if (!startResult.ok) {
+  if (!startResult.ok && startResult.status === 404) {
     // Agent was pre-validated above; any 404 here is the PR not found
     return mcpError(
       `PR '${pr_id}' not found. Check the pr_id or import PRs via the DevDigest UI.`,
     );
   }
+  if (!startResult.ok) return startResult.result;
 
   const runId = startResult.data.runs[0]?.run_id;
   if (!runId) {
@@ -97,6 +99,9 @@ export async function runAgentOnPr(
       traceData = traceResult.data;
       break;
     }
+
+    // API went away mid-poll — surface it now instead of spinning to timeout.
+    if (traceResult.status === null) return traceResult.result;
 
     // 404 = trace not yet written (still running OR failed).
     // Check run status to detect failure early.
