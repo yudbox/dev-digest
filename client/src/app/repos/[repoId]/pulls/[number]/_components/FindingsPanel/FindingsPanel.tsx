@@ -6,10 +6,9 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Toggle, EmptyState, SEV, Icon } from "@devdigest/ui";
-import type { FindingRecord, Severity, EvalCaseInput } from "@devdigest/shared";
-import { FindingCard } from "../FindingCard";
-import { useFindingAction, useCreatePrComment } from "../../../../../../../lib/hooks/reviews";
-import { usePrefillEvalCase } from "@/lib/hooks/evals";
+import type { FindingRecord, Severity } from "@devdigest/shared";
+import { FindingCard } from "@/components/findings/FindingCard";
+import { useFindingCardController } from "@/components/findings/useFindingCardController";
 import { EvalCaseModal } from "@/components/evals/EvalCaseModal";
 import { KEY_TO_ACTION, SEVERITY_FILTERS } from "./constants";
 import { visibleFindings } from "./helpers";
@@ -28,8 +27,7 @@ export function FindingsPanel({
   headSha?: string | null;
 }) {
   const t = useTranslations("prReview");
-  const action = useFindingAction();
-  const postComment = useCreatePrComment(prId);
+  const controller = useFindingCardController(prId);
   const searchParams = useSearchParams();
   const targetFindingId = searchParams.get("finding");
   const [hideLow, setHideLow] = React.useState(false);
@@ -37,10 +35,6 @@ export function FindingsPanel({
     null,
   );
   const [focusIdx, setFocusIdx] = React.useState(0);
-  const prefillEvalCase = usePrefillEvalCase();
-  const [evalPrefill, setEvalPrefill] = React.useState<EvalCaseInput | null>(
-    null,
-  );
 
   const counts = React.useMemo(
     () => ({
@@ -64,23 +58,19 @@ export function FindingsPanel({
       if (e.key === "j") setFocusIdx((i) => Math.min(i + 1, shown.length - 1));
       else if (e.key === "k") setFocusIdx((i) => Math.max(i - 1, 0));
       else if (KEY_TO_ACTION[e.key] && shown[focusIdx]) {
-        action.mutate({
-          findingId: shown[focusIdx]!.id,
-          action: KEY_TO_ACTION[e.key]!,
-          prId,
-        });
+        controller.onAction(shown[focusIdx]!)(KEY_TO_ACTION[e.key]!);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [shown, focusIdx, action, prId]);
+  }, [shown, focusIdx, controller]);
 
   return (
     <div>
-      {evalPrefill && (
+      {controller.evalPrefill && (
         <EvalCaseModal
-          prefill={evalPrefill}
-          onClose={() => setEvalPrefill(null)}
+          prefill={controller.evalPrefill}
+          onClose={controller.closeEval}
         />
       )}
       <div style={s.toolbar}>
@@ -125,31 +115,11 @@ export function FindingsPanel({
               focused={i === focusIdx}
               targeted={f.id === targetFindingId}
               defaultExpanded={i === 0}
-              pending={action.isPending && action.variables?.findingId === f.id}
+              pending={controller.isPending(f.id)}
               repo={repo}
               headSha={headSha}
-              onAction={(act, extra) => {
-                action.mutate({
-                  findingId: f.id,
-                  action: act,
-                  prId,
-                  note: extra?.note,
-                  reply: extra?.reply,
-                });
-                // AC-37: post inline GitHub comment when user replies to author
-                if (act === "reply" && extra?.reply) {
-                  postComment.mutate({
-                    path: f.file,
-                    line: f.start_line,
-                    body: extra.reply,
-                  });
-                }
-              }}
-              onCreateEvalCase={(finding) =>
-                prefillEvalCase.mutate(finding.id, {
-                  onSuccess: (input) => setEvalPrefill(input),
-                })
-              }
+              onAction={controller.onAction(f)}
+              onCreateEvalCase={controller.onCreateEvalCase}
             />
           ))
         )}

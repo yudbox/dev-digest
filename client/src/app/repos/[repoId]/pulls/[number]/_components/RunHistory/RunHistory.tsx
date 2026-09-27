@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
 import { Severity, type RunSummary, type PrCommit, type ReviewRecord } from "@devdigest/shared";
 import { SeverityChip } from "@/components/SeverityChip/SeverityChip";
-import { FindingsPopover } from "../../../_components/FindingsPopover/FindingsPopover";
+import { FindingsPopover } from "@/app/repos/[repoId]/pulls/_components/FindingsPopover/FindingsPopover";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first

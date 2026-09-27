@@ -10,7 +10,7 @@ import { Icon, Badge } from "@devdigest/ui";
 import { Severity, type ReviewRecord, type Verdict } from "@devdigest/shared";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
-import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
+import { useDeleteReview } from "@/lib/hooks/reviews";
 import type { VcsUrlRepo } from "@/lib/utils";
 
 const VERDICT_COLOR: Record<string, string> = {

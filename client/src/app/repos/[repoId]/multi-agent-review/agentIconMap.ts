@@ -1,6 +1,6 @@
 /* agentIconMap — keyword→icon mapping for agent tiles (AC-12).
    Pure function, unit-testable. Matches the first keyword in name/description. */
-import type { IconName } from "../../../../vendor/ui/icons";
+import type { IconName } from "@/vendor/ui/icons";
 
 const KEYWORD_MAP: [RegExp, IconName][] = [
   [/security|vuln|owasp|secret|pentest/i, "Shield"],

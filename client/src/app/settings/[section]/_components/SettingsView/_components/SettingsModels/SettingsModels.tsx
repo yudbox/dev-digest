@@ -6,13 +6,13 @@ import { FormField, SearchableSelect, Icon } from "@devdigest/ui";
 import {
   useFeatureModels,
   useUpdateSettings,
-} from "../../../../../../../lib/hooks";
-import { useProviderModels } from "../../../../../../../lib/hooks/agents";
-import { toModelOptions } from "../../../../../../../lib/utils/modelLabel";
+} from "@/lib/hooks";
+import { useProviderModels } from "@/lib/hooks/agents";
+import { toModelOptions } from "@/lib/utils/modelLabel";
 import type {
   FeatureModelId,
   ResolvedFeatureModel,
-} from "../../../../../../../lib/types";
+} from "@/lib/types";
 import { SectionTitle } from "../SectionTitle";
 import { s } from "./styles";
 

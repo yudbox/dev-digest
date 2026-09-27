@@ -17,6 +17,7 @@ import { reviewToDto } from "./helpers.js";
 import { RunLogger } from "../../platform/run-logger.js";
 import { loadDiff } from "./diff-loader.js";
 import { deriveIntent } from "./intent-deriver.js";
+import { gatherIntentContext } from "./intent-context.js";
 
 // Re-export DTO types + converters for backward-compatible imports from
 // './service.js' (these previously lived here; logic now in ./helpers.ts).
@@ -242,7 +243,10 @@ export class ReviewService {
       repo,
     );
     const runLog = new RunLogger(this.container.runBus, [], logger, { prId });
-    // forceRecalculate=true bypasses the headSha cache check
+    // forceRecalculate=true bypasses the headSha cache check. This call site
+    // (unlike run-executor's) has no `resolvedHeadSha` from a just-completed
+    // `fetchPullHead` — best effort with `pull.headSha` (Q13): if that commit
+    // isn't present locally, the plan read fails and the note explains why.
     return deriveIntent(
       this.container,
       this.repo,
@@ -250,7 +254,7 @@ export class ReviewService {
       pull,
       diff,
       runLog,
-      undefined,
+      () => gatherIntentContext(this.container, repo, pull, pull.headSha, runLog),
       true,
     );
   }

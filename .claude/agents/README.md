@@ -279,6 +279,47 @@ Fix:      <конкретный фикс одной строкой>
 
 ---
 
+### `security-reviewer.md`
+
+**Триггер:** security review — поиск эксплуатируемых уязвимостей, OWASP Top 10.
+
+**Модель:** `sonnet`
+
+**Tools:** `Read`, `Grep`, `Glob`, `Bash`, `Skill` — **без Write/Edit**
+
+**Skills preloaded:** `security`
+
+**Формат вывода:**
+```
+FINDING [CRITICAL|HIGH|MEDIUM] — <класс уязвимости>
+File:     <path>:<line>
+OWASP:    <категория>
+Exploit:  <конкретный сценарий эксплойта>
+Fix:      <конкретный фикс одной строкой>
+```
+
+**Ограничения:** READ-ONLY — NEVER пишет и не предлагает код, только диагностика + severity.
+
+---
+
+### `brainstorm.md`
+
+**Триггер:** сравнение вариантов реализации до принятия решения — архитектурный выбор, выбор библиотеки, форма данных.
+
+**Модель:** `sonnet`
+
+**Tools:** `Read`, `Grep`, `Glob` — read-only, без `Skill` (`skills:` не задан)
+
+**Что делает:**
+1. `STEP 0` — уточняет саму формулировку решения и кандидатов
+2. `STEP 1` — заземляет каждый вариант в реальном коде (`Grep`/`Read`), а не в общих рассуждениях
+3. `STEP 2` — таблица сравнения: approach / pros / cons / cost / risk
+4. `STEP 3` — рекомендация одним вариантом + открытые вопросы
+
+**Ограничения:** NEVER пишет код, NEVER редактирует файлы, NEVER рекомендует вариант без заземления в STEP 1.
+
+---
+
 ## Все скилы проекта
 
 | Скил | Назначение | Кто использует |
@@ -293,7 +334,7 @@ Fix:      <конкретный фикс одной строкой>
 | `react-best-practices` | React 19: компоненты, хуки, state, performance, anti-patterns. | planner (on-demand), implementer UI (on-demand), architecture-reviewer (on-demand), **test-writer (on-demand)**, doc-writer (on-demand) |
 | `react-testing-library` | RTL + Vitest: query priority, userEvent, async patterns, mocking. | implementer UI (on-demand, Phase 4), **test-writer (preload)** |
 | `typescript-expert` | TypeScript: type-level programming, generics, utility types, strict mode. | implementer (preload, оба scope), **architecture-reviewer (preload)**, **test-writer (preload)** |
-| `security` | OWASP Top 10: XSS, CSRF, injection, auth, secrets management. | implementer (preload, оба scope), **architecture-reviewer (preload)**, **test-writer (on-demand)** |
+| `security` | OWASP Top 10: XSS, CSRF, injection, auth, secrets management. | implementer (preload, оба scope), **architecture-reviewer (preload)**, **test-writer (on-demand)**, **security-reviewer (preload)** |
 | `mermaid-diagram` | Mermaid: flowchart, sequence, classDiagram, ER, stateDiagram. | planner (preload, для диаграмм в планах), **doc-writer (preload)** |
 | `engineering-insights` | Запись открытий и паттернов в `*/insights/INSIGHTS.md`. | implementer (on-demand, конец сессии) |
 | `pr-self-review` | Оркестратор ревью: diff → buckets → sub-agents → merge gate. Официальный гейт. | implementer вызывает в конце на `git diff $START_SHA...HEAD` |

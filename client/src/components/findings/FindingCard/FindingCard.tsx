@@ -20,14 +20,14 @@ import {
 import type { FindingRecord, FindingActionKind, FindingReply } from "@devdigest/shared";
 import { SEV_COLOR, SEV_COLOR_FALLBACK } from "./constants";
 import { lineLabel } from "./helpers";
-import { vcsBlobUrl, type VcsUrlRepo } from "../../../../../../../lib/utils/vcsUrls";
+import { vcsBlobUrl, type VcsUrlRepo } from "@/lib/utils/vcsUrls";
 import { s } from "./styles";
 import {
   useFindingReplies,
   usePublishFindingReply,
   useEditFindingReply,
   useDeleteFindingReply,
-} from "../../../../../../../lib/hooks/reviews";
+} from "@/lib/hooks/reviews";
 
 function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();

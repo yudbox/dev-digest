@@ -380,11 +380,15 @@ export interface MockGitOptions {
   head?: string;
   /** Head `currentHead()` returns AFTER `sync()` runs — simulates fetch+reset advancing HEAD. */
   syncedHead?: string;
+  /** Fixtures for `readFileAtRef`, keyed `` `${ref}:${path}` ``. Missing key → throws "not found". */
+  filesAtRef?: Record<string, string>;
 }
 
 export class MockGitClient implements GitClient {
   public cloned: { repo: RepoRef; url: string }[] = [];
   public syncs: { repo: RepoRef; branch: string }[] = [];
+  /** Records every `readFileAtRef` call — tests assert "not called" (e.g. AC-42). */
+  public readFileAtRefCalls: { repo: RepoRef; ref: string; path: string }[] = [];
   private syncedHead?: string;
 
   constructor(private opts: MockGitOptions = {}) {}
@@ -444,6 +448,13 @@ export class MockGitClient implements GitClient {
   }
   async readFile(_repo: RepoRef, path: string): Promise<string> {
     return this.opts.files?.[path] ?? "";
+  }
+  async readFileAtRef(repo: RepoRef, ref: string, path: string): Promise<string> {
+    this.readFileAtRefCalls.push({ repo, ref, path });
+    const key = `${ref}:${path}`;
+    const content = this.opts.filesAtRef?.[key];
+    if (content === undefined) throw new Error("not found");
+    return content;
   }
 }
 

@@ -1,9 +1,10 @@
 /* CodeLine — one rendered diff line: gutter number, +/- sign, text, plus the
-   hover "+" affordance, any anchored comment threads, and an inline composer. */
+   hover "+" affordance, any anchored comment threads, an inline composer, and
+   (SPEC-2026-09-23-smart-diff-hw3-upgrade) one stacked FindingMarker per
+   finding on this line with its InlineFindingCard opening in place below. */
 "use client";
 
 import React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import {
   commentTargetFor,
   type CommentThread,
@@ -14,68 +15,37 @@ import { type Line } from "../helpers";
 import { s, lineRowFor, lineSignFor } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
-
-const BADGE_STYLE: Record<string, React.CSSProperties> = {
-  CRITICAL: {
-    color: "#ef4444",
-    fontSize: 11,
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-    paddingLeft: 8,
-    userSelect: "none",
-  },
-  WARNING: {
-    color: "#f97316",
-    fontSize: 11,
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-    paddingLeft: 8,
-    userSelect: "none",
-  },
-  SUGGESTION: {
-    color: "#3b82f6",
-    fontSize: 11,
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-    paddingLeft: 8,
-    userSelect: "none",
-  },
-};
-const BADGE_LABEL: Record<string, string> = {
-  CRITICAL: "⊘ blocker",
-  WARNING: "△ warning",
-  SUGGESTION: "◇ suggestion",
-};
-const BADGE_BORDER: Record<string, string> = {
-  CRITICAL: "#ef4444",
-  WARNING: "#f97316",
-  SUGGESTION: "#3b82f6",
-};
-const BADGE_BG: Record<string, string> = {
-  CRITICAL: "rgba(239, 68, 68, 0.06)",
-  WARNING: "rgba(249, 115, 22, 0.06)",
-  SUGGESTION: "rgba(59, 130, 246, 0.06)",
-};
+import { FindingMarker } from "../FindingMarker";
+import { InlineFindingCard } from "../InlineFindingCard";
+import { mostSevereActive, type DiffFindingsApi } from "../findings";
+import type { FindingRecord } from "@devdigest/shared";
+import { SEV } from "@devdigest/ui";
 
 export function CodeLine({
   ln,
   path,
   threads,
   commenting,
-  badge,
+  lineFindings,
+  findings,
   targetLine,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
-  badge?: { severity: string; findingId: string; accepted?: boolean };
+  /** Findings anchored to this rendered line (already resolved by FileCard —
+   *  never present on a line with no new-side line number, AC-30). */
+  lineFindings?: FindingRecord[];
+  findings?: DiffFindingsApi;
   targetLine?: number;
 }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
+  // Cards closed by default; independent per finding, on this line only
+  // (AC-21). Not reset by `showComments` — markers/cards are never gated by
+  // it (AC-19).
+  const [openIds, setOpenIds] = React.useState<Set<string>>(new Set());
 
   if (ln.kind === "hunk") {
     return (
@@ -90,6 +60,31 @@ export function CodeLine({
   const showAdd = hover && !!target && !composing;
   const lineNo = ln.newNo ?? ln.oldNo;
   const isTarget = targetLine !== undefined && lineNo === targetLine;
+
+  const toggleFinding = (id: string) =>
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const openFindings = (lineFindings ?? []).filter((f) => openIds.has(f.id));
+
+  // Full-width row tint for a line that carries findings: a 3px severity bar on
+  // the left + a translucent severity background, coloured by the line's most
+  // severe ACTIVE finding. Accepted-only lines keep a neutral bar, no tint.
+  const tintFinding =
+    lineFindings && lineFindings.length > 0 ? mostSevereActive(lineFindings) : null;
+  const rowTint: React.CSSProperties =
+    tintFinding && SEV[tintFinding.severity]
+      ? {
+          borderLeft: `3px solid ${SEV[tintFinding.severity].c}`,
+          background: SEV[tintFinding.severity].bg,
+        }
+      : lineFindings && lineFindings.length > 0
+        ? { borderLeft: "3px solid var(--border)" }
+        : {};
 
   return (
     <div
@@ -109,13 +104,7 @@ export function CodeLine({
                 outline: "1px solid var(--accent-text)",
               }
             : {}),
-          ...(badge && BADGE_BORDER[badge.severity]
-            ? {
-                borderLeft: `3px solid ${badge.accepted ? "var(--border)" : BADGE_BORDER[badge.severity]}`,
-                background: badge.accepted ? "transparent" : BADGE_BG[badge.severity],
-                opacity: badge.accepted ? 0.45 : 1,
-              }
-            : {}),
+          ...rowTint,
         }}
       >
         <span
@@ -141,24 +130,17 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
-        {badge && BADGE_STYLE[badge.severity] && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              const sp = new URLSearchParams(searchParams.toString());
-              sp.set("tab", "findings");
-              sp.set("finding", badge.findingId);
-              router.push(`?${sp.toString()}`);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") e.currentTarget.click();
-            }}
-            style={{ ...BADGE_STYLE[badge.severity], cursor: badge.accepted ? "default" : "pointer", opacity: badge.accepted ? 0.45 : 1 }}
-          >
-            {BADGE_LABEL[badge.severity] ?? badge.severity.toLowerCase()}
-          </span>
+        {lineFindings && lineFindings.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 8 }}>
+            {lineFindings.map((f) => (
+              <FindingMarker
+                key={f.id}
+                f={f}
+                open={openIds.has(f.id)}
+                onClick={() => toggleFinding(f.id)}
+              />
+            ))}
+          </div>
         )}
       </div>
 
@@ -182,6 +164,13 @@ export function CodeLine({
           onClose={() => setComposing(false)}
         />
       )}
+
+      {findings &&
+        openFindings.map((f) => (
+          <div key={f.id} style={{ margin: "6px 14px 8px 58px" }}>
+            <InlineFindingCard f={f} api={findings} />
+          </div>
+        ))}
     </div>
   );
 }

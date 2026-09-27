@@ -3,10 +3,10 @@
 
 import React from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useMultiAgentRuns } from "../../../../lib/hooks/reviews";
+import { useMultiAgentRuns } from "@/lib/hooks/reviews";
 import type { MultiAgentRunSummary } from "@devdigest/shared";
 import { Icon } from "@devdigest/ui";
-import { AppShell } from "../../../../components/app-shell";
+import { AppShell } from "@/components/app-shell";
 
 function statusColor(s: MultiAgentRunSummary["status"]) {
   if (s === "running") return "var(--accent-text, #4f9cf9)";

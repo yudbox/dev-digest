@@ -3,8 +3,8 @@ import { render, screen, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { EvalCase } from "@devdigest/shared";
-import evalMessages from "../../../../messages/en/eval.json";
-import commonMessages from "../../../../messages/en/common.json";
+import evalMessages from "@messages/en/eval.json";
+import commonMessages from "@messages/en/common.json";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),

@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   useMultiAgentRun,
   useRunEvents,
-} from "../../../../../lib/hooks/reviews";
+} from "@/lib/hooks/reviews";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AgentColumn } from "@devdigest/shared";
 import { Icon } from "@devdigest/ui";
@@ -16,8 +16,8 @@ import { AggregateTab } from "./_components/AggregateTab";
 import RunTraceDrawer from "../../pulls/[number]/_components/RunTraceDrawer";
 import { VerdictBanner } from "../../pulls/[number]/_components/VerdictBanner";
 import { FindingsPanel } from "../../pulls/[number]/_components/FindingsPanel";
-import { AppShell } from "../../../../../components/app-shell";
-import { useActiveRepo } from "../../../../../lib/contexts/repoContext";
+import { AppShell } from "@/components/app-shell";
+import { useActiveRepo } from "@/lib/contexts/repoContext";
 
 type ViewMode = "columns" | "tabs" | "aggregate";
 

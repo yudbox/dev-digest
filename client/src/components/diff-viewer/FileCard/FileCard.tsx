@@ -1,10 +1,12 @@
-/* FileCard — one collapsible file in the diff: header (path, +/- stat, comment
-   count) and, when open, its parsed lines plus any outdated comments. */
+/* FileCard — one collapsible file in the diff: header (path, finding dot,
+   +/- stat, comment count) and, when open, its parsed lines, any outdated
+   comments, and an end-of-file block for findings that aren't on a rendered
+   new-side line (AC-29). */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Icon } from "@devdigest/ui";
+import { Icon, SEV } from "@devdigest/ui";
 import type { PrFile } from "@/lib/types";
 import { AUTO_EXPAND_MAX_LINES } from "../constants";
 import { parsePatch, type Line } from "../helpers";
@@ -18,7 +20,15 @@ import {
 import { s, chevronFor } from "../styles";
 import { CodeLine } from "../CodeLine";
 import { OutdatedComments } from "../OutdatedComments";
+import { UnanchoredFindings } from "../UnanchoredFindings";
 import { SeverityChip } from "@/components/SeverityChip/SeverityChip";
+import {
+  hasActive,
+  isActive,
+  mostSevereActive,
+  splitByRenderedLines,
+  type DiffFindingsApi,
+} from "../findings";
 
 const JUMPABLE_SEVERITIES = ["CRITICAL", "WARNING", "SUGGESTION"] as const;
 
@@ -40,16 +50,15 @@ export function FileCard({
   file,
   commenting,
   initialOpen,
-  lineBadges,
+  findings,
   targetLine,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
   initialOpen?: boolean;
-  lineBadges?: Map<
-    number,
-    { severity: string; findingId: string; accepted?: boolean }
-  >;
+  /** Every finding of this file from the smart-diff response (single source
+   *  of truth, AC-31) — `undefined` when smart-diff hasn't loaded/failed. */
+  findings?: DiffFindingsApi;
   targetLine?: number;
 }) {
   const t = useTranslations("shell");
@@ -59,33 +68,67 @@ export function FileCard({
   );
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
 
-  // One count + jump-target line per severity present in this file — reuses
-  // the same SeverityChip already used for run-level counts (Test Quality
-  // Rev... "△ 3 · ◇ 2"), just scoped to this file's findings instead of a run.
+  const fileFindings = React.useMemo(
+    () => findings?.byFile.get(file.path) ?? [],
+    [findings, file.path],
+  );
+
+  // Rendered new-side line numbers (added + context lines) — markers only
+  // ever attach here (AC-30); a deleted line never gets one even if its old
+  // line number equals a finding's start_line.
+  const renderedNewLines = React.useMemo(() => {
+    const set = new Set<number>();
+    for (const ln of lines) if (ln.newNo != null) set.add(ln.newNo);
+    return set;
+  }, [lines]);
+
+  const { byLine: findingsByLine, unanchored } = React.useMemo(
+    () => splitByRenderedLines(fileFindings, renderedNewLines),
+    [fileFindings, renderedNewLines],
+  );
+
+  const fileHasActive = hasActive(fileFindings);
+  // Same Show/Hide switch as GitHub comments hides the inline annotations only;
+  // the header dot + severity chips stay so the reviewer still sees where
+  // findings are.
+  const showInline = findings?.showInline !== false;
+  const dotColor = React.useMemo(() => {
+    const worst = mostSevereActive(fileFindings);
+    return worst ? SEV[worst.severity].c : null;
+  }, [fileFindings]);
+
+  // One count + jump-target line per severity present among ACTIVE findings —
+  // reuses the same SeverityChip already used for run-level counts, scoped to
+  // this file's active findings (AC-17; accepted findings don't count).
   const severityGroups = React.useMemo(() => {
-    if (!lineBadges || lineBadges.size === 0) return null;
+    const active = fileFindings.filter(isActive);
+    if (active.length === 0) return null;
     const groups = {} as Record<
       (typeof JUMPABLE_SEVERITIES)[number],
       { count: number; line: number }
     >;
-    for (const [line, b] of lineBadges) {
-      if (!JUMPABLE_SEVERITIES.includes(b.severity as never)) continue;
-      const sev = b.severity as (typeof JUMPABLE_SEVERITIES)[number];
+    for (const f of active) {
+      if (!JUMPABLE_SEVERITIES.includes(f.severity as never)) continue;
+      const sev = f.severity as (typeof JUMPABLE_SEVERITIES)[number];
       const existing = groups[sev];
       if (existing) {
         existing.count += 1;
-        existing.line = Math.min(existing.line, line);
+        existing.line = Math.min(existing.line, f.start_line);
       } else {
-        groups[sev] = { count: 1, line };
+        groups[sev] = { count: 1, line: f.start_line };
       }
     }
     return Object.keys(groups).length > 0 ? groups : null;
-  }, [lineBadges]);
+  }, [fileFindings]);
 
   // Locally-controlled scroll target: starts from the URL-driven `targetLine`
   // prop, but can be overridden by clicking one of the severity chips below.
   const [localTargetLine, setLocalTargetLine] = React.useState(targetLine);
   React.useEffect(() => setLocalTargetLine(targetLine), [targetLine]);
+  // Bumped on every chip click so a repeat click scrolls again even when the
+  // file is already open and the target line hasn't changed (otherwise the
+  // effect below has no changed dependency and silently does nothing).
+  const [jumpRequest, setJumpRequest] = React.useState(0);
 
   React.useEffect(() => {
     if (!open || localTargetLine === undefined) return;
@@ -96,7 +139,7 @@ export function FileCard({
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
     return () => cancelAnimationFrame(raf);
-  }, [open, localTargetLine, file.path]);
+  }, [open, localTargetLine, file.path, jumpRequest]);
 
   // Group this file's comments into threads, then split into ones we can anchor
   // to a rendered line vs. "outdated" (GitHub dropped the line / it's not here).
@@ -125,6 +168,18 @@ export function FileCard({
         <span className="mono" style={s.filePath}>
           {file.path}
         </span>
+        {dotColor && fileHasActive && (
+          <span
+            data-testid="file-dot"
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: dotColor,
+              flexShrink: 0,
+            }}
+          />
+        )}
         {severityGroups && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {JUMPABLE_SEVERITIES.map((sev) => {
@@ -136,8 +191,10 @@ export function FileCard({
                   sev={sev}
                   count={group.count}
                   onClick={() => {
+                    if (findings?.showInline === false) findings.onRevealInline?.();
                     setOpen(true);
                     setLocalTargetLine(group.line);
+                    setJumpRequest((n) => n + 1);
                   }}
                 />
               );
@@ -175,13 +232,21 @@ export function FileCard({
                 path={file.path}
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
-                badge={lineBadges?.get(ln.newNo ?? ln.oldNo ?? -1)}
+                lineFindings={
+                  showInline && ln.newNo != null
+                    ? findingsByLine.get(ln.newNo)
+                    : undefined
+                }
+                findings={findings}
                 targetLine={localTargetLine}
               />
             ))
           )}
           {commenting && commenting.showComments && (
             <OutdatedComments threads={outdated} />
+          )}
+          {findings && showInline && unanchored.length > 0 && (
+            <UnanchoredFindings findings={unanchored} api={findings} />
           )}
         </div>
       )}

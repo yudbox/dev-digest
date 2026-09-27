@@ -365,6 +365,15 @@ export interface GitClient {
   log(repo: RepoRef, path?: string): Promise<GitCommit[]>;
   readFile(repo: RepoRef, path: string): Promise<string>;
   /**
+   * Read a file's content at a specific commit/ref via git objects
+   * (`git show <ref>:<path>`) — independent of the working copy, which
+   * `sync()` may have reset to the default branch. Used to read a plan/spec
+   * file that was added or changed IN the PR itself, from the PR head
+   * revision (`ref` = the sha `fetchPullHead` just resolved), not whatever
+   * commit the working copy happens to be checked out to.
+   */
+  readFileAtRef(repo: RepoRef & { provider?: VcsProvider }, ref: string, path: string): Promise<string>;
+  /**
    * Local clone directory for `repo`. Provider-aware to avoid a path
    * collision (`github:acme/api` vs `azure-devops:acme/api` sharing the same
    * `owner/name` pair are two different repos — SPEC-2026-08-25-azure-devops-integration

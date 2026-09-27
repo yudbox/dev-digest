@@ -5,13 +5,13 @@
 import React from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import { Icon } from "@devdigest/ui";
-import { useAgents } from "../../../../../lib/hooks/agents";
-import { useRunMultiAgentReview } from "../../../../../lib/hooks/reviews";
-import { usePulls } from "../../../../../lib/hooks/pulls";
-import { SelectAllClearAllControl } from "../../../../../components/agent-picker/SelectAllClearAllControl";
+import { useAgents } from "@/lib/hooks/agents";
+import { useRunMultiAgentReview } from "@/lib/hooks/reviews";
+import { usePulls } from "@/lib/hooks/pulls";
+import { SelectAllClearAllControl } from "@/components/agent-picker/SelectAllClearAllControl";
 import { agentIcon, agentColor as getAgentColor } from "../agentIconMap";
 import type { Agent } from "@devdigest/shared";
-import { AppShell } from "../../../../../components/app-shell";
+import { AppShell } from "@/components/app-shell";
 
 
 export default function ConfigureRunPage() {

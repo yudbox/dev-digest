@@ -7,12 +7,12 @@ import React from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Icon } from "@devdigest/ui";
 import { Checkbox } from "@devdigest/ui";
-import { useAgents } from "../../../../../../../lib/hooks/agents";
+import { useAgents } from "@/lib/hooks/agents";
 import {
   useRunReview,
   useRunMultiAgentReview,
-} from "../../../../../../../lib/hooks/reviews";
-import { SelectAllClearAllControl } from "../../../../../../../components/agent-picker/SelectAllClearAllControl";
+} from "@/lib/hooks/reviews";
+import { SelectAllClearAllControl } from "@/components/agent-picker/SelectAllClearAllControl";
 import type { Agent } from "@devdigest/shared";
 
 function formatMs(ms: number | null | undefined): string {

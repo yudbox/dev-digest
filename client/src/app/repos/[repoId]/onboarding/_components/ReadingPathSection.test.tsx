@@ -3,7 +3,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { ReadingPathItem } from "@devdigest/shared";
 import { vcsBlobUrl, type VcsUrlRepo } from "@/lib/utils/vcsUrls";
-import messages from "../../../../../../messages/en/onboarding.json";
+import messages from "@messages/en/onboarding.json";
 import { ReadingPathSection } from "./ReadingPathSection";
 
 afterEach(cleanup);

@@ -32,6 +32,10 @@ vi.mock("./diff-loader.js", () => ({
   }),
 }));
 
+vi.mock("./intent-deriver.js", () => ({
+  deriveIntent: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@devdigest/reviewer-core", () => ({
   reviewPullRequest: vi.fn().mockResolvedValue({
     review: { verdict: "approve", summary: "Looks good", score: 100, findings: [] },
@@ -183,5 +187,46 @@ describe("ReviewRunExecutor — feature-model strict resolution degrade", () => 
     // The failing agent never reached the LLM call — it aborted before that.
     expect(container.llm).toHaveBeenCalledTimes(1);
     expect(container.llm).toHaveBeenCalledWith("openai");
+  });
+});
+
+describe("ReviewRunExecutor — Intent context loader (SPEC-2026-09-23-smart-diff-hw3-upgrade)", () => {
+  it("passes a loadContext loader (not a pre-fetched linkedIssue) to deriveIntent", async () => {
+    const { deriveIntent } = await import("./intent-deriver.js");
+    const container = makeContainer({ hasOverride: false });
+    const repo = makeRepo();
+    const executor = new ReviewRunExecutor(container, repo, container.agentsRepo);
+
+    const pull = {
+      id: "pr-1",
+      repoId: "repo-1",
+      number: 1,
+      title: "Test PR",
+      body: null,
+      base: "main",
+      headSha: "sha1",
+      lastReviewedSha: null,
+    } as unknown as PullRow;
+
+    const repoRow = {
+      id: "repo-1",
+      owner: "acme",
+      name: "widgets",
+      clonePath: "/tmp/mock-clone",
+    } as unknown as Parameters<typeof executor.executeRuns>[2];
+
+    await executor.executeRuns("ws-1", pull, repoRow, [
+      { agent: makeAgent(), runId: "run-1" },
+    ]);
+
+    expect(deriveIntent).toHaveBeenCalled();
+    const lastCall = (deriveIntent as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
+    const loadContext = lastCall[6];
+    expect(typeof loadContext).toBe("function");
+    // Calling it must not throw (no issue/plan link in this pull's body → a
+    // no-op gather, no vcs/git calls needed).
+    await expect(loadContext()).resolves.toEqual(
+      expect.objectContaining({ missing: {} }),
+    );
   });
 });

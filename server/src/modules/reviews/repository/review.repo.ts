@@ -178,15 +178,10 @@ export async function setFindingReplied(
 
 export interface LatestReviewData {
   agentId: string | null;
-  findings: Array<{
-    id: string;
-    file: string;
-    title: string;
-    severity: string;
-    startLine: number;
-    acceptedAt: Date | null;
-    dismissedAt: Date | null;
-  }>;
+  /** Full finding rows (Smart Diff's `line_findings` needs the complete
+   *  FindingRecord shape — rationale, suggestion, category, etc. — not just
+   *  the small subset used for the old one-badge-per-line reduction). */
+  findings: FindingRow[];
   reviewTokens: number | null;
 }
 
@@ -220,17 +215,8 @@ export async function getLatestReviewData(
   const latestReviews = [...latestByAgent.values()];
   const reviewIds = latestReviews.map((r) => r.id);
 
-  const allFindings = await db
-    .select({
-      id: t.findings.id,
-      reviewId: t.findings.reviewId,
-      file: t.findings.file,
-      title: t.findings.title,
-      severity: t.findings.severity,
-      startLine: t.findings.startLine,
-      acceptedAt: t.findings.acceptedAt,
-      dismissedAt: t.findings.dismissedAt,
-    })
+  const allFindings: FindingRow[] = await db
+    .select()
     .from(t.findings)
     .where(inArray(t.findings.reviewId, reviewIds));
 
@@ -252,17 +238,7 @@ export async function getLatestReviewData(
 
   return latestReviews.map((review) => ({
     agentId: review.agentId,
-    findings: allFindings
-      .filter((f) => f.reviewId === review.id)
-      .map((f) => ({
-        id: f.id,
-        file: f.file,
-        title: f.title,
-        severity: f.severity,
-        startLine: f.startLine,
-        acceptedAt: f.acceptedAt,
-        dismissedAt: f.dismissedAt,
-      })),
+    findings: allFindings.filter((f) => f.reviewId === review.id),
     reviewTokens: review.runId
       ? (runTokensMap.get(review.runId) ?? null)
       : null,
