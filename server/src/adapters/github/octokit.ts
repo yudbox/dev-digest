@@ -91,12 +91,20 @@ export class OctokitGitHubClient implements VcsClient {
             repo: repo.name,
             pull_number: n,
           });
-          const { data: files } = await this.octokit.rest.pulls.listFiles({
-            owner: repo.owner,
-            repo: repo.name,
-            pull_number: n,
-            per_page: 100,
-          });
+          // GitHub caps a single listFiles page at 100 — paginate() follows
+          // every subsequent page so PRs with >100 changed files aren't
+          // silently truncated (the truncation used to desync Smart Diff /
+          // Blast Radius, which read this list, from the review agent's
+          // findings, which come from the untruncated local git diff).
+          const files = await this.octokit.paginate(
+            this.octokit.rest.pulls.listFiles,
+            {
+              owner: repo.owner,
+              repo: repo.name,
+              pull_number: n,
+              per_page: 100,
+            },
+          );
           const { data: commits } = await this.octokit.rest.pulls.listCommits({
             owner: repo.owner,
             repo: repo.name,

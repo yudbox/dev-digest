@@ -13,7 +13,7 @@ import {
 } from "@devdigest/ui";
 import { AppShell } from "@/components/app-shell";
 import { RepoNotFound } from "@/components/repo-not-found";
-import { usePulls, useRefreshRepo } from "@/lib/hooks";
+import { usePulls, useRefreshRepo, useRepoSyncStatus } from "@/lib/hooks";
 import { useActiveRepo, useRepoNotFound } from "@/lib/contexts/repoContext";
 import { ApiError } from "@/lib/api";
 import { COLUMN_KEYS, SKELETON_ROWS } from "./constants";
@@ -33,7 +33,16 @@ export default function PullsPage() {
   const { activeRepo } = useActiveRepo();
   const repoNotFound = useRepoNotFound(repoId);
   const { data: pulls, isLoading, isError, error, refetch } = usePulls(repoId);
+  const { status: syncStatus, forceCheck: forceSyncCheck } = useRepoSyncStatus(repoId);
   const refresh = useRefreshRepo();
+  const handleRefresh = () => {
+    refresh.mutate(repoId, {
+      // The refresh endpoint just enqueues a background clone job and
+      // returns immediately — give it a moment to actually fetch+merge
+      // before re-checking, or this would show the pre-refresh staleness.
+      onSuccess: () => setTimeout(forceSyncCheck, 2500),
+    });
+  };
 
   // Default to "needs review" — the most actionable filter on open.
   const status = search.get("status") ?? "needs_review";
@@ -93,8 +102,9 @@ export default function PullsPage() {
           onQuery={setQuery}
           sort={sort}
           onSort={setSort}
-          onRefresh={() => refresh.mutate(repoId)}
+          onRefresh={handleRefresh}
           refreshing={refresh.isPending}
+          syncStatus={syncStatus}
         />
         <div style={s.headRow}>
           {COLUMN_KEYS.map((key, i) => (

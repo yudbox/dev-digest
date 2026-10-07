@@ -19,7 +19,7 @@ export function FindingMarker({
 }) {
   const meta = SEV[f.severity];
   const SIcon = Icon[meta.icon];
-  const accepted = !!f.accepted_at;
+  const resolved = !!f.accepted_at || !!f.dismissed_at;
 
   return (
     <button
@@ -38,7 +38,7 @@ export function FindingMarker({
         border: `1px solid ${meta.c}`,
         background: open ? meta.c : "transparent",
         color: open ? "var(--bg-primary, #fff)" : meta.c,
-        opacity: accepted ? 0.45 : 1,
+        opacity: resolved ? 0.45 : 1,
         cursor: "pointer",
         padding: 0,
       }}

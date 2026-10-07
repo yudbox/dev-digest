@@ -86,8 +86,17 @@ export class RepoService {
       if (hasGit) {
         const { simpleGit } = await import('simple-git');
         try {
-          const sg = simpleGit(clonePath, { timeout: { block: 15000 } })
-            .env({ ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' });
+          // Set on process.env (inherited by git subprocesses) rather than
+          // via simple-git's .env(), which inspects and rejects vars like
+          // PAGER/EDITOR present in the shell environment — see the same
+          // note in adapters/git/simple-git.ts. Passing `...process.env`
+          // straight into .env() made this whole branch a silent no-op:
+          // simple-git threw on the first command (GitPluginError, "Use of
+          // GIT_EDITOR is not permitted"), the catch below swallowed it, and
+          // the job still reported "done" without ever fetching anything.
+          process.env.GIT_TERMINAL_PROMPT ??= '0';
+          process.env.GCM_INTERACTIVE ??= 'never';
+          const sg = simpleGit(clonePath, { timeout: { block: 15000 } });
           // Embed credentials into the remote URL so git doesn't prompt.
           const remoteUrl: string = (await sg.remote(['get-url', 'origin']) as string).trim();
           const azureToken = await this.container.secrets.get(AZURE_DEVOPS_TOKEN_SECRET);
@@ -100,6 +109,36 @@ export class RepoService {
           }
           await sg.fetch([fetchUrl]);
           console.info(`[clone-job] Fetched existing clone ${owner}/${name}`);
+
+          // `fetch` alone only updates the origin/* remote-tracking refs —
+          // it never advances the checked-out local branch. Without this,
+          // an already-cloned repo's local branch stays frozen at whatever
+          // commit it was on at import time forever, no matter how many
+          // times Refresh is clicked, silently desyncing every diff computed
+          // from this clone (Smart Diff, Blast Radius, the review agent's
+          // own diff) from the real, current remote.
+          try {
+            const currentBranch = (
+              await sg.revparse(['--abbrev-ref', 'HEAD'])
+            ).trim();
+            if (currentBranch && currentBranch !== 'HEAD') {
+              await sg.merge([`origin/${currentBranch}`, '--ff-only']);
+              console.info(
+                `[clone-job] Fast-forwarded ${owner}/${name}#${currentBranch} to origin`,
+              );
+            }
+          } catch (ffErr) {
+            // Diverged history, detached HEAD, or no upstream for this
+            // branch — leave the clone as-is rather than force anything.
+            console.warn(
+              `[clone-job] Fast-forward skipped for ${owner}/${name} — ${(ffErr as Error).message}`,
+            );
+          }
+
+          // Bump last_polled_at so "when was this last synced" is honest —
+          // this fetch-only path used to never touch it, leaving it stuck at
+          // the original import date indefinitely.
+          await this.repo.updateClonePath(repoId, clonePath);
         } catch (err) {
           console.warn(`[clone-job] Fetch failed for ${owner}/${name} — using existing clone as-is`);
         }
@@ -235,6 +274,40 @@ export class RepoService {
       // No handler / transient enqueue failure — refresh button is best-effort.
     }
     return { status: 'refreshing' };
+  }
+
+  /**
+   * Read-only staleness check for the PR-list header: how many commits the
+   * local clone's default branch is missing relative to origin, plus when it
+   * was last synced. Unlike `refresh()`, this never moves the local branch —
+   * the client gates how often it calls this (see `useRepoSyncStatus`) and
+   * `refresh()` is still the action that actually catches the clone up.
+   */
+  async syncStatus(
+    workspaceId: string,
+    id: string,
+  ): Promise<{ commits_behind: number | null; last_polled_at: string | null }> {
+    const repo = await this.repo.getById(workspaceId, id);
+    if (!repo) throw new NotFoundError('Repo not found');
+    const lastPolledAt = repo.lastPolledAt?.toISOString() ?? null;
+    if (!repo.clonePath) return { commits_behind: null, last_polled_at: lastPolledAt };
+
+    let commitsBehind: number | null = null;
+    try {
+      commitsBehind = await this.container.git.commitsBehind(
+        {
+          owner: repo.owner,
+          name: repo.name,
+          project: repo.project ?? undefined,
+          baseUrl: repo.baseUrl ?? undefined,
+          provider: repo.vcsProvider as VcsProvider,
+        },
+        repo.defaultBranch,
+      );
+    } catch {
+      // Best-effort — a transient fetch failure shouldn't break the PR list page.
+    }
+    return { commits_behind: commitsBehind, last_polled_at: lastPolledAt };
   }
 
   async remove(workspaceId: string, id: string): Promise<void> {

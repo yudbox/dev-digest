@@ -240,6 +240,13 @@ export class SimpleGitClient implements GitClient {
     return { head: (await g.revparse(['HEAD'])).trim() };
   }
 
+  async commitsBehind(repo: RepoRef, branch: string): Promise<number> {
+    const g = this.git(repo);
+    await g.fetch(['origin', branch]);
+    const out = await g.raw(['rev-list', '--count', `${branch}..origin/${branch}`]);
+    return parseInt(out.trim(), 10) || 0;
+  }
+
   async currentHead(repo: RepoRef): Promise<string> {
     return (await this.git(repo).revparse(['HEAD'])).trim();
   }

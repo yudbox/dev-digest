@@ -47,7 +47,7 @@ export async function getFeatureModelOverride(
  */
 const LABEL_OVERRIDES: Partial<Record<FeatureModelId, string>> = {
   // review_intent is now also used by the Aggregate tab → renamed to "Standard Model"
-  review_intent: 'Standard Model',
+  review_intent: "Standard Model",
 };
 
 /**

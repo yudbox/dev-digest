@@ -18,8 +18,8 @@ Prerequisites: Node ≥22, pnpm ≥10, Docker.
 
 | Package | Path | Port |
 |---------|------|------|
-| `@devdigest/api` | `server/` | 3001 |
-| `@devdigest/web` | `client/` | 3000 |
+| `@devdigest/api` | `server/` | 3011 |
+| `@devdigest/web` | `client/` | 3010 |
 | `@devdigest/reviewer-core` | `reviewer-core/` | — |
 | `@devdigest/e2e` | `e2e/` | — |
 | `@devdigest/shared` | `server/src/vendor/shared/` | — (alias only) |

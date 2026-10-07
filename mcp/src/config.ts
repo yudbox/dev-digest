@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const ConfigSchema = z.object({
-  apiUrl: z.string().url().default("http://localhost:3001"),
+  apiUrl: z.string().url().default("http://localhost:3011"),
   pollIntervalMs: z.coerce.number().int().positive().default(2_000),
   pollTimeoutMs: z.coerce.number().int().positive().default(120_000),
 });

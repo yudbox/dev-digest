@@ -36,12 +36,14 @@ export class PullsService {
     // 0 findings must still return `[]`, not `null`, for every file).
     const hasReview = latestReviewData.length > 0;
 
-    // Union findings across all latest-per-agent results (AC-10), excluding
-    // dismissed ones. Accepted findings ARE included (with their accepted
-    // state) — no per-line reduction, every finding is kept.
-    const allFindings = latestReviewData
-      .flatMap((r) => r.findings)
-      .filter((f) => !f.dismissedAt);
+    // Union findings across all latest-per-agent results (AC-10). Both
+    // accepted AND dismissed findings are included (with their respective
+    // state) — no per-line reduction, every finding is kept. Reverted the
+    // original "exclude dismissed" behavior: a dismissed finding must stay
+    // visible (dimmed, same as an accepted one) so its card survives long
+    // enough for "Turn into eval case" to build a negative eval case from
+    // it — that flow needs the finding present, not vanished on dismiss.
+    const allFindings = latestReviewData.flatMap((r) => r.findings);
     const reviewTokens =
       latestReviewData.find((r) => r.reviewTokens !== null)?.reviewTokens ??
       null;

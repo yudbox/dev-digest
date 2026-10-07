@@ -30,6 +30,16 @@ function renderWithIntl(ui: React.ReactElement) {
   );
 }
 
+/** The group's accordion header — the only button carrying aria-expanded
+ *  (the "collapse/expand all files" button nested inside it does not). */
+function groupHeader(role: string): HTMLElement {
+  const header = within(screen.getByTestId(`group-${role}`))
+    .getAllByRole("button")
+    .find((el) => el.hasAttribute("aria-expanded"));
+  if (!header) throw new Error(`no header for group ${role}`);
+  return header;
+}
+
 function makeFinding(overrides: Partial<FindingRecord> = {}): FindingRecord {
   return {
     id: "f1",
@@ -149,8 +159,8 @@ describe("SmartDiffViewer", () => {
       />,
     );
     expect(screen.getByTestId("file-docs/a.md")).toHaveAttribute("data-open", "false");
-    // accepted-only finding still expands the file (AC-15)
-    expect(screen.getByTestId("file-docs/b.md")).toHaveAttribute("data-open", "true");
+    // accepted-only (resolved) finding no longer forces the file open
+    expect(screen.getByTestId("file-docs/b.md")).toHaveAttribute("data-open", "false");
     // deep-link target expands regardless of findings
     expect(screen.getByTestId("file-docs/c.md")).toHaveAttribute("data-open", "true");
   });
@@ -217,7 +227,7 @@ describe("SmartDiffViewer — group accordions and five fixed groups", () => {
         files={[makeFile("src/a.ts"), makeFile("src/b.ts")]}
       />,
     );
-    const header = within(screen.getByTestId("group-core")).getByRole("button");
+    const header = groupHeader("core");
     const counter = within(header).getByText("● 2");
     const files = within(header).getByText("2 files");
     // Both live in the same right-aligned cluster, counter first.
@@ -229,7 +239,7 @@ describe("SmartDiffViewer — group accordions and five fixed groups", () => {
     renderWithIntl(
       <SmartDiffViewer smartDiff={FIVE_GROUPS(["src/a.ts"])} files={[makeFile("src/a.ts")]} />,
     );
-    const header = within(screen.getByTestId("group-core")).getByRole("button");
+    const header = groupHeader("core");
     expect(screen.getByTestId("file-src/a.ts")).toBeInTheDocument();
     expect(header).toHaveAttribute("aria-expanded", "true");
 

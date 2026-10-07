@@ -352,6 +352,14 @@ export interface GitClient {
    * subsequent index reflects the latest code. Returns the new HEAD sha.
    */
   sync(repo: RepoRef, branch: string): Promise<{ head: string }>;
+  /**
+   * Fetch `branch` from origin (remote-tracking refs only, local branch is
+   * NOT moved) and count commits the local `branch` is missing relative to
+   * `origin/<branch>` (`git rev-list --count branch..origin/branch`) — a
+   * read-only "how stale is this clone" check for UI staleness banners,
+   * distinct from `sync()` which actually advances the local branch.
+   */
+  commitsBehind(repo: RepoRef, branch: string): Promise<number>;
   currentHead(repo: RepoRef): Promise<string>;
   diff(repo: RepoRef, base: string, head: string): Promise<UnifiedDiff>;
   /**

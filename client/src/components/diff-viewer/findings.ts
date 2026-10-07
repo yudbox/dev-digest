@@ -40,10 +40,11 @@ export function indexLineFindings(smartDiff: SmartDiff): Map<string, FindingReco
   return byFile;
 }
 
-/** A finding is "active" while it hasn't been accepted. Dismissed findings
- *  never reach the client (the server already excludes them). */
+/** A finding is "active" while it hasn't been accepted OR dismissed — both
+ *  are resolved states that stay visible (dimmed) but shouldn't count toward
+ *  the group dot / file dot / severity chips. */
 export function isActive(f: FindingRecord): boolean {
-  return !f.accepted_at;
+  return !f.accepted_at && !f.dismissed_at;
 }
 
 /** Does this file/line have at least one active (not accepted) finding? */

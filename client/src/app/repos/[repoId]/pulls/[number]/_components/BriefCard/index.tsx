@@ -56,7 +56,19 @@ export function BriefCard({
     );
   }
 
-  if (isError || !brief) {
+  // A failed generation (flaky model / bad structured output) is logged for
+  // debugging but not surfaced as an alarming error card — it happens
+  // occasionally with weaker models and isn't worth interrupting the PR page.
+  // The user can still retry via the Regenerate button once a brief exists.
+  if (isError) {
+    // eslint-disable-next-line no-console
+    console.error(
+      "[BriefCard] Brief generation failed — check server logs for the LLM error.",
+    );
+    return null;
+  }
+
+  if (!brief) {
     return (
       <div style={s.errorCard}>
         <span style={s.errorText}>{t("error")}</span>

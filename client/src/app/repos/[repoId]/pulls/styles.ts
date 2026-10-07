@@ -78,6 +78,13 @@ export const s = {
     alignItems: "center",
     gap: 12,
   } satisfies CSSProperties,
+  syncStatus: {
+    fontSize: 12,
+    color: "var(--text-muted)",
+    whiteSpace: "nowrap",
+  } satisfies CSSProperties,
+  syncStatusBehind: { color: "var(--warn)" } satisfies CSSProperties,
+  syncStatusOk: { color: "var(--text-muted)" } satisfies CSSProperties,
   pageHeader: {
     padding: "24px 32px 10px",
     display: "flex",

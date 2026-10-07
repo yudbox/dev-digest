@@ -53,7 +53,8 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
   {
     id: "review_intent",
     label: "Standard Model",
-    description: "Used for: PR Review and Aggregate.",
+    description:
+      "Used for: Intent, Multi-agent review Aggregate, and Blast radius summary.",
     defaultProvider: "openrouter",
     defaultModel: "deepseek/deepseek-v4-flash",
   },

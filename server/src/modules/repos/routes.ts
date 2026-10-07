@@ -11,8 +11,9 @@ import { RepoService } from './service.js';
  * codes, and delegates all business logic to RepoService.
  *   POST   /repos              → add repo (parse URL, persist, enqueue real clone)
  *   GET    /repos              → list repos (workspace-scoped)
- *   POST   /repos/:id/refresh  → re-fetch clone + bump last_polled_at
- *   DELETE /repos/:id          → remove repo
+ *   POST   /repos/:id/refresh      → re-fetch clone + bump last_polled_at
+ *   GET    /repos/:id/sync-status  → { commits_behind, last_polled_at } (fetches, but never moves the local branch)
+ *   DELETE /repos/:id              → remove repo
  *
  * The clone runs as a JobRunner job (kind 'clone') — real `git clone` via the
  * GitClient adapter into <cloneDir>/<owner>/<repo>.
@@ -60,6 +61,13 @@ export default async function reposRoutes(appBase: FastifyInstance) {
   app.post('/repos/:id/refresh', { schema: { params: IdParams } }, async (req) => {
     const { workspaceId } = await getContext(app.container, req);
     return service.refresh(workspaceId, req.params.id);
+  });
+
+  // Read-only staleness check (commits behind + last synced) for the PR-list
+  // header banner — the client calls this at most once/day per repo.
+  app.get('/repos/:id/sync-status', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(app.container, req);
+    return service.syncStatus(workspaceId, req.params.id);
   });
 
   app.delete('/repos/:id', { schema: { params: IdParams } }, async (req) => {

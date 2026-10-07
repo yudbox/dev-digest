@@ -382,6 +382,8 @@ export interface MockGitOptions {
   syncedHead?: string;
   /** Fixtures for `readFileAtRef`, keyed `` `${ref}:${path}` ``. Missing key → throws "not found". */
   filesAtRef?: Record<string, string>;
+  /** Override `commitsBehind()` — how many commits the local clone is missing. */
+  commitsBehind?: number;
 }
 
 export class MockGitClient implements GitClient {
@@ -415,6 +417,9 @@ export class MockGitClient implements GitClient {
   }
   async currentHead(): Promise<string> {
     return this.syncedHead ?? this.opts.head ?? "a1b2c3d4";
+  }
+  async commitsBehind(): Promise<number> {
+    return this.opts.commitsBehind ?? 0;
   }
   async diffNameOnly(): Promise<string[]> {
     return this.opts.diffNameOnly ?? [];

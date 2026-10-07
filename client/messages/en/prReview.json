@@ -81,6 +81,8 @@
     "largeBody": "Consider splitting it into smaller, focused PRs for easier review:",
     "filesCount": "{count} files",
     "filesWithFindings": "● {count}",
+    "collapseAllFiles": "Collapse all files in this group",
+    "expandAllFiles": "Expand all files in this group",
     "outsideDiff": "Outside the rendered diff",
     "filesChangedTitle": "Files changed · {count} files",
     "toggleShow": "Show {items}",
@@ -117,6 +119,15 @@
     },
     "refresh": "Refresh",
     "refreshing": "Refreshing…",
+    "syncStatus": {
+      "behind": "main is {count, plural, one {# commit} other {# commits}} behind",
+      "upToDate": "Up to date",
+      "syncedToday": "synced today",
+      "syncedDaysAgo": "synced {count, plural, one {# day} other {# days}} ago",
+      "syncedMonthsAgo": "synced {count, plural, one {# month} other {# months}} ago",
+      "syncedOverYearAgo": "synced over a year ago",
+      "neverSynced": "never synced"
+    },
     "filterPlaceholder": "Filter pull requests…",
     "sort": {
       "newest": "Sort: Newest",

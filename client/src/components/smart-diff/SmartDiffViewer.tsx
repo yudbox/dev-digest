@@ -82,17 +82,37 @@ function GroupSection({
     hasActive(f.line_findings),
   ).length;
 
-  // The group itself is an accordion. A non-empty group starts expanded; an
-  // empty one (always returned by the server, "0 files") has nothing to show
-  // and can't be expanded. A deep link into this group forces it open.
+  // The group itself is an accordion. A non-empty group starts expanded,
+  // EXCEPT docs/boilerplate (collapsedByDefault) which start closed — unless
+  // the group already has an active finding, so a real finding is never
+  // hidden behind a closed accordion. An empty group (always returned by the
+  // server, "0 files") has nothing to show and can't be expanded. A deep
+  // link into this group forces it open.
   const isEmpty = group.files.length === 0;
   const containsTarget =
     !!targetFile && group.files.some((f) => f.path === targetFile);
-  const [open, setOpen] = React.useState(!isEmpty);
+  const [open, setOpen] = React.useState(
+    !isEmpty && (!collapsedByDefault || filesWithFindings > 0),
+  );
   React.useEffect(() => {
     if (containsTarget) setOpen(true);
   }, [containsTarget]);
   const expanded = open && !isEmpty;
+
+  // "Collapse/expand all files in this group" — independent of the group's
+  // own open/closed accordion. `allFilesOpen` is null until first clicked
+  // (each file keeps its own default — collapsed-by-default role, unresolved
+  // finding, deep-link target); after that it's a blunt "every file in this
+  // group, all at once" override. `filesGen` forces each FileCard to remount
+  // with the new `initialOpen` — FileCard's own open state is uncontrolled
+  // (internal useState), so a prop change alone wouldn't move it.
+  const [allFilesOpen, setAllFilesOpen] = React.useState<boolean | null>(null);
+  const [filesGen, setFilesGen] = React.useState(0);
+  const toggleAllFiles = (e: React.MouseEvent) => {
+    e.stopPropagation(); // don't also toggle the group's own accordion
+    setAllFilesOpen((prev) => !(prev ?? true));
+    setFilesGen((g) => g + 1);
+  };
 
   return (
     <div style={s.group} data-testid={`group-${group.role}`}>
@@ -127,6 +147,20 @@ function GroupSection({
           <span style={s.groupCount}>
             {t("filesCount", { count: group.files.length })}
           </span>
+          {!isEmpty && (
+            <button
+              type="button"
+              onClick={toggleAllFiles}
+              title={
+                allFilesOpen === false
+                  ? t("expandAllFiles")
+                  : t("collapseAllFiles")
+              }
+              style={s.collapseAllBtn}
+            >
+              <Icon.ChevronsUpDown size={13} />
+            </button>
+          )}
         </span>
       </div>
 
@@ -134,15 +168,21 @@ function GroupSection({
         const prFile = fileMap.get(smartFile.path);
         if (!prFile) return null;
 
-        // A collapsed-by-default group still expands a file with real
-        // findings (including accepted-only) — the collapse default is about
-        // reducing noise, not hiding real findings (AC-15).
-        const hasFindings = (smartFile.line_findings?.length ?? 0) > 0;
+        // A collapsed-by-default group still expands a file with a real,
+        // UNRESOLVED finding — the collapse default is about reducing noise,
+        // not hiding something that still needs attention. A file whose only
+        // findings are already accepted/dismissed doesn't need to force-open.
+        const hasActiveFindings = hasActive(smartFile.line_findings);
+        // The per-file default UNTIL "collapse/expand all" is clicked once;
+        // after that, allFilesOpen (true/false) wins for every file here,
+        // overriding even the deep-link target / findings exceptions — the
+        // whole point of clicking it is "no, really, all of them."
         const initialOpen =
-          targetFile === prFile.path || !collapsedByDefault || hasFindings;
+          allFilesOpen ??
+          (targetFile === prFile.path || !collapsedByDefault || hasActiveFindings);
 
         return (
-          <div key={smartFile.path} style={s.fileWrapper}>
+          <div key={`${smartFile.path}-${filesGen}`} style={s.fileWrapper}>
             {smartFile.pseudocode_summary && (
               <div style={s.whatDoes}>
                 <span style={s.whatDoesLabel}>{t("whatDoes")}</span>{" "}
@@ -323,6 +363,19 @@ const s: Record<string, CSSProperties> = {
     gap: 10,
   },
   groupCount: { fontSize: 12, color: "var(--text-muted)" },
+  collapseAllBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    border: "1px solid var(--border-subtle, rgba(255,255,255,0.12))",
+    background: "transparent",
+    color: "var(--text-muted)",
+    cursor: "pointer",
+    flexShrink: 0,
+  },
   fileWrapper: { display: "flex", flexDirection: "column", gap: 4 },
   whatDoes: { fontSize: 12, color: "var(--text-secondary)", paddingLeft: 4 },
   whatDoesLabel: { fontWeight: 600, color: "var(--text-muted)" },
