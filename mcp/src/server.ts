@@ -13,10 +13,16 @@ export function createServer(client: DevDigestClient): McpServer {
     version: "0.1.0",
   });
 
+  // Read tools never mutate DevDigest state. Always use the 5-arg
+  // tool(name, description, schema, annotations, cb) overload — with 4 args an
+  // empty `{}` schema is ambiguous with annotations.
+  const readOnly = { readOnlyHint: true } as const;
+
   server.tool(
     "list_agents",
     "List configured review agents with their IDs and models.",
     {},
+    readOnly,
     () => listAgents(client),
   );
 
@@ -47,6 +53,7 @@ export function createServer(client: DevDigestClient): McpServer {
           "If true, return findings from all runs, not just the latest per agent",
         ),
     },
+    readOnly,
     (args) => getFindings(client, args),
   );
 
@@ -56,6 +63,7 @@ export function createServer(client: DevDigestClient): McpServer {
     {
       repo_id: z.string().describe("Repository ID, e.g. 'repo-789'"),
     },
+    readOnly,
     (args) => getConventions(client, args),
   );
 
@@ -65,6 +73,7 @@ export function createServer(client: DevDigestClient): McpServer {
     {
       pr_id: z.string().describe("Pull request ID, e.g. 'pr-abc123'"),
     },
+    readOnly,
     (args) => getBlastRadius(client, args),
   );
 

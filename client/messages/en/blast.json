@@ -14,5 +14,12 @@
   "graph": {
     "empty": "No downstream callers to graph.",
     "ariaLabel": "Blast radius graph"
+  },
+  "degradedReason": {
+    "flag_off": "Repo intelligence is turned off for this workspace.",
+    "index_failed": "Repository index failed to build — try re-syncing the repo.",
+    "index_partial": "Repository index is incomplete — some callers may be missing.",
+    "repo_too_large": "Repository is too large to index.",
+    "no_data": "No index data for the changed files yet."
   }
 }

@@ -55,11 +55,12 @@ export async function getFindings(
     `/pulls/${pr_id}/reviews`,
   );
 
-  if (!result.ok) {
+  if (!result.ok && result.status === 404) {
     return mcpError(
       `PR '${pr_id}' not found. Check the pr_id or import PRs via the DevDigest UI.`,
     );
   }
+  if (!result.ok) return result.result;
 
   if (result.data.length === 0) {
     return mcpError(
