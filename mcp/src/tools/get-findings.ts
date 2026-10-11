@@ -1,5 +1,6 @@
 import type { DevDigestClient } from "../api-client.js";
 import { mcpError, mcpSuccess } from "../api-client.js";
+import { resolvePrId } from "../resolve-pr.js";
 
 /**
  * Mirrors ReviewDto from server/src/modules/reviews/helpers.ts.
@@ -46,13 +47,16 @@ function deduplicateByAgent(reviews: ReviewRow[]): ReviewRow[] {
 
 export async function getFindings(
   client: DevDigestClient,
-  args: { pr_id: string; all_runs?: boolean },
+  args: { pr_id: string; repo?: string; all_runs?: boolean },
 ) {
   const { pr_id, all_runs = false } = args;
 
+  const resolved = await resolvePrId(client, pr_id, args.repo);
+  if (!resolved.ok) return resolved.result;
+
   const result = await client.request<ReviewRow[]>(
     "GET",
-    `/pulls/${pr_id}/reviews`,
+    `/pulls/${resolved.id}/reviews`,
   );
 
   if (!result.ok && result.status === 404) {

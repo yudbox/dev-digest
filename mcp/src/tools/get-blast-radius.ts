@@ -1,5 +1,6 @@
 import type { DevDigestClient } from "../api-client.js";
 import { mcpSuccess } from "../api-client.js";
+import { resolvePrId } from "../resolve-pr.js";
 
 // Local interface mirrors BlastRadiusResult from
 // server/src/vendor/shared/contracts/brief.ts → BlastRadiusResult
@@ -29,11 +30,14 @@ interface BlastRadiusResult {
 
 export async function getBlastRadius(
   client: DevDigestClient,
-  args: { pr_id: string },
+  args: { pr_id: string; repo?: string },
 ) {
+  const resolved = await resolvePrId(client, args.pr_id, args.repo);
+  if (!resolved.ok) return resolved.result;
+
   const result = await client.request<BlastRadiusResult>(
     "GET",
-    `/pulls/${args.pr_id}/blast`,
+    `/pulls/${resolved.id}/blast`,
   );
   if (!result.ok) return result.result;
 

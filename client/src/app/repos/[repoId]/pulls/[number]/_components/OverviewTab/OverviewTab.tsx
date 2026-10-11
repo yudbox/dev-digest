@@ -75,14 +75,15 @@ export function OverviewTab({ prBody, prId, repo, headSha }: OverviewTabProps) {
         </ErrorBoundary>
       </section>
 
-      {/* 2-column: Intent + Blast Radius */}
+      {/* 2-column: Intent + Blast Radius — the row is as tall as the taller
+          card and both stretch to it, so the two cards always line up. */}
       <div
         style={
           {
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: 16,
-            alignItems: "start",
+            alignItems: "stretch",
           } satisfies CSSProperties
         }
       >
@@ -97,7 +98,7 @@ export function OverviewTab({ prBody, prId, repo, headSha }: OverviewTabProps) {
           style={{
             display: "flex",
             flexDirection: "column",
-            height: 700,
+            minHeight: 450,
             minWidth: 0,
           }}
         >

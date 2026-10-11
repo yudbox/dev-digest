@@ -186,6 +186,7 @@
     "changedSymbol": "Changed symbol",
     "caller": "Caller",
     "endpoint": "Endpoint",
+    "cron": "Cron / job",
     "openGraph": "Graph",
     "graphTitle": "Blast Radius Graph",
     "closeGraph": "Close graph"

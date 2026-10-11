@@ -87,7 +87,9 @@ export function BlastRadiusCard({
         </p>
       )}
 
-      <div className="flex-1 overflow-y-auto">
+      {/* Capped so a PR with 100+ symbols scrolls here instead of making the
+          whole Intent/Blast row (and the Intent card with it) huge. */}
+      <div className="flex-1 overflow-y-auto max-h-[520px]">
         <SymbolList rows={symbolRows} repo={repo} headSha={headSha} />
       </div>
 

@@ -98,13 +98,19 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-log "starting API on :3001 (server)"
+# Ports come from server/.env (the API reads the same file for its own port
+# and for the CORS origin), so the web port is passed to Next.js as PORT.
+env_port() { grep -E "^$1=" server/.env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"[:space:]'; }
+API_PORT="$(env_port API_PORT)"; API_PORT="${API_PORT:-3001}"
+WEB_PORT="$(env_port WEB_PORT)"; WEB_PORT="${WEB_PORT:-3000}"
+
+log "starting API on :$API_PORT (server)"
 (cd server && pnpm dev) &
 SERVER_PID=$!
 
 if [ "$RUN_CLIENT" -eq 1 ]; then
-  log "starting web on :3000 (client) — Ctrl-C to stop both"
-  (cd client && pnpm dev)
+  log "starting web on :$WEB_PORT (client) — Ctrl-C to stop both"
+  (cd client && PORT="$WEB_PORT" pnpm dev)
 else
   log "API running (PID $SERVER_PID) — Ctrl-C to stop"
   wait "$SERVER_PID"

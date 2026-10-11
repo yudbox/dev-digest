@@ -30,7 +30,17 @@ export function createServer(client: DevDigestClient): McpServer {
     "run_agent_on_pr",
     "Run a review agent on a pull request and return findings.",
     {
-      pr_id: z.string().describe("Pull request ID, e.g. 'pr-abc123'"),
+      pr_id: z
+        .string()
+        .describe(
+          "Pull request: DevDigest's internal pr_id (UUID, e.g. '5f5c6812-462d-4735-ad7c-4cadba36ce61'), the PR number (e.g. '#15' or '15'), or part of the PR title (e.g. 'cost tracking')",
+        ),
+      repo: z
+        .string()
+        .optional()
+        .describe(
+          "Optional repository to search in when pr_id is a number or title: 'owner/name', just 'name' (e.g. 'ai-customer-support'), or the repo id",
+        ),
       agent_id: z
         .string()
         .describe(
@@ -44,7 +54,17 @@ export function createServer(client: DevDigestClient): McpServer {
     "get_findings",
     "Get the latest review verdict and findings for a pull request, grouped by agent. Each review includes its findings nested inside. By default returns only the latest run per agent.",
     {
-      pr_id: z.string().describe("Pull request ID, e.g. 'pr-abc123'"),
+      pr_id: z
+        .string()
+        .describe(
+          "Pull request: DevDigest's internal pr_id (UUID, e.g. '5f5c6812-462d-4735-ad7c-4cadba36ce61'), the PR number (e.g. '#15' or '15'), or part of the PR title (e.g. 'cost tracking')",
+        ),
+      repo: z
+        .string()
+        .optional()
+        .describe(
+          "Optional repository to search in when pr_id is a number or title: 'owner/name', just 'name' (e.g. 'ai-customer-support'), or the repo id",
+        ),
       all_runs: z
         .boolean()
         .optional()
@@ -71,7 +91,17 @@ export function createServer(client: DevDigestClient): McpServer {
     "get_blast_radius",
     "Get the blast radius (impact map) of a pull request — changed symbols, callers, impacted endpoints, and prior PRs touching the same files.",
     {
-      pr_id: z.string().describe("Pull request ID, e.g. 'pr-abc123'"),
+      pr_id: z
+        .string()
+        .describe(
+          "Pull request: DevDigest's internal pr_id (UUID, e.g. '5f5c6812-462d-4735-ad7c-4cadba36ce61'), the PR number (e.g. '#15' or '15'), or part of the PR title (e.g. 'cost tracking')",
+        ),
+      repo: z
+        .string()
+        .optional()
+        .describe(
+          "Optional repository to search in when pr_id is a number or title: 'owner/name', just 'name' (e.g. 'ai-customer-support'), or the repo id",
+        ),
     },
     readOnly,
     (args) => getBlastRadius(client, args),

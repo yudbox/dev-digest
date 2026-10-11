@@ -4,7 +4,17 @@ import React, { useEffect, useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import type { BlastRadiusResult } from "@devdigest/shared";
-import { BlastGraph } from "./BlastGraph";
+import { BlastGraph, KIND_COLOR, type GraphKind } from "./BlastGraph";
+
+const LEGEND: Array<{
+  kind: GraphKind;
+  label: "changedSymbol" | "caller" | "endpoint" | "cron";
+}> = [
+  { kind: "symbol", label: "changedSymbol" },
+  { kind: "caller", label: "caller" },
+  { kind: "endpoint", label: "endpoint" },
+  { kind: "cron", label: "cron" },
+];
 
 interface BlastGraphLightboxProps {
   data: BlastRadiusResult;
@@ -72,18 +82,15 @@ export function BlastGraphLightbox({ data, onClose }: BlastGraphLightboxProps) {
 
         {/* HTML legend — bottom-left */}
         <div className="absolute bottom-4 left-4 flex flex-col gap-1 text-[11px] text-slate-400">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-[#818cf8]" />
-            {t("changedSymbol")}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-[#94a3b8]" />
-            {t("caller")}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-[#4ade80]" />
-            {t("endpoint")}
-          </div>
+          {LEGEND.map(({ kind, label }) => (
+            <div key={kind} className="flex items-center gap-2">
+              <span
+                className="inline-block w-3 h-3 rounded-[3px] border-[1.5px]"
+                style={{ borderColor: KIND_COLOR[kind] }}
+              />
+              {t(label)}
+            </div>
+          ))}
         </div>
       </div>
     </div>,
