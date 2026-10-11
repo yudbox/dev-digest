@@ -20,10 +20,19 @@ import type { MemoryCreateInput, MemoryListQuery } from "@devdigest/shared";
 export type MemoryRow = typeof t.memory.$inferSelect;
 export type MemoryLearningStateRow = typeof t.memoryLearningState.$inferSelect;
 
-/** Row returned by selectForPrompt — minimal, used to bump lastUsedAt. */
-export interface PromptMemoryRow {
+/** A memory entry eligible for a review prompt (scope + confidence filter passed). */
+export interface EligibleMemoryRow {
   id: string;
   content: string;
+  /** Whether the entry has an embedding (only those can be ranked by similarity). */
+  hasEmbedding: boolean;
+}
+
+/** An eligible entry ranked by embedding similarity (1 = identical direction). */
+export interface RankedMemoryRow {
+  id: string;
+  content: string;
+  similarity: number;
 }
 
 /** Row returned by selectForSnapshot — exactly the 5 JSONL fields. */
@@ -68,37 +77,75 @@ export interface UpdateMemory {
 // Repository
 // ---------------------------------------------------------------------------
 
+/** scope=global OR (scope=repo AND repo_id=repoId), confidence >= 0.7, in the workspace. */
+function eligibleWhere(workspaceId: string, repoId: string) {
+  return and(
+    eq(t.memory.workspaceId, workspaceId),
+    gte(t.memory.confidence, 0.7),
+    or(
+      eq(t.memory.scope, "global"),
+      and(eq(t.memory.scope, "repo"), eq(t.memory.repoId, repoId)),
+    ),
+  );
+}
+
+/** The top-k similarity query (exported for a SQL-shape unit test). */
+export function rankQuery(db: Db, workspaceId: string, repoId: string, vector: number[], k: number) {
+  const literal = `[${vector.join(",")}]`;
+  const distance = sql`${t.memory.embedding} <=> ${literal}::vector`;
+  return db
+    .select({
+      id: t.memory.id,
+      content: t.memory.content,
+      similarity: sql<number>`1 - (${distance})`,
+    })
+    .from(t.memory)
+    .where(and(eligibleWhere(workspaceId, repoId), sql`${t.memory.embedding} IS NOT NULL`))
+    .orderBy(distance)
+    .limit(k);
+}
+
 export class MemoryRepository {
   constructor(private db: Db) {}
 
   // ---- Read paths ----------------------------------------------------------
 
   /**
-   * Prompt read path (AC-1/R1/R20): scope=global OR (scope=repo AND repo_id=repoId),
-   * confidence >= 0.7. Returns id+content only (id needed to bump lastUsedAt).
+   * Entries eligible for a review prompt (AC-1/R1/R20): scope=global OR
+   * (scope=repo AND repo_id=repoId), confidence >= 0.7. The review picks from
+   * these — by embedding similarity when it can, otherwise all of them.
    */
-  async selectForPrompt(
+  async listEligibleForPrompt(
     workspaceId: string,
     repoId: string,
-  ): Promise<PromptMemoryRow[]> {
-    const rows = await this.db
-      .select({ id: t.memory.id, content: t.memory.content })
+  ): Promise<EligibleMemoryRow[]> {
+    return this.db
+      .select({
+        id: t.memory.id,
+        content: t.memory.content,
+        hasEmbedding: sql<boolean>`${t.memory.embedding} IS NOT NULL`,
+      })
       .from(t.memory)
-      .where(
-        and(
-          eq(t.memory.workspaceId, workspaceId),
-          gte(t.memory.confidence, 0.7),
-          or(
-            eq(t.memory.scope, "global"),
-            and(eq(t.memory.scope, "repo"), eq(t.memory.repoId, repoId)),
-          ),
-        ),
-      );
-    return rows;
+      .where(eligibleWhere(workspaceId, repoId));
   }
 
   /**
-   * Snapshot read path (AC-5/R5/R6/R20): same WHERE as selectForPrompt, but
+   * The k eligible entries closest to `vector` by cosine distance (pgvector
+   * `<=>`), most similar first. Entries without an embedding are never returned.
+   * Parameterised: the vector is bound as a value, not spliced into SQL.
+   */
+  async rankByEmbedding(
+    workspaceId: string,
+    repoId: string,
+    vector: number[],
+    k: number,
+  ): Promise<RankedMemoryRow[]> {
+    const rows = await rankQuery(this.db, workspaceId, repoId, vector, k);
+    return rows.map((r) => ({ id: r.id, content: r.content, similarity: Number(r.similarity) }));
+  }
+
+  /**
+   * Snapshot read path (AC-5/R5/R6/R20): same WHERE as listEligibleForPrompt, but
    * ordered by confidence × recency DESC, capped at 50. Recency = epoch seconds
    * of COALESCE(last_used_at, created_at) normalized to the range [0,1] is
    * impractical in SQL; instead we use the raw epoch value as a tie-breaker via

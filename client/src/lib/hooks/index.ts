@@ -10,3 +10,4 @@ export * from "./skills";
 export * from "./conventions";
 export * from "./evals";
 export * from "./ci";
+export * from "./performance";

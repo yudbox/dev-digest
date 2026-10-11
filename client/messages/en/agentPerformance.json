@@ -1,32 +1,57 @@
 {
+  "crumb": "Agent Performance",
   "title": "Agent Performance",
-  "subtitle": "Accept-rate is the headline quality signal · cost shown as a breakdown",
-  "loadError": "Could not load agent performance.",
-  "summary": {
+  "subtitle": "Which agents earn their keep — accept rate is the quality signal",
+  "kpi": {
     "totalRuns": "Total runs",
-    "avgAcceptRate": "Avg accept-rate",
     "totalCost": "Total cost",
-    "mostActive": "Most active"
-  },
-  "costByAgent": "Cost by agent",
-  "costByModel": "Cost by model",
-  "noCost": "No cost recorded yet.",
-  "sort": {
-    "acceptRate": "accept-rate",
-    "runs": "runs",
-    "cost": "cost"
+    "avgAccept": "Avg accept rate",
+    "mostActive": "Most-active agent",
+    "mostActiveCaption": "{runs, plural, one {# run} other {# runs}} · {accept} accept",
+    "mostActiveCaptionNoAccept": "{runs, plural, one {# run} other {# runs}}",
+    "noHistory": "Not enough history to compare",
+    "costDeltaTip": "Compared with the previous period of the same length"
   },
   "table": {
     "agent": "Agent",
-    "accept": "Accept",
     "runs": "Runs",
-    "findings": "Findings",
-    "cost": "Cost",
-    "trend": "Trend"
+    "avgCost": "Avg cost",
+    "avgDuration": "Avg dur.",
+    "accept": "Accept",
+    "lastRun": "Last run",
+    "view": "View",
+    "deleted": "Deleted agents",
+    "disabled": "disabled",
+    "sortBy": "Sort by {column}"
+  },
+  "arrow": {
+    "was": "was {pct}% ({accepted}/{resolved})",
+    "noHistory": "No data for the previous {period}",
+    "fewDecisions": "Not enough decisions in the previous period ({count})"
+  },
+  "previous": {
+    "oneDay": "day",
+    "days": "{count} days"
+  },
+  "expand": {
+    "summary": "avg {duration} · {cost}",
+    "lastRuns": "last {count, plural, one {# run} other {# runs}} in this period",
+    "noRuns": "No runs in this period"
+  },
+  "cost": {
+    "title": "Cost breakdown",
+    "byAgent": "By agent",
+    "byModel": "By model",
+    "noCost": "No cost data in this period",
+    "unknownModel": "Unknown model",
+    "otherAgents": "Other ({count, plural, one {# agent} other {# agents}})",
+    "otherModels": "Other ({count, plural, one {# model} other {# models}})"
   },
   "empty": {
-    "title": "No agent runs yet",
-    "body": "Run a review (manually) to populate per-agent performance."
-  },
-  "perAgent": "Per-agent"
+    "neverTitle": "No agent runs yet",
+    "neverBody": "Agent Performance fills in automatically after agents review pull requests — locally or in CI. Nothing is collected until the first run.",
+    "windowTitleDays": "No runs in the last {days, plural, one {# day} other {# days}}",
+    "windowTitleCustom": "No runs in the selected range",
+    "windowBody": "Try a longer period"
+  }
 }

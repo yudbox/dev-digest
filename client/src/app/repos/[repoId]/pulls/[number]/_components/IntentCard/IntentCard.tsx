@@ -170,6 +170,7 @@ const s = {
     display: "flex",
     flexDirection: "column",
     gap: 14,
+    flex: 1,
     minHeight: 450,
     boxSizing: "border-box",
     minWidth: 0,

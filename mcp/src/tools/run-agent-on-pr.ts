@@ -1,5 +1,6 @@
 import type { DevDigestClient } from "../api-client.js";
 import { mcpError, mcpSuccess } from "../api-client.js";
+import { resolvePrId } from "../resolve-pr.js";
 
 interface RunSummary {
   run_id: string;
@@ -42,9 +43,13 @@ function sleep(ms: number): Promise<void> {
 
 export async function runAgentOnPr(
   client: DevDigestClient,
-  args: { pr_id: string; agent_id: string },
+  args: { pr_id: string; agent_id: string; repo?: string },
 ) {
-  const { pr_id, agent_id } = args;
+  const { agent_id } = args;
+
+  const resolved = await resolvePrId(client, args.pr_id, args.repo);
+  if (!resolved.ok) return resolved.result;
+  const pr_id = resolved.id;
 
   // Pre-validate agent exists before POST (avoids guessing by error text)
   const agentCheck = await client.request<unknown>(

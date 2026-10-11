@@ -6,7 +6,6 @@ import { Severity } from './findings';
  *
  * NEW file (A6 owns it; the barrel re-exports it). Covers:
  *   - PluginBundle / InstalledPlugin   POST /plugins/export, /plugins/import, GET /plugins
- *   - AgentPerf / AgentPerfRow         GET /agents/performance
  *   - Digest / DigestSettings          Weekly Digest (settings + cron-built rows)
  *
  * Nothing here mutates an existing contract — these sit alongside A2's
@@ -130,60 +129,6 @@ export const PluginImportResult = z.object({
   }),
 });
 export type PluginImportResult = z.infer<typeof PluginImportResult>;
-
-// ---------------------------------------------------------------------------
-// Agent Performance  (GET /agents/performance)
-// ---------------------------------------------------------------------------
-
-/** Per-agent performance row (aggregate across agent_runs + findings). */
-export const AgentPerfRow = z.object({
-  agent_id: z.string(),
-  agent_name: z.string(),
-  provider: z.string().nullable(),
-  model: z.string().nullable(),
-  runs: z.number().int(),
-  findings_total: z.number().int(),
-  accepted: z.number().int(),
-  dismissed: z.number().int(),
-  /** headline quality signal: accepted / (accepted + dismissed), 0..1 or null. */
-  accept_rate: z.number().nullable(),
-  dismiss_rate: z.number().nullable(),
-  avg_findings_per_run: z.number().nullable(),
-  total_cost_usd: z.number().nullable(),
-  avg_cost_usd: z.number().nullable(),
-  avg_latency_ms: z.number().nullable(),
-  last_run_at: z.string().nullable(),
-  findings_by_severity: z.object({
-    CRITICAL: z.number().int(),
-    WARNING: z.number().int(),
-    SUGGESTION: z.number().int(),
-  }),
-  /** recent findings-per-run trend (oldest→newest) for the sparkline. */
-  trend: z.array(z.number()),
-});
-export type AgentPerfRow = z.infer<typeof AgentPerfRow>;
-
-/** A donut segment {label,value,color}. */
-export const PerfCostSegment = z.object({
-  label: z.string(),
-  value: z.number(),
-});
-export type PerfCostSegment = z.infer<typeof PerfCostSegment>;
-
-/** Response of GET /agents/performance. */
-export const AgentPerf = z.object({
-  summary: z.object({
-    runs: z.number().int(),
-    total_cost_usd: z.number().nullable(),
-    avg_accept_rate: z.number().nullable(),
-    most_active_agent: z.string().nullable(),
-  }),
-  agents: z.array(AgentPerfRow),
-  /** cost split by agent and by model (for the two cost-breakdown donuts). */
-  cost_by_agent: z.array(PerfCostSegment),
-  cost_by_model: z.array(PerfCostSegment),
-});
-export type AgentPerf = z.infer<typeof AgentPerf>;
 
 // re-export Severity-adjacent helper to keep the import surface tidy
 export { Severity };

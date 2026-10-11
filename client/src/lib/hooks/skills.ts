@@ -29,15 +29,6 @@ export interface UpdateSkillInput {
   >;
 }
 
-export interface SkillStats {
-  agent_count: number;
-  pull_frequency_pct: number;
-  accept_rate_pct: number;
-  findings_30d: number;
-  agents: Array<{ id: string; name: string }>;
-  findings_by_category: Record<string, number>;
-}
-
 export interface SkillVersionRow {
   version: number;
   body: string;
@@ -109,17 +100,8 @@ export function useDeleteSkill() {
 }
 
 // ---------------------------------------------------------------------------
-// Skill stats + versions
+// Skill versions
 // ---------------------------------------------------------------------------
-
-export function useSkillStats(id: string | null | undefined) {
-  return useQuery({
-    queryKey: ["skill-stats", id],
-    queryFn: () => api.get<SkillStats>(`/skills/${id}/stats`),
-    enabled: !!id,
-    staleTime: 30_000,
-  });
-}
 
 export function useSkillVersions(id: string | null | undefined) {
   return useQuery({

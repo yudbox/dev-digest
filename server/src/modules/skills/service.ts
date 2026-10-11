@@ -1,7 +1,9 @@
 import type { Container } from "../../platform/container.js";
-import type { Skill, SkillSource, SkillType } from "@devdigest/shared";
+import type { Skill, SkillSource, SkillStatsResponse, SkillType, StatsWindow } from "@devdigest/shared";
 import { SkillsRepository } from "./repository.js";
-import type { SkillRow, SkillStats, SkillVersionRow } from "./repository.js";
+import type { SkillRow, SkillVersionRow } from "./repository.js";
+import { toSkillStatsResponse } from "../performance/helpers.js";
+import { NotFoundError } from "../../platform/errors.js";
 import { THREAT_LEVEL } from "./scanner.js";
 import type { ThreatLevel } from "./scanner.js";
 
@@ -64,13 +66,24 @@ export class SkillsService {
   }
 
   async list(workspaceId: string): Promise<Skill[]> {
-    const rows = await this.repo.listWithStats(workspaceId);
-    return rows.map((r) => ({
-      ...toSkillDto(r.skill),
-      agent_count: r.agent_count,
-      pull_frequency_pct: r.pull_frequency_pct,
-      accept_rate_pct: r.accept_rate_pct,
-    }));
+    const rows = await this.repo.listWithAgentCounts(workspaceId);
+    // Run-based numbers come from the shared performance aggregation (one
+    // batched query for every skill), with the same definitions as Skill Stats.
+    const usage = await this.container.performanceRepo.skillAggregatesAllTime(workspaceId);
+    return rows.map((r) => {
+      const u = usage.get(r.skill.id);
+      return {
+        ...toSkillDto(r.skill),
+        agent_count: r.agent_count,
+        // Omitted (not 0) when there is no denominator: "no data" is not "0%".
+        ...(u && u.prsLoaded > 0
+          ? { pull_frequency_pct: Math.round((u.prsApplied / u.prsLoaded) * 100) }
+          : {}),
+        ...(u && u.resolved > 0
+          ? { accept_rate_pct: Math.round((u.accepted / u.resolved) * 100) }
+          : {}),
+      };
+    });
   }
 
   async get(workspaceId: string, id: string): Promise<Skill | undefined> {
@@ -139,11 +152,14 @@ export class SkillsService {
     return this.repo.listVersions(id);
   }
 
-  async stats(
-    workspaceId: string,
-    id: string,
-  ): Promise<SkillStats | undefined> {
-    return this.repo.stats(workspaceId, id);
+  /** Skill Stats for a window; throws 404 when the skill is not in the workspace. */
+  async stats(workspaceId: string, id: string, window: StatsWindow): Promise<SkillStatsResponse> {
+    const data = await this.container.performanceRepo.skillStats(workspaceId, id, {
+      from: new Date(window.from),
+      to: new Date(window.to),
+    });
+    if (!data) throw new NotFoundError("Skill not found");
+    return toSkillStatsResponse(window, data);
   }
 
   async updateThreatLevel(id: string, threatLevel: ThreatLevel): Promise<void> {

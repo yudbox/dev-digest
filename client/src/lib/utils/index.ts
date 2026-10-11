@@ -4,3 +4,4 @@ export type { VcsUrlRepo } from "./vcsUrls";
 export { modelLabel, toModelOptions } from "./modelLabel";
 export type { PricedModel } from "./modelLabel";
 export { FEATURE_MODELS } from "./featureModels";
+export * from "./period";

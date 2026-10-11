@@ -1,0 +1,27 @@
+{
+  "name": "The stats period is shared between Agent Performance and the agent's Stats tab",
+  "description": "Switches the global period to 1 day on Agent Performance, opens an agent's Stats tab and confirms it is already on 1 day, switches it back to 30 days there and confirms Agent Performance follows. The period lives in localStorage ('dd-period'), so it survives navigation. Read-only: no model call. Depends on the performance demo seed.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/agent-performance"], "label": "load Agent Performance" },
+    { "cmd": ["wait", "--url", "/agent-performance"], "label": "route reached" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "stats fetch settles" },
+    { "cmd": ["wait", "--text", "30 days"], "label": "the default period is 30 days" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Period"], "label": "open the period selector" },
+    { "cmd": ["find", "text", "1 day", "click"], "label": "choose 1 day" },
+    { "cmd": ["wait", "--text", "1 day"], "label": "the selector now shows 1 day" },
+    { "cmd": ["open", "{BASE}/agents"], "label": "go to the agents list" },
+    { "cmd": ["wait", "--text", "Security Reviewer"], "label": "seeded agent card is visible" },
+    { "cmd": ["find", "text", "Security Reviewer", "click"], "label": "open the agent" },
+    { "cmd": ["wait", "--url", "/agents/"], "label": "agent editor reached" },
+    { "cmd": ["find", "text", "Stats", "click"], "label": "open the Stats tab" },
+    { "cmd": ["wait", "--url", "tab=stats"], "label": "Stats tab is active in the URL" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "agent stats fetch settles" },
+    { "cmd": ["wait", "--text", "Run history"], "label": "run history renders" },
+    { "cmd": ["wait", "--text", "1 day"], "label": "the Stats tab is already on 1 day (shared period)" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Period"], "label": "open the period selector on the Stats tab" },
+    { "cmd": ["find", "text", "30 days", "click"], "label": "switch back to 30 days" },
+    { "cmd": ["open", "{BASE}/agent-performance"], "label": "return to Agent Performance" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "stats fetch settles" },
+    { "cmd": ["wait", "--text", "30 days"], "label": "Agent Performance follows the change" }
+  ]
+}

@@ -1,4 +1,4 @@
-/* providers.tsx — client provider stack: React Query + Theme + active Repo. */
+/* providers.tsx — client provider stack: React Query + Theme + active Repo + stats Period. */
 "use client";
 
 import React from "react";
@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-query";
 import { ThemeProvider } from "./theme";
 import { RepoProvider } from "./repoContext";
+import { PeriodProvider } from "./periodContext";
 import { ToastProvider, notify } from "./toast";
 import { ApiError } from "../api";
 
@@ -47,7 +48,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={qc}>
       <ThemeProvider>
         <ToastProvider>
-          <RepoProvider>{children}</RepoProvider>
+          <RepoProvider>
+            <PeriodProvider>{children}</PeriodProvider>
+          </RepoProvider>
         </ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>

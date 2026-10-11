@@ -97,5 +97,29 @@
     "bodyLabel": "Skill body (Markdown)",
     "bodyHint": "Saving a changed body creates a new immutable version.",
     "version": "v{version}"
+  },
+  "stats": {
+    "noUsageTitle": "No usage yet",
+    "noUsageBody": "This skill isn't enabled on any agent. Add it to an agent to start collecting stats.",
+    "neverTitle": "This skill hasn't run yet",
+    "neverBody": "Stats fill in automatically after an agent that uses this skill reviews a pull request.",
+    "noRunsTitle": "No runs in this period",
+    "noRunsBody": "Try a longer period",
+    "kpi": {
+      "usedBy": "Used by",
+      "usedByValue": "{count, plural, one {# agent} other {# agents}}",
+      "ranInPeriod": "{count} ran in period",
+      "pullFrequency": "Pull frequency",
+      "pullFrequencyValue": "{pct}% ({applied}/{loaded} PRs)",
+      "pullCaption": "local runs",
+      "acceptRate": "Accept rate",
+      "findings": "Findings"
+    },
+    "agents": {
+      "title": "Agents using this skill",
+      "open": "Open",
+      "disabled": "disabled"
+    },
+    "byCategory": "Findings by category"
   }
 }

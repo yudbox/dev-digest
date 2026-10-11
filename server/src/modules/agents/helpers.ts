@@ -5,6 +5,7 @@ import type {
   ReviewStrategy,
 } from "@devdigest/shared";
 import type { AgentRow } from "./repository.js";
+import { EMPTY_AGGREGATE, toAgentRow, type AgentAggregate } from "../performance/helpers.js";
 
 /**
  * Pure helpers for the agents module — DB row ⇄ DTO mapping and the
@@ -82,4 +83,28 @@ export function isConfigChange(
       JSON.stringify(patch.contextDocPaths) !==
         JSON.stringify(existing.contextDocPaths ?? []))
   );
+}
+
+/** The list-view stats fields of the public `Agent` DTO. */
+export type AgentListStats = Pick<
+  Agent,
+  "runs_count" | "accept_rate_pct" | "avg_cost_usd" | "avg_duration_ms"
+>;
+
+/**
+ * All-time list stats from the shared performance aggregation, via the SAME row
+ * mapper the dashboard and the Agent Stats tab use (so the numbers cannot
+ * drift). `accept_rate_pct` is omitted — not 0 — when nobody has accepted or
+ * dismissed a finding yet: "no decisions" is not "0% accepted".
+ */
+export function toAgentListStats(agg: AgentAggregate | undefined): AgentListStats {
+  const row = toAgentRow({ id: null, name: "", enabled: true }, agg ?? EMPTY_AGGREGATE, undefined, []);
+  return {
+    runs_count: row.runs,
+    ...(row.accept.resolved > 0
+      ? { accept_rate_pct: Math.round((row.accept.accepted / row.accept.resolved) * 100) }
+      : {}),
+    avg_cost_usd: row.avgCostUsd,
+    avg_duration_ms: row.avgDurationMs,
+  };
 }
