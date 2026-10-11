@@ -12,7 +12,7 @@ import type {
 } from "@devdigest/shared";
 import * as t from "../../db/schema.js";
 import { AgentsRepository } from "./repository.js";
-import { toAgentDto } from "./helpers.js";
+import { toAgentDto, toAgentListStats } from "./helpers.js";
 
 /**
  * A2 — agents service. Business logic for the Agents tab + Agent Editor.
@@ -63,36 +63,28 @@ export class AgentsService {
 
   async list(workspaceId: string): Promise<Agent[]> {
     const rows = await this.repo.list(workspaceId);
-    // Attach skill_count + bonus stats to each agent (two extra queries for
-    // ALL agents combined — never one query per agent).
+    // Attach skill_count + all-time stats to each agent (extra queries for ALL
+    // agents combined — never one query per agent). The stats come from the
+    // shared performance aggregation, the same one the dashboard and the Agent
+    // Stats tab use.
     const skillCounts = await this.repo.skillCountsForWorkspace(workspaceId);
-    const stats = await this.repo.statsForWorkspace(workspaceId);
-    return rows.map((row) => {
-      const s = stats.get(row.id);
-      return {
-        ...toAgentDto(row),
-        skill_count: skillCounts.get(row.id) ?? 0,
-        runs_count: s?.runsCount ?? 0,
-        accept_rate_pct: s?.acceptRatePct ?? 0,
-        avg_cost_usd: s?.avgCostUsd ?? null,
-        avg_duration_ms: s?.avgDurationMs ?? null,
-      };
-    });
+    const stats = await this.container.performanceRepo.agentAggregates(workspaceId, null);
+    return rows.map((row) => ({
+      ...toAgentDto(row),
+      skill_count: skillCounts.get(row.id) ?? 0,
+      ...toAgentListStats(stats.get(row.id)),
+    }));
   }
 
   async get(workspaceId: string, id: string): Promise<Agent | undefined> {
     const row = await this.repo.getById(workspaceId, id);
     if (!row) return undefined;
     const skillCount = await this.repo.skillCount(id);
-    const stats = await this.repo.statsForWorkspace(workspaceId);
-    const s = stats.get(id);
+    const stats = await this.container.performanceRepo.agentAggregates(workspaceId, null, id);
     return {
       ...toAgentDto(row),
       skill_count: skillCount,
-      runs_count: s?.runsCount ?? 0,
-      accept_rate_pct: s?.acceptRatePct ?? 0,
-      avg_cost_usd: s?.avgCostUsd ?? null,
-      avg_duration_ms: s?.avgDurationMs ?? null,
+      ...toAgentListStats(stats.get(id)),
     };
   }
 

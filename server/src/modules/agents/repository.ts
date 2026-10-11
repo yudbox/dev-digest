@@ -1,4 +1,4 @@
-import { and, asc, avg, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../../db/client.js";
 import * as t from "../../db/schema.js";
 import type { CiFailOn, Provider, ReviewStrategy } from "@devdigest/shared";
@@ -61,14 +61,6 @@ export interface AgentVersionRow {
   version: number;
   systemPrompt: string;
   createdAt: Date;
-}
-
-/** Bonus list-stats (AC-30): runs count, finding-level accept rate, avg cost. */
-export interface AgentStats {
-  runsCount: number;
-  acceptRatePct: number;
-  avgCostUsd: number | null;
-  avgDurationMs: number | null;
 }
 
 export class AgentsRepository {
@@ -319,74 +311,5 @@ export class AgentsRepository {
       .where(inArray(t.agentSkills.agentId, agentIds))
       .groupBy(t.agentSkills.agentId);
     return new Map(rows.map((r) => [r.agentId, r.n]));
-  }
-
-  /**
-   * Map of agentId → {runsCount, acceptRatePct, avgCostUsd} for every agent in
-   * a workspace, in ONE query (two pre-aggregated subqueries LEFT JOINed onto
-   * `agents` — not a per-agent loop). `accept_rate_pct` is FINDING-level (%
-   * of resolved findings — accepted OR dismissed — that were accepted), not
-   * verdict-level (AC-30's explicit clarification; deliberately different from
-   * `SkillsRepository`'s existing verdict-based formula, reused as-is for
-   * AC-31 — the two bonus stats are intentionally NOT the same formula).
-   */
-  async statsForWorkspace(
-    workspaceId: string,
-  ): Promise<Map<string, AgentStats>> {
-    const runsAgg = this.db
-      .select({
-        agentId: t.agentRuns.agentId,
-        runsCount: count(t.agentRuns.id).as("runs_count"),
-        avgCost: avg(t.agentRuns.costUsd).as("avg_cost"),
-        avgDuration: avg(t.agentRuns.durationMs).as("avg_duration"),
-      })
-      .from(t.agentRuns)
-      .where(eq(t.agentRuns.workspaceId, workspaceId))
-      .groupBy(t.agentRuns.agentId)
-      .as("runs_agg");
-
-    const findingsAgg = this.db
-      .select({
-        agentId: t.reviews.agentId,
-        resolved: count(
-          sql`CASE WHEN ${t.findings.acceptedAt} IS NOT NULL OR ${t.findings.dismissedAt} IS NOT NULL THEN 1 END`,
-        ).as("resolved"),
-        accepted: count(
-          sql`CASE WHEN ${t.findings.acceptedAt} IS NOT NULL THEN 1 END`,
-        ).as("accepted"),
-      })
-      .from(t.findings)
-      .innerJoin(t.reviews, eq(t.findings.reviewId, t.reviews.id))
-      .where(eq(t.reviews.workspaceId, workspaceId))
-      .groupBy(t.reviews.agentId)
-      .as("findings_agg");
-
-    const rows = await this.db
-      .select({
-        agentId: t.agents.id,
-        runsCount: runsAgg.runsCount,
-        avgCost: runsAgg.avgCost,
-        avgDuration: runsAgg.avgDuration,
-        resolved: findingsAgg.resolved,
-        accepted: findingsAgg.accepted,
-      })
-      .from(t.agents)
-      .leftJoin(runsAgg, eq(runsAgg.agentId, t.agents.id))
-      .leftJoin(findingsAgg, eq(findingsAgg.agentId, t.agents.id))
-      .where(eq(t.agents.workspaceId, workspaceId));
-
-    const result = new Map<string, AgentStats>();
-    for (const row of rows) {
-      const resolved = row.resolved ?? 0;
-      const accepted = row.accepted ?? 0;
-      result.set(row.agentId, {
-        runsCount: row.runsCount ?? 0,
-        acceptRatePct:
-          resolved > 0 ? Math.round((accepted / resolved) * 100) : 0,
-        avgCostUsd: row.avgCost == null ? null : Number(row.avgCost),
-        avgDurationMs: row.avgDuration == null ? null : Number(row.avgDuration),
-      });
-    }
-    return result;
   }
 }

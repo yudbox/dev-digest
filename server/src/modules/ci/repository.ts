@@ -202,7 +202,10 @@ export class CiRepository {
           suggestion: input.suggestion,
           durationMs: input.durationMs,
           costUsd: input.costUsd,
-          ranAt: input.ranAt,
+          // The real CI time is stable across re-imports; LEAST keeps the earlier
+          // value, so a run first stored under its import time is corrected, and
+          // a re-import can never push a run later in time.
+          ranAt: sql`LEAST(${t.ciRuns.ranAt}, excluded.ran_at)`,
         },
       })
       .returning();
@@ -366,6 +369,10 @@ export class CiRepository {
     findingsCount: number;
     durationMs: number | null;
     costUsd: number | null;
+    /** When the CI run actually ran (not when it was imported). */
+    ranAt: Date;
+    /** The CI run this row was imported from. */
+    ciRunId: string;
   }): Promise<void> {
     await this.db.insert(t.agentRuns).values({
       workspaceId: input.workspaceId,
@@ -375,6 +382,18 @@ export class CiRepository {
       findingsCount: input.findingsCount,
       durationMs: input.durationMs,
       costUsd: input.costUsd,
+      ranAt: input.ranAt,
+      ciRunId: input.ciRunId,
     });
+  }
+
+  /** The agent run already imported for a CI run, if any (re-imports must not duplicate it). */
+  async findAgentRunIdByCiRunId(ciRunId: string): Promise<string | undefined> {
+    const [row] = await this.db
+      .select({ id: t.agentRuns.id })
+      .from(t.agentRuns)
+      .where(eq(t.agentRuns.ciRunId, ciRunId))
+      .limit(1);
+    return row?.id;
   }
 }

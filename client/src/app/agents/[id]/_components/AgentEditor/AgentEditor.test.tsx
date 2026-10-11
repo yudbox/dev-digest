@@ -26,6 +26,15 @@ vi.mock("@/lib/hooks/evals", () => ({
   useRunSkillEvals: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+// The Stats tab has its own tests (needs a query client + period provider).
+vi.mock("./_components/StatsTab", () => ({
+  StatsTab: ({ agentId, agentName }: { agentId: string; agentName: string }) => (
+    <div data-testid="stats-tab-stub">
+      {agentId}:{agentName}
+    </div>
+  ),
+}));
+
 import { AgentEditor } from "./AgentEditor";
 
 afterEach(cleanup);
@@ -69,5 +78,20 @@ describe("A2 Agent Editor (smoke)", () => {
     renderWithIntl(<AgentEditor agent={AGENT} tab="evals" onTab={() => {}} />);
     expect(screen.getByText("Eval cases")).toBeInTheDocument();
     expect(screen.getByText("View full dashboard →")).toBeInTheDocument();
+  });
+
+  it("lists Stats between Evals and CI and renders it for ?tab=stats", () => {
+    const { container } = renderWithIntl(<AgentEditor agent={AGENT} tab="stats" onTab={() => {}} />);
+    const labels = ["Config", "Skills", "Context", "Evals", "Stats", "CI"].map((l) => container.textContent!.indexOf(l));
+    expect(labels.every((i) => i >= 0)).toBe(true);
+    expect([...labels].sort((a, b) => a - b)).toEqual(labels);
+    expect(screen.getByTestId("stats-tab-stub")).toHaveTextContent("ag1:Security Reviewer");
+    // other tabs' content is not rendered
+    expect(screen.queryByText("Configuration")).toBeNull();
+  });
+
+  it("does not render the Stats tab on other tabs", () => {
+    renderWithIntl(<AgentEditor agent={AGENT} tab="config" onTab={() => {}} />);
+    expect(screen.queryByTestId("stats-tab-stub")).toBeNull();
   });
 });

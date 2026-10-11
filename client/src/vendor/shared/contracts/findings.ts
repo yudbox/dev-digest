@@ -65,6 +65,11 @@ export const Finding = z.object({
   // Lethal-trifecta variant fields (present only when kind === 'lethal_trifecta')
   trifecta_components: z.array(TrifectaComponent).nullish(),
   evidence: z.array(TrifectaEvidence).nullish(),
+  /**
+   * Skill labels (`"S1"`…`"Sn"`) that produced this finding, as reported by the
+   * model. The server maps them to skill ids before saving; see FindingRecord.
+   */
+  rule_refs: z.array(z.string()).max(20).nullish(),
 });
 export type Finding = z.infer<typeof Finding>;
 
@@ -79,6 +84,8 @@ export const FindingRecord = Finding.extend({
   review_id: z.string(),
   accepted_at: z.string().nullable(),
   dismissed_at: z.string().nullable(),
+  /** Persisted: skill ids (uuid) that produced this finding; null for legacy rows. */
+  rule_refs: z.array(z.string().uuid()).nullish(),
 });
 export type FindingRecord = z.infer<typeof FindingRecord>;
 
@@ -95,6 +102,8 @@ export const Review = z.object({
       "Overall PR quality from 0 to 100, where HIGHER is better. 90–100 = no or only trivial issues (approve); 60–89 = minor suggestions; 30–59 = warnings worth addressing; 0–29 = critical problems. Must be consistent with `findings`: if there are no findings, the score is 90 or above.",
     ),
   findings: z.array(Finding),
+  /** Skill labels (`"S1"`…`"Sn"`) the model considered relevant to this diff. */
+  skills_applied: z.array(z.string()).max(50).nullish(),
 });
 export type Review = z.infer<typeof Review>;
 

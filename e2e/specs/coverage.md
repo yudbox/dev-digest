@@ -15,6 +15,9 @@ What is covered, what is not, and why.
 | `onboarding` | `flows/onboarding.json` | Onboarding wizard loads and first step renders |
 | `settings` | `flows/settings.json` | Settings page loads, provider selector visible |
 | `azure-devops` | `specs/08-azure-devops.flow.json` | Settings API Keys renders the Azure DevOps PAT row alongside GitHub (TASK-010/TASK-011) |
+| `agent-performance` | `specs/09-agent-performance.flow.json` | Agent Performance opens from the GLOBAL sidebar and renders seeded agents, an agent without runs, and both cost donuts (read-only, needs the performance demo seed) |
+| `stats-period-shared` | `specs/10-stats-period-shared.flow.json` | The 1 day / 30 days period set on Agent Performance carries over to the agent's Stats tab and back |
+| `skill-stats` | `specs/11-skill-stats.flow.json` | Skill Stats tab renders pull frequency, the agents list and findings by category |
 
 ## What Is Not Covered
 

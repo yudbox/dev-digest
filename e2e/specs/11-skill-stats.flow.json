@@ -1,0 +1,16 @@
+{
+  "name": "Skill Stats shows usage, pull frequency and findings by category",
+  "description": "Opens a seeded skill and its Stats tab and confirms the redesigned layout renders. Read-only: no model call. Depends on the performance demo seed (it attaches the demo skills to the Security Reviewer and records usage for them).",
+  "steps": [
+    { "cmd": ["open", "{BASE}/skills"], "label": "load the skills page" },
+    { "cmd": ["wait", "--text", "Secret Leakage Gate"], "label": "a seeded skill is listed" },
+    { "cmd": ["find", "text", "Secret Leakage Gate", "click"], "label": "open the skill" },
+    { "cmd": ["wait", "--url", "/skills/"], "label": "skill editor reached" },
+    { "cmd": ["find", "text", "Stats", "click"], "label": "open the Stats tab" },
+    { "cmd": ["wait", "--url", "tab=stats"], "label": "Stats tab is active in the URL" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "skill stats fetch settles" },
+    { "cmd": ["wait", "--text", "Pull frequency"], "label": "pull frequency card renders" },
+    { "cmd": ["wait", "--text", "Agents using this skill"], "label": "agents list renders" },
+    { "cmd": ["wait", "--text", "Findings by category"], "label": "category donut card renders" }
+  ]
+}

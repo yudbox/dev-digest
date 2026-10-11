@@ -1,0 +1,16 @@
+{
+  "name": "Agent Performance renders from the sidebar with seeded runs, table and cost breakdown",
+  "description": "Opens Agent Performance from the GLOBAL sidebar and confirms the page shows the seeded agents and both cost donuts. Read-only: the screen only reads stored runs and findings, so no model call and no API key are needed. Depends on the performance demo seed (`pnpm db:seed` seeds ~65 days of runs for the acme/payments-api agents). Numbers are not asserted because run times are relative to 'now'.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
+    { "cmd": ["find", "text", "Agent Performance", "click"], "label": "click Agent Performance in the sidebar" },
+    { "cmd": ["wait", "--url", "/agent-performance"], "label": "navigate to the workspace-level route" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "stats fetch settles" },
+    { "cmd": ["wait", "--text", "Which agents earn their keep"], "label": "page subtitle renders" },
+    { "cmd": ["wait", "--text", "Security Reviewer"], "label": "a seeded agent is in the table" },
+    { "cmd": ["wait", "--text", "Custom Mentor"], "label": "an agent without runs is a row, not an empty page" },
+    { "cmd": ["wait", "--text", "By agent"], "label": "cost by agent donut renders" },
+    { "cmd": ["wait", "--text", "By model"], "label": "cost by model donut renders" }
+  ]
+}

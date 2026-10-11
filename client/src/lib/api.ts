@@ -315,6 +315,45 @@ export function patchAgentCiFailOn(
   return api.put<Agent>(`/agents/${agentId}`, { ci_fail_on });
 }
 
+// ---- Performance / stats (read-only) --------------------------------------
+
+import type {
+  AgentPerformanceResponse,
+  AgentStatsResponse,
+  AgentRunsResponse,
+  RunFindingsResponse,
+  SkillStatsResponse,
+} from "@devdigest/shared";
+
+/** `query` is the period querystring from `usePeriod()` (`range=…&tz=…` or `from/to/tz`). */
+export function getAgentPerformance(query: string): Promise<AgentPerformanceResponse> {
+  return api.get<AgentPerformanceResponse>(`/agent-performance?${query}`);
+}
+
+export function getAgentStats(agentId: string, query: string): Promise<AgentStatsResponse> {
+  return api.get<AgentStatsResponse>(`/agents/${agentId}/stats?${query}`);
+}
+
+export function getAgentRuns(
+  agentId: string,
+  query: string,
+  page: { cursor?: string | null; limit?: number } = {},
+): Promise<AgentRunsResponse> {
+  const extra = new URLSearchParams();
+  if (page.limit) extra.set("limit", String(page.limit));
+  if (page.cursor) extra.set("cursor", page.cursor);
+  const tail = extra.toString();
+  return api.get<AgentRunsResponse>(`/agents/${agentId}/runs?${query}${tail ? `&${tail}` : ""}`);
+}
+
+export function getRunFindings(runId: string): Promise<RunFindingsResponse> {
+  return api.get<RunFindingsResponse>(`/runs/${runId}/findings`);
+}
+
+export function getSkillStats(skillId: string, query: string): Promise<SkillStatsResponse> {
+  return api.get<SkillStatsResponse>(`/skills/${skillId}/stats?${query}`);
+}
+
 // ---- Memory ---------------------------------------------------------------
 
 import type {

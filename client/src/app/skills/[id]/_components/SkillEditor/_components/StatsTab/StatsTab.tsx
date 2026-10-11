@@ -1,303 +1,153 @@
-/* StatsTab — usage stats: agent count, pull frequency, accept rate, findings. */
+/* Skill Editor → Stats. How a skill is used, for the global period. Reads stored
+   runs and findings only — never starts a review or a model call. */
 "use client";
 
 import React from "react";
-import { Skeleton, ErrorState } from "@devdigest/ui";
 import { useRouter } from "next/navigation";
-import { useSkillStats } from "@/lib/hooks/skills";
+import { Badge, Card, CircularScore, SectionLabel } from "@devdigest/ui";
+import { useTranslations } from "next-intl";
+import type { SkillStatsResponse } from "@devdigest/shared";
+import {
+  AcceptRateValue,
+  AgentIcon,
+  CategoryDonut,
+  KpiCard,
+  PeriodHeader,
+  StatsEmpty,
+  StatsError,
+  StatsSkeleton,
+} from "@/components/stats";
+import { useSkillStats } from "@/lib/hooks/performance";
 
-const CATEGORY_COLORS = [
-  "#6366f1",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#06b6d4",
-];
+/** "71% (12/17 PRs)", or a dash when the skill was loaded on no PR in the period. */
+function PullFrequencyValue({ applied, loaded }: { applied: number; loaded: number }) {
+  const t = useTranslations("skills.stats.kpi");
+  if (loaded <= 0) return <>—</>;
+  return <>{t("pullFrequencyValue", { pct: Math.round((applied / loaded) * 100), applied, loaded })}</>;
+}
 
-function StatCard({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: React.ReactNode;
-  sub?: string;
-}) {
+function KpiRow({ data }: { data: SkillStatsResponse }) {
+  const t = useTranslations("skills.stats.kpi");
+  const pct = data.accept.resolved > 0 ? Math.round((data.accept.accepted / data.accept.resolved) * 100) : null;
   return (
-    <div
-      style={{
-        padding: "16px 20px",
-        background: "var(--bg-elevated)",
-        border: "1px solid var(--border)",
-        borderRadius: 10,
-        display: "flex",
-        flexDirection: "column",
-        gap: 4,
-        flex: 1,
-        minWidth: 120,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: "var(--text-muted)",
-          letterSpacing: 1,
-          textTransform: "uppercase",
-        }}
+    <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+      {/* Period-independent: how many agents have the skill attached right now. */}
+      <KpiCard label={t("usedBy")} testId="kpi-used-by" value={t("usedByValue", { count: data.usedBy })}>
+        <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{t("ranInPeriod", { count: data.ranInPeriod })}</span>
+      </KpiCard>
+
+      <KpiCard
+        label={t("pullFrequency")}
+        testId="kpi-pull"
+        value={<PullFrequencyValue applied={data.pullFrequency.prsApplied} loaded={data.pullFrequency.prsLoaded} />}
       >
-        {label}
-      </div>
-      <div
-        style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)" }}
-      >
-        {value}
-      </div>
-      {sub && (
-        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{sub}</div>
-      )}
+        <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{t("pullCaption")}</span>
+      </KpiCard>
+
+      <KpiCard
+        label={t("acceptRate")}
+        testId="kpi-accept"
+        value={<AcceptRateValue accepted={data.accept.accepted} resolved={data.accept.resolved} size={20} caption localFindings={data.findings} />}
+        aside={pct !== null ? <CircularScore score={pct} size={34} stroke={4} /> : undefined}
+      />
+
+      <KpiCard label={t("findings")} testId="kpi-findings" value={data.findings} />
     </div>
   );
 }
 
-export function StatsTab({ skillId }: { skillId: string }) {
+/** Agents that currently have the skill — a configuration list, so it does not depend on the period. */
+function AgentsUsing({ agents }: { agents: SkillStatsResponse["agents"] }) {
+  const t = useTranslations("skills.stats.agents");
   const router = useRouter();
-  const { data: stats, isLoading, isError, refetch } = useSkillStats(skillId);
+  return (
+    <Card>
+      <SectionLabel icon="Cpu">{t("title")}</SectionLabel>
+      <div data-testid="agents-using" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {agents.map((a) => (
+          <div
+            key={a.id}
+            data-testid="agent-using-row"
+            data-agent={a.name}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 9,
+              padding: "8px 10px",
+              borderRadius: 7,
+              border: "1px solid var(--border)",
+              background: "var(--bg-elevated)",
+              opacity: a.enabled ? 1 : 0.65,
+            }}
+          >
+            <AgentIcon id={a.id} size={22} />
+            <span style={{ fontSize: 12.5, fontWeight: 600, flex: 1 }}>{a.name}</span>
+            {!a.enabled && <Badge>{t("disabled")}</Badge>}
+            <button
+              type="button"
+              onClick={() => router.push(`/agents/${a.id}?tab=stats`)}
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--accent-text)", fontSize: 12 }}
+            >
+              {t("open")}
+            </button>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
-  if (isLoading) {
+export function StatsTab({ skillId }: { skillId: string }) {
+  const t = useTranslations("skills.stats");
+  const { data, isPending, isError, refetch } = useSkillStats(skillId);
+
+  // Attached to no agent: there is nothing to measure at all.
+  if (data && data.usedBy === 0) {
     return (
-      <div
-        style={{
-          padding: 28,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <Skeleton height={90} />
-        <Skeleton height={200} />
+      <div data-testid="skill-no-usage" style={{ padding: "24px 28px" }}>
+        <StatsEmpty title={t("noUsageTitle")} body={t("noUsageBody")} icon="BarChart" />
       </div>
     );
   }
 
-  if (isError || !stats) {
-    return (
-      <ErrorState body="Could not load stats." onRetry={() => refetch()} />
-    );
-  }
-
-  const categoryEntries = Object.entries(stats.findings_by_category);
-  const categoryTotal = categoryEntries.reduce((s, [, n]) => s + n, 0);
-
-  // Build conic-gradient for donut
-  let cumulative = 0;
-  const segments = categoryEntries.map(([cat, count], i) => {
-    const pct = categoryTotal > 0 ? (count / categoryTotal) * 100 : 0;
-    const start = cumulative;
-    cumulative += pct;
-    return {
-      cat,
-      count,
-      pct,
-      start,
-      color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
-    };
-  });
-
-  const gradient =
-    categoryTotal > 0
-      ? segments
-          .map(
-            (s) =>
-              `${s.color} ${s.start.toFixed(1)}% ${(s.start + s.pct).toFixed(1)}%`,
-          )
-          .join(", ")
-      : "var(--border) 0% 100%";
+  const neverRan = data !== undefined && !data.hasAnyRuns;
+  const noRunsInPeriod = data !== undefined && data.hasAnyRuns && data.loadedRunsInWindow === 0;
 
   return (
-    <div
-      style={{
-        padding: 28,
-        display: "flex",
-        flexDirection: "column",
-        gap: 24,
-        maxWidth: 720,
-      }}
-    >
-      <h2 style={{ fontSize: 16, fontWeight: 700 }}>Stats</h2>
-
-      {/* Top stat cards */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <StatCard label="Used by" value={stats.agent_count} sub="agents" />
-        <StatCard
-          label="Pull frequency"
-          value={`${stats.pull_frequency_pct}%`}
-        />
-        <StatCard
-          label="Accept rate"
-          value={
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {stats.accept_rate_pct}%
-              <svg
-                width={36}
-                height={36}
-                viewBox="0 0 36 36"
-                style={{ transform: "rotate(-90deg)" }}
-              >
-                <circle
-                  cx={18}
-                  cy={18}
-                  r={14}
-                  fill="none"
-                  stroke="var(--border)"
-                  strokeWidth={4}
-                />
-                <circle
-                  cx={18}
-                  cy={18}
-                  r={14}
-                  fill="none"
-                  stroke="var(--ok)"
-                  strokeWidth={4}
-                  strokeDasharray={`${(stats.accept_rate_pct / 100) * 87.96} 87.96`}
-                />
-              </svg>
-            </div>
-          }
-        />
-        <StatCard label="Findings (30d)" value={stats.findings_30d} />
+    <div style={{ padding: "20px 28px 40px" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+        <PeriodHeader window={data?.window} />
       </div>
 
-      {/* Bottom: agents list + findings by category */}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        {/* Agents using this skill */}
-        <div
-          style={{
-            flex: 1,
-            minWidth: 200,
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border)",
-            borderRadius: 10,
-            padding: 16,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--text-muted)",
-              letterSpacing: 1,
-              textTransform: "uppercase",
-              marginBottom: 12,
-            }}
-          >
-            Agents using this skill
+      {isError ? (
+        <StatsError onRetry={() => void refetch()} />
+      ) : isPending || !data ? (
+        <StatsSkeleton cards={4} rows={2} />
+      ) : neverRan || noRunsInPeriod ? (
+        <div style={{ display: "grid", gap: 20 }}>
+          <div data-testid={neverRan ? "skill-never-ran" : "skill-no-runs"}>
+            <StatsEmpty
+              icon="BarChart"
+              title={neverRan ? t("neverTitle") : t("noRunsTitle")}
+              body={neverRan ? t("neverBody") : t("noRunsBody")}
+            />
           </div>
-          {stats.agents.length === 0 && (
-            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>None yet</p>
-          )}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {stats.agents.map((a) => (
-              <div
-                key={a.id}
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-              >
-                <span style={{ fontSize: 13, flex: 1 }}>{a.name}</span>
-                <button
-                  onClick={() => router.push(`/agents/${a.id}`)}
-                  style={{
-                    fontSize: 12,
-                    color: "var(--accent)",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: 0,
-                  }}
-                >
-                  Open →
-                </button>
-              </div>
-            ))}
-          </div>
+          <AgentsUsing agents={data.agents} />
         </div>
-
-        {/* Findings by category donut */}
-        <div
-          style={{
-            flex: 1,
-            minWidth: 200,
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border)",
-            borderRadius: 10,
-            padding: 16,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--text-muted)",
-              letterSpacing: 1,
-              textTransform: "uppercase",
-              marginBottom: 12,
-            }}
-          >
-            Findings by category
-          </div>
-          {categoryTotal === 0 ? (
-            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
-              No findings yet
-            </p>
-          ) : (
-            <div
-              style={{
-                display: "flex",
-                gap: 20,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <div
-                style={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: "50%",
-                  background: `conic-gradient(${gradient})`,
-                  flexShrink: 0,
-                }}
-              />
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {segments.map((s) => (
-                  <div
-                    key={s.cat}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      fontSize: 12,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 2,
-                        background: s.color,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span style={{ color: "var(--text-secondary)" }}>
-                      {s.cat}
-                    </span>
-                    <span style={{ fontWeight: 600 }}>{s.count}</span>
-                  </div>
-                ))}
+      ) : (
+        <>
+          <KpiRow data={data} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <AgentsUsing agents={data.agents} />
+            <Card>
+              <SectionLabel icon="Tag">{t("byCategory")}</SectionLabel>
+              <div style={{ display: "grid", placeItems: "center", paddingTop: 6 }}>
+                <CategoryDonut categories={data.categories} />
               </div>
-            </div>
-          )}
-        </div>
-      </div>
+            </Card>
+          </div>
+        </>
+      )}
     </div>
   );
 }

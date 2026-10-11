@@ -178,6 +178,8 @@ export async function completeAgentRun(
     blockers?: number | null;
     /** Failure reason (status='failed') / cancellation note. Null clears it. */
     error?: string | null;
+    /** Where `costUsd` came from ('api' = provider-billed, 'estimate' = price table). */
+    costSource?: 'api' | 'estimate' | null;
   },
 ): Promise<void> {
   await db
@@ -193,8 +195,43 @@ export async function completeAgentRun(
       score: values.score ?? null,
       blockers: values.blockers ?? null,
       error: values.error ?? null,
+      costSource: values.costSource ?? null,
     })
     .where(eq(t.agentRuns.id, runId));
+}
+
+/**
+ * Record how memory was selected for a run and which entries (with rank and
+ * similarity). The mode is written even when no entry was selected, so a run
+ * that pulled nothing still counts in "most-pulled memory" denominators.
+ */
+export async function setMemorySelection(
+  db: Db,
+  runId: string,
+  mode: 'top_k' | 'fallback',
+  entries: { id: string; rank: number; similarity: number | null }[],
+): Promise<void> {
+  await db.update(t.agentRuns).set({ memoryMode: mode }).where(eq(t.agentRuns.id, runId));
+  if (entries.length === 0) return;
+  await db
+    .insert(t.agentRunMemory)
+    .values(
+      entries.map((e) => ({ runId, memoryId: e.id, rank: e.rank, similarity: e.similarity })),
+    )
+    .onConflictDoNothing();
+}
+
+/** One row per skill that was loaded into the run's prompt. */
+export async function insertRunSkills(
+  db: Db,
+  runId: string,
+  records: { skillId: string; skillVersion: number; applied: boolean; findingsCited: number }[],
+): Promise<void> {
+  if (records.length === 0) return;
+  await db
+    .insert(t.agentRunSkills)
+    .values(records.map((r) => ({ runId, ...r })))
+    .onConflictDoNothing();
 }
 
 /** Persist the WHOLE run log as ONE document. PK = runId → agent_runs. */

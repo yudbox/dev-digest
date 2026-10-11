@@ -13,7 +13,7 @@ import { Icon } from "@devdigest/ui";
 import { AgentColumnCard } from "./_components/AgentColumnCard";
 import { WhereAgentsDisagree } from "./_components/WhereAgentsDisagree";
 import { AggregateTab } from "./_components/AggregateTab";
-import RunTraceDrawer from "../../pulls/[number]/_components/RunTraceDrawer";
+import RunTraceDrawer from "@/components/run-trace-drawer";
 import { VerdictBanner } from "../../pulls/[number]/_components/VerdictBanner";
 import { FindingsPanel } from "../../pulls/[number]/_components/FindingsPanel";
 import { AppShell } from "@/components/app-shell";

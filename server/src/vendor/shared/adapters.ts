@@ -76,6 +76,8 @@ export interface StructuredResult<T> {
   tokensIn: number;
   tokensOut: number;
   costUsd: number | null;
+  /** 'api' = provider-reported cost, 'estimate' = price table; null when cost is unknown. */
+  costSource?: 'api' | 'estimate' | null;
   raw: string;
   attempts: number;
 }
@@ -174,6 +176,10 @@ export interface WorkflowRun {
   prNumber: number | null;
   headSha: string | null;
   htmlUrl: string | null;
+  /** When the workflow run started on GitHub (ISO); preferred over `createdAt`. */
+  runStartedAt?: string | null;
+  /** When the workflow run was created on GitHub (ISO). */
+  createdAt?: string | null;
   artifacts: WorkflowRunArtifact[];
 }
 

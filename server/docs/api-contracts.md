@@ -42,6 +42,36 @@ Rate limit: `POST /pulls/:id/review` — 120/min globally.
 | `PUT` | `/agents/:id` | Update agent |
 | `DELETE` | `/agents/:id` | Delete agent |
 
+### Performance (stats — read-only)
+
+All four endpoints are `GET`, read only stored runs/findings, and never call an
+LLM, the embedder, a review run or the CI import. Contracts live in
+`contracts/performance.ts`.
+
+| Method | Path | Returns |
+|--------|------|---------|
+| GET | `/agent-performance` | `AgentPerformanceResponse` — KPIs, one row per agent (+ a "Deleted agents" row when needed), cost by agent / by model (≤ 7 segments each) |
+| GET | `/agents/:id/stats` | `AgentStatsResponse` — KPIs, most-used skills, most-pulled memory, severity buckets, five category counts |
+| GET | `/agents/:id/runs` | `AgentRunsResponse` — run history, newest first, cursor-paged |
+| GET | `/runs/:id/findings` | `RunFindingsResponse` — findings of one run (trace drawer) |
+
+**Period query** (all but `/runs/:id/findings`): `range=1d|30d` **or** `from`+`to`
+(ISO instants, at most 30 local days), plus `tz` (IANA name, required). The server
+resolves it once (`modules/performance/window.ts`) and returns the resulting
+`window` (bounds, buckets, previous window) so every screen agrees.
+
+- `1d` — six fixed 4-hour local slots (00/04/08/12/16/20); the sixth is the current, incomplete one.
+- `30d` — rolling 30 × 24 h ending now; five weekly buckets counted from the start, the last partial.
+- custom — `[D1 00:00, D2+1 00:00)` local, capped at now; 1 day → H1…H6, 2–14 days → D1…Dn, 15–30 days → W1…Wn.
+
+**Run history paging:** `limit` 1–50 (default 10) and an opaque `cursor` (the
+`(ran_at, id)` of the last row). Cursor paging means runs created meanwhile can
+neither duplicate nor skip rows.
+
+**Errors:** a malformed period, time zone, `limit` or `cursor` is **400**
+`bad_request` (not the 422 used for body/param schema failures). An id from another
+workspace is **404**.
+
 ### Repo Intel
 
 | Method | Path | Description |

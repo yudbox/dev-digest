@@ -24,5 +24,6 @@ export * from "./contracts/why";
 export * from "./contracts/eval-ci";
 export * from "./contracts/memory";
 export * from "./contracts/observability";
+export * from "./contracts/performance";
 export * from "./contracts/productionize";
 export * from "./adapters";

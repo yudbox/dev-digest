@@ -27,6 +27,7 @@ import { AppError, NotFoundError } from "../../platform/errors.js";
 import { assembleFiles } from "./generators/index.js";
 import type { CiRepository } from "./repository.js";
 import { extractFirstFileFromZip } from "./zip.js";
+import { ciRunTime } from "./run-time.js";
 import { buildMemorySnapshot } from "../memory/snapshot.js";
 
 // ---------------------------------------------------------------------------
@@ -361,7 +362,7 @@ export class CiService {
           ciInstallationId: installation.id,
           prNumber: run.prNumber,
           prTitle,
-          ranAt: new Date(),
+          ranAt: ciRunTime(run, new Date()),
           status,
           findingsCount,
           critical,
@@ -373,15 +374,22 @@ export class CiService {
           source: installation.targetType,
         });
 
-        // Insert agent_runs row (cross-module, via CiRepository)
-        await this.repo.insertAgentRun({
-          workspaceId: installation.workspaceId,
-          agentId: installation.agentId,
-          status,
-          findingsCount,
-          durationMs,
-          costUsd,
-        });
+        // One agent_runs row per CI run (cross-module, via CiRepository): placed
+        // at the CI run's own time and linked to it. A re-import finds the row
+        // by `ci_run_id` and adds nothing — otherwise every Refresh would count
+        // the same run again.
+        if (!(await this.repo.findAgentRunIdByCiRunId(ciRunRow.id))) {
+          await this.repo.insertAgentRun({
+            workspaceId: installation.workspaceId,
+            agentId: installation.agentId,
+            status,
+            findingsCount,
+            durationMs,
+            costUsd,
+            ranAt: ciRunRow.ranAt ?? ciRunTime(run, new Date()),
+            ciRunId: ciRunRow.id,
+          });
+        }
 
         // Insert ci_run_findings
         if (artifactFindings.length > 0) {

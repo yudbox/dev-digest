@@ -37,8 +37,25 @@ const VERDICT_RANK: Record<string, number> = {
 };
 
 /**
+ * Union of the skill labels reported by each chunk, first-seen order. Returns
+ * undefined when EVERY chunk omitted the field (unknown), which is different
+ * from a chunk explicitly reporting none (an empty list).
+ */
+function unionLabels(lists: Array<string[] | null | undefined>): string[] | undefined {
+  const seen = new Set<string>();
+  let reported = false;
+  for (const list of lists) {
+    if (!list) continue;
+    reported = true;
+    for (const label of list) seen.add(label);
+  }
+  return reported ? [...seen] : undefined;
+}
+
+/**
  * Merge N partial Reviews (one per mapped file/chunk) into a single Review:
- * concat findings, take the worst verdict, mean score, joined summaries.
+ * concat findings, take the worst verdict, mean score, joined summaries, and
+ * the union of the reported applied-skill labels.
  */
 export function reduceReviews(partials: Review[]): Review {
   if (partials.length === 1) return partials[0]!;
@@ -51,7 +68,14 @@ export function reduceReviews(partials: Review[]): Review {
     ? Math.round(partials.reduce((s, p) => s + p.score, 0) / partials.length)
     : 0;
   const summary = partials.map((p) => p.summary).filter(Boolean).join(' ');
-  return { verdict, score, summary, findings };
+  const skillsApplied = unionLabels(partials.map((p) => p.skills_applied));
+  return {
+    verdict,
+    score,
+    summary,
+    findings,
+    ...(skillsApplied ? { skills_applied: skillsApplied } : {}),
+  };
 }
 
 /** Extract the slice of the unified diff for a single file (for map chunks). */

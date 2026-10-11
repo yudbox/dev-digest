@@ -110,6 +110,17 @@ export interface ReviewOutcome {
   tokensIn: number;
   tokensOut: number;
   costUsd: number | null;
+  /**
+   * Provenance of `costUsd`: 'api' only when EVERY chunk reported a
+   * provider-billed cost; 'estimate' when any chunk was estimated from a price
+   * table; null when the cost is unknown.
+   */
+  costSource: "api" | "estimate" | null;
+  /**
+   * Skill labels (S1…Sn) the model reported as applied, union over chunks.
+   * null when every chunk omitted the field (unknown, not "none applied").
+   */
+  skillsApplied: string[] | null;
   /** Joined raw model outputs (for the run trace). */
   raw: string;
 }
@@ -178,6 +189,7 @@ export async function reviewPullRequest(
   let tokensIn = 0;
   let tokensOut = 0;
   let costUsd: number | null = 0;
+  let allCostsFromApi = true;
   const raws: string[] = [];
 
   for (const chunk of chunks) {
@@ -206,6 +218,7 @@ export async function reviewPullRequest(
     tokensOut += res.tokensOut;
     costUsd =
       costUsd == null || res.costUsd == null ? null : costUsd + res.costUsd;
+    if (res.costSource !== "api") allCostsFromApi = false;
     raws.push(res.raw);
     partials.push(res.data);
     emit(
@@ -231,9 +244,16 @@ export async function reviewPullRequest(
   // Score is derived from the findings that SURVIVED grounding (not the model's
   // self-reported number, and not the pre-grounding set) so the score, the
   // findings list, and the deterministic event always agree.
+  // `skills_applied` is engine metadata, not part of the persisted review: lift
+  // it out so `review` keeps its established shape. Dropped findings are gone
+  // from `ground.kept`, so their `rule_refs` never reach the caller.
+  const { skills_applied: skillsApplied, ...mergedReview } = merged;
+  const costSource: ReviewOutcome["costSource"] =
+    costUsd == null ? null : allCostsFromApi ? "api" : "estimate";
+
   return {
     review: {
-      ...merged,
+      ...mergedReview,
       findings: ground.kept,
       score: scoreFromFindings(ground.kept),
     },
@@ -245,6 +265,8 @@ export async function reviewPullRequest(
     tokensIn,
     tokensOut,
     costUsd,
+    costSource,
+    skillsApplied: skillsApplied ?? null,
     raw: raws.join("\n---\n"),
   };
 }

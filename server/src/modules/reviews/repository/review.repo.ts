@@ -26,16 +26,22 @@ export async function insertReview(
   return row!;
 }
 
+/**
+ * `ruleRefs[i]` are the skill ids (already mapped from the model's labels) that
+ * produced `findings[i]`; omit for findings without attribution.
+ */
 export async function insertFindings(
   db: Db,
   reviewId: string,
   findings: Finding[],
+  ruleRefs?: (string[] | null)[],
 ): Promise<FindingRow[]> {
   if (findings.length === 0) return [];
   const rows = await db
     .insert(t.findings)
     .values(
-      findings.map((f) => ({
+      findings.map((f, i) => ({
+        ruleRefs: ruleRefs?.[i] ?? null,
         reviewId,
         file: f.file,
         startLine: f.start_line,

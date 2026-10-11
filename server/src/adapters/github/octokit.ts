@@ -596,6 +596,8 @@ export class OctokitGitHubClient implements VcsClient {
                   prNumber: run.pull_requests?.[0]?.number ?? null,
                   headSha: run.head_sha ?? null,
                   htmlUrl: run.html_url ?? null,
+                  runStartedAt: run.run_started_at ?? null,
+                  createdAt: run.created_at ?? null,
                   artifacts,
                 } satisfies WorkflowRun;
               }),

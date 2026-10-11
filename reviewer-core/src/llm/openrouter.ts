@@ -99,12 +99,19 @@ export class OpenRouterProvider implements LLMProvider {
 
       const parsed = parseWithRepair(req.schema, lastRaw);
       if (parsed.ok) {
+        // Provider-billed cost wins; otherwise fall back to the injected price
+        // table. `costSource` records which one it was so the UI can tell a
+        // billed number from a DevDigest estimate.
+        const estimated =
+          costFromApi == null ? (this.estimateCost?.(req.model, tokensIn, tokensOut) ?? null) : null;
+        const costUsd = costFromApi ?? estimated;
         return {
           data: parsed.data,
           model: req.model,
           tokensIn,
           tokensOut,
-          costUsd: costFromApi ?? this.estimateCost?.(req.model, tokensIn, tokensOut) ?? null,
+          costUsd,
+          costSource: costFromApi != null ? 'api' : estimated != null ? 'estimate' : null,
           raw: lastRaw,
           attempts: attempt,
         };

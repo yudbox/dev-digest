@@ -57,8 +57,12 @@ export class ReviewRepository {
     return reviewRepo.insertReview(this.db, values);
   }
 
-  insertFindings(reviewId: string, findings: Finding[]): Promise<FindingRow[]> {
-    return reviewRepo.insertFindings(this.db, reviewId, findings);
+  insertFindings(
+    reviewId: string,
+    findings: Finding[],
+    ruleRefs?: (string[] | null)[],
+  ): Promise<FindingRow[]> {
+    return reviewRepo.insertFindings(this.db, reviewId, findings, ruleRefs);
   }
 
   /** Reviews for a PR (newest first), each with its findings. */
@@ -221,9 +225,33 @@ export class ReviewRepository {
       blockers?: number | null;
       /** Failure reason (status='failed') / cancellation note. Null clears it. */
       error?: string | null;
+      /** Where `costUsd` came from ('api' = provider-billed, 'estimate' = price table). */
+      costSource?: "api" | "estimate" | null;
     },
   ): Promise<void> {
     return runRepo.completeAgentRun(this.db, runId, values);
+  }
+
+  /** How memory was selected for a run (+ the selected entries). */
+  setMemorySelection(
+    runId: string,
+    mode: "top_k" | "fallback",
+    entries: { id: string; rank: number; similarity: number | null }[],
+  ): Promise<void> {
+    return runRepo.setMemorySelection(this.db, runId, mode, entries);
+  }
+
+  /** The skills that were loaded into a run's prompt, with applied / cited counts. */
+  insertRunSkills(
+    runId: string,
+    records: {
+      skillId: string;
+      skillVersion: number;
+      applied: boolean;
+      findingsCited: number;
+    }[],
+  ): Promise<void> {
+    return runRepo.insertRunSkills(this.db, runId, records);
   }
 
   /** Record the head SHA a review ran against (PR-list freshness derivation). */
@@ -280,15 +308,6 @@ export class ReviewRepository {
     sources: Record<string, string | null | undefined>;
   }): Promise<void> {
     return memoryRepo.insertMemory(this.db, values);
-  }
-
-  searchMemory(values: {
-    workspaceId: string;
-    repoId: string | null;
-    embedding: number[];
-    limit: number;
-  }): Promise<{ id: string; content: string }[]> {
-    return memoryRepo.searchMemory(this.db, values);
   }
 
   bumpMemoryLastUsedAt(ids: string[]): Promise<void> {

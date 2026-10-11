@@ -99,5 +99,54 @@
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."
+  },
+  "stats": {
+    "neverTitle": "This agent hasn't run yet",
+    "neverBody": "Stats fill in automatically after this agent reviews a pull request — locally or in CI.",
+    "noRunsTitle": "No runs in this period",
+    "noRunsBody": "Try a longer period",
+    "kpi": {
+      "totalRuns": "Total runs",
+      "avgCost": "Avg cost / run",
+      "avgDuration": "Avg duration",
+      "acceptRate": "Accept rate",
+      "noHistory": "Not enough history to compare",
+      "deltaTip": "Compared with the previous period of the same length"
+    },
+    "skills": {
+      "title": "Most-used skills",
+      "hint": "Share of runs where the model applied the skill",
+      "none": "No skills attached to this agent",
+      "noUsage": "No skill usage recorded in this period"
+    },
+    "memory": {
+      "title": "Most-pulled memory",
+      "hint": "Share of runs where this entry was pulled into the prompt",
+      "none": "No memory pulled in this period"
+    },
+    "noDataBefore": "No data before {date}",
+    "severity": {
+      "title": "Findings by severity",
+      "caption": "{count, plural, one {# finding} other {# findings}} in period"
+    },
+    "category": {
+      "title": "Findings by category"
+    },
+    "history": {
+      "title": "Run history",
+      "timestamp": "Timestamp",
+      "pr": "PR",
+      "tokens": "Tokens",
+      "cost": "Cost",
+      "findings": "Findings",
+      "source": "Source",
+      "local": "local",
+      "ci": "CI",
+      "viewTrace": "View trace",
+      "openGithub": "Open in GitHub",
+      "failed": "Run failed",
+      "loadingMore": "Loading more runs…",
+      "empty": "No runs in this period"
+    }
   }
 }

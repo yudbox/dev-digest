@@ -22,6 +22,13 @@ import { loadDiff } from "./diff-loader.js";
 import { deriveIntent } from "./intent-deriver.js";
 import { gatherIntentContext } from "./intent-context.js";
 import { resolveFeatureModelStrict } from "../settings/feature-models.js";
+import { buildMemoryQuery, selectMemoryForRun } from "./memory-selection.js";
+import {
+  buildRunSkillRecords,
+  buildSkillLabelMap,
+  mapAppliedLabels,
+  mapRuleRefs,
+} from "./skill-labels.js";
 import type { FeatureModelId } from "@devdigest/shared";
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
@@ -307,8 +314,14 @@ export class ReviewRunExecutor {
       const linkedSkills = await this.container.agentsRepo.linkedSkills(
         agent.id,
       );
-      const skillBodies = linkedSkills
-        .filter((s) => s.skill.enabled)
+      const enabledSkills = linkedSkills.filter((s) => s.skill.enabled);
+      // The prompt labels these [S1]…[Sn] in THIS order; the same order is used
+      // below to map the model's labels back to skill ids.
+      const loadedSkills = enabledSkills.map((s) => ({
+        skillId: s.skill.id,
+        version: s.skill.version,
+      }));
+      const skillBodies = enabledSkills
         .map((s) => {
           // Skills from untrusted external sources (URL / community) are
           // delimiter-wrapped so their body cannot act as injected instructions.
@@ -365,26 +378,39 @@ export class ReviewRunExecutor {
         );
       }
 
-      // ---- Memory: confidence+scope filter (AC-1/AC-3) ----------------------
-      // Select memory rows matching this workspace/repo with confidence >= 0.7.
-      // Inject their content strings into the prompt; bump lastUsedAt after.
-      let memoryPulled: MemoryPulled[] = [];
-      let memoryIds: string[] = [];
-      try {
-        const memoryRows = await this.container.memoryRepo.selectForPrompt(
+      // ---- Memory: relevance-ranked (top-K) with a deterministic fallback ----
+      // Eligible = same workspace/repo scope with confidence >= 0.7. The review
+      // gets the entries closest in meaning to THIS PR (intent + title + changed
+      // files), so different PRs pull different memory. If similarity search is
+      // not possible (no embedder / no embeddings) it falls back to every
+      // eligible entry, and says so in the run log. Never fails the run.
+      const memorySelection = await selectMemoryForRun(
+        {
+          picker: this.container.memoryRepo,
+          getEmbedder: () => this.container.embedder(),
+          log: (m) => runLog.info(m),
+        },
+        {
           workspaceId,
-          pull.repoId,
+          repoId: pull.repoId,
+          queryText: buildMemoryQuery({
+            intent,
+            title: pull.title,
+            changedFiles: diff.files.map((f) => f.path),
+          }),
+        },
+      );
+      const memoryPulled: MemoryPulled[] = memorySelection.entries.map((m) => ({
+        text: m.content,
+      }));
+      const memoryIds = memorySelection.entries.map((m) => m.id);
+      // Recorded at selection time (the run row exists), so even a run that
+      // later fails keeps what it pulled; the mode is written for 0 entries too.
+      await this.repo
+        .setMemorySelection(runId, memorySelection.mode, memorySelection.entries)
+        .catch((err: Error) =>
+          runLog.info(`Memory: could not record selection (${err.message})`),
         );
-        if (memoryRows.length > 0) {
-          memoryPulled = memoryRows.map((m) => ({ text: m.content }));
-          memoryIds = memoryRows.map((m) => m.id);
-          runLog.info(
-            `Memory: ${memoryRows.length} rule(s) injected into prompt`,
-          );
-        }
-      } catch {
-        // Never let memory retrieval break a run
-      }
 
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
@@ -438,6 +464,13 @@ export class ReviewRunExecutor {
 
       const keptFindings = outcome.review.findings;
 
+      // Map the model's skill labels back to skill ids. Labels are model output
+      // (untrusted): anything that does not correspond to a skill loaded in this
+      // run is dropped, and only ids are stored.
+      const skillLabels = buildSkillLabelMap(loadedSkills);
+      const appliedSkillIds = mapAppliedLabels(skillLabels, outcome.skillsApplied);
+      const ruleRefIds = keptFindings.map((f) => mapRuleRefs(skillLabels, f.rule_refs));
+
       // ---- Persist review + findings ----------------------------------------
       const review = await this.repo.insertReview({
         workspaceId,
@@ -453,6 +486,7 @@ export class ReviewRunExecutor {
       const findingRows = await this.repo.insertFindings(
         review.id,
         keptFindings,
+        ruleRefIds,
       );
       runLog.result(
         `Persisted review ${review.id} with ${findingRows.length} finding(s)`,
@@ -485,7 +519,19 @@ export class ReviewRunExecutor {
         score: outcome.review.score,
         blockers,
         error: null,
+        costSource: outcome.costSource,
       });
+
+      // Which skills were loaded, whether the model applied them, and how many
+      // saved findings cited each (drives Most-used skills / Skill Stats).
+      await this.repo
+        .insertRunSkills(
+          runId,
+          buildRunSkillRecords(loadedSkills, appliedSkillIds, ruleRefIds),
+        )
+        .catch((err: Error) =>
+          runLog.info(`Skills: could not record usage (${err.message})`),
+        );
 
       const trace: RunTrace = {
         config: {

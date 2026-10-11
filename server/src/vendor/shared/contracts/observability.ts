@@ -9,7 +9,6 @@ import { Severity, FindingRecord } from './findings.js';
  *   - MultiAgentRun        the response of POST /pulls/:id/multi-agent-run
  *   - AgentColumn          one agent's column in the multi-agent view
  *   - Conflict / ConflictTake  where agents disagree on the same file:line
- *   - AgentStats           per-agent quality aggregates (GET /agents/:id/stats)
  *   - CuratorResult        the cross-session memory curator outcome
  *
  * The single-document run trace itself stays in `contracts/trace.ts` (RunTrace).
@@ -97,39 +96,6 @@ export const MultiAgentRunSummary = z.object({
   status: z.enum(['running', 'failed', 'done']),
 });
 export type MultiAgentRunSummary = z.infer<typeof MultiAgentRunSummary>;
-
-// ---------------------------------------------------------------------------
-// Per-agent Stats (GET /agents/:id/stats)
-// ---------------------------------------------------------------------------
-
-/** A single (date, value) point for a sparkline/trend. */
-export const StatPoint = z.object({ label: z.string(), value: z.number() });
-export type StatPoint = z.infer<typeof StatPoint>;
-
-export const AgentStats = z.object({
-  agent_id: z.string(),
-  agent_name: z.string(),
-  runs: z.number().int(),
-  findings_total: z.number().int(),
-  /** accept-rate is the headline quality signal. 0..1 over acted findings. */
-  accepted: z.number().int(),
-  dismissed: z.number().int(),
-  pending: z.number().int(),
-  accept_rate: z.number().nullable(),
-  dismiss_rate: z.number().nullable(),
-  avg_findings_per_run: z.number().nullable(),
-  total_cost_usd: z.number().nullable(),
-  avg_cost_usd: z.number().nullable(),
-  avg_latency_ms: z.number().nullable(),
-  findings_by_severity: z.object({
-    CRITICAL: z.number().int(),
-    WARNING: z.number().int(),
-    SUGGESTION: z.number().int(),
-  }),
-  /** recent runs for a small trend chart (oldest→newest). */
-  trend: z.array(StatPoint),
-});
-export type AgentStats = z.infer<typeof AgentStats>;
 
 // ---------------------------------------------------------------------------
 // Cross-session memory curator

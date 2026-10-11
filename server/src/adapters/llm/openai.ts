@@ -138,12 +138,16 @@ export class OpenAIProvider implements LLMProvider {
 
       const parsed = parseWithRepair(req.schema, lastRaw);
       if (parsed.ok) {
+        // The OpenAI API reports no billed cost, so this is always an estimate
+        // from the price table (null when the model has no known price).
+        const costUsd = this.estimateCost(req.model, tokensIn, tokensOut);
         return {
           data: parsed.data,
           model: req.model,
           tokensIn,
           tokensOut,
-          costUsd: this.estimateCost(req.model, tokensIn, tokensOut),
+          costUsd,
+          costSource: costUsd != null ? "estimate" : null,
           raw: lastRaw,
           attempts: attempt,
         };

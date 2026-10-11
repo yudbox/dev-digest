@@ -2,6 +2,7 @@ import "dotenv/config";
 import { createDb, type Db } from "./client.js";
 import * as t from "./schema.js";
 import { eq, and, isNull } from "drizzle-orm";
+import { seedPerformanceDemo } from "./seed-performance.js";
 
 /**
  * Seed the starter's demo data. Idempotent: re-running upserts the default
@@ -683,9 +684,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   }
   const handle = createDb(url);
+  // The performance demo data lives behind the CLI entry only: the exported
+  // `seed(db)` is shared with integration tests and must stay small.
   seed(handle.db)
     .then(async (r) => {
-      console.log("✓ seeded", r);
+      const demo = await seedPerformanceDemo(handle.db, { workspaceId: r.workspaceId });
+      console.log("✓ seeded", r, "+ performance demo", demo);
       await handle.close();
       process.exit(0);
     })

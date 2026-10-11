@@ -1,0 +1,60 @@
+{
+  "caption": {
+    "oneDay": "1 day · {from} – now",
+    "thirtyDays": "30 days · {from} – now",
+    "custom": "{from} – {to}"
+  },
+  "bucket": {
+    "inProgress": "in progress",
+    "partial": "partial",
+    "now": "now"
+  },
+  "period": {
+    "label": "Period",
+    "oneDay": "1 day",
+    "thirtyDays": "30 days",
+    "custom": "Custom range",
+    "from": "From",
+    "to": "To",
+    "maxDays": "Up to 30 days"
+  },
+  "syncCi": {
+    "label": "Sync CI",
+    "syncing": "Syncing…",
+    "success": "Imported {count, plural, one {# CI run} other {# CI runs}}"
+  },
+  "costSource": {
+    "billed": "billed",
+    "estimated": "estimated",
+    "mixed": "mixed",
+    "tipBilled": "Billed: cost reported by the provider's billing API.",
+    "tipEstimated": "Estimated: DevDigest estimate from token counts × the price table.",
+    "tipMixed": "Mixed: some runs are billed by the provider, others are DevDigest estimates."
+  },
+  "runsWithoutCost": "{count, plural, one {# run without cost} other {# runs without cost}}",
+  "smallSample": "small sample",
+  "smallSampleTip": "Fewer than {min} data points — don't draw conclusions from it.",
+  "accept": {
+    "caption": "based on {count, plural, one {# local finding} other {# local findings}}"
+  },
+  "category": {
+    "security": "security",
+    "bug": "bug",
+    "perf": "perf",
+    "style": "style",
+    "test": "test",
+    "noFindings": "No findings in this period"
+  },
+  "severity": {
+    "critical": "Critical",
+    "warning": "Warning",
+    "suggestion": "Suggestion"
+  },
+  "state": {
+    "errorTitle": "Couldn't load this data",
+    "errorBody": "Something went wrong while loading it. Nothing has been changed."
+  },
+  "agent": {
+    "deleted": "Deleted agents"
+  }
+}

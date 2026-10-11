@@ -1,171 +1,95 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startPg, dockerAvailable, type PgFixture } from '../../../test/helpers/pg.js';
-import { buildApp } from '../../app.js';
-import { loadConfig } from '../../platform/config.js';
-import { seed } from '../../db/seed.js';
-import * as t from '../../db/schema.js';
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import type { AuthProvider } from "@devdigest/shared";
+import { startMemoryPg, type MemoryPgFixture } from "../../../test/helpers/memory-pg.js";
+import { buildApp } from "../../app.js";
+import { loadConfig } from "../../platform/config.js";
+import { addAgent, addReviewWithFindings, addRun, createWorld, type World } from "../performance/it-fixtures.js";
 
 /**
- * TASK-004 (bonus, out of L06 grading rubric) — `AgentsRepository.statsForWorkspace()`.
+ * Agents list stats (`GET /agents`, `GET /agents/:id`). The numbers come from the
+ * shared performance aggregation, so they follow the same rules as the dashboard:
+ * only finished runs count, accept rate is finding-level over resolved findings,
+ * averages are over known cost / successful runs, and "no decisions" is omitted
+ * rather than reported as 0%.
  *
- * Agents are seeded directly via Drizzle rather than `POST /agents` — same
- * pre-existing, unrelated `repo_id` bug documented in `evals.it.test.ts`.
+ * Runs on an in-memory Postgres (PGlite) — no Docker, no real database.
  */
-const hasDocker = await dockerAvailable();
-const d = hasDocker ? describe : describe.skip;
-const config = () => loadConfig({ ...process.env, NODE_ENV: 'test' } as NodeJS.ProcessEnv);
+const config = () => loadConfig({ ...process.env, NODE_ENV: "test" } as NodeJS.ProcessEnv);
+const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000);
 
-d('A2 bonus: agent list stats (Testcontainers pg)', () => {
-  let pg: PgFixture;
-  let workspaceId: string;
-  let repoId: string;
+describe("agent list stats (in-memory Postgres)", () => {
+  let pg: MemoryPgFixture;
+  let world: World;
+  let app: Awaited<ReturnType<typeof buildApp>>;
 
   beforeAll(async () => {
-    pg = await startPg();
-    await seed(pg.handle.db);
-    const [ws] = await pg.handle.db.select().from(t.workspaces);
-    workspaceId = ws!.id;
-    const [repo] = await pg.handle.db
-      .insert(t.repos)
-      .values({ workspaceId, owner: 'acme', name: 'agents-stats-repo', fullName: 'acme/agents-stats-repo' })
-      .returning();
-    repoId = repo!.id;
+    pg = await startMemoryPg();
+    world = await createWorld(pg.handle.db);
+    const auth: AuthProvider = {
+      currentUser: async () => ({ id: "00000000-0000-4000-8000-0000000000aa", email: "t@t", name: "t" }),
+      currentWorkspace: async () => ({ id: world.ws, name: "stats" }),
+    };
+    app = await buildApp({ config: config(), db: pg.handle.db, overrides: { auth } });
   });
   afterAll(async () => {
+    await app?.close();
     await pg?.stop();
   });
 
-  it('AC-017: GET /agents attaches runs_count/accept_rate_pct/avg_cost_usd via one batched stats query (finding-level accept rate)', async () => {
-    const app = await buildApp({ config: config(), db: pg.handle.db, overrides: {} });
+  it("GET /agents attaches runs_count, finding-level accept rate, avg cost and avg duration", async () => {
+    const db = pg.handle.db;
+    const a = await addAgent(db, world, "Stats Agent A");
+    const b = await addAgent(db, world, "Stats Agent B (no runs)");
 
-    const [agentA] = await pg.handle.db
-      .insert(t.agents)
-      .values({
-        workspaceId,
-        repoId,
-        name: 'Stats Agent A',
-        provider: 'openai',
-        model: 'm',
-        systemPrompt: 's',
-      })
-      .returning();
-    const [agentB] = await pg.handle.db
-      .insert(t.agents)
-      .values({
-        workspaceId,
-        repoId,
-        name: 'Stats Agent B (no runs)',
-        provider: 'openai',
-        model: 'm',
-        systemPrompt: 's',
-      })
-      .returning();
+    // costs 2.0 and null → average over KNOWN cost is 2.0, not 1.0
+    const r1 = await addRun(db, world, { agentId: a, ranAt: hoursAgo(5), costUsd: 2.0, durationMs: 1000 });
+    const r2 = await addRun(db, world, { agentId: a, ranAt: hoursAgo(4), costUsd: null, durationMs: 3000 });
+    // not finished → excluded from every number
+    await addRun(db, world, { agentId: a, ranAt: hoursAgo(3), status: "running", costUsd: 50 });
+    await addRun(db, world, { agentId: a, ranAt: hoursAgo(3), status: "cancelled", costUsd: 50 });
+    // failed → counted as a run (it consumed resources) but not in the duration average
+    await addRun(db, world, { agentId: a, ranAt: hoursAgo(2), status: "failed", costUsd: null, durationMs: 9 });
 
-    const [pr] = await pg.handle.db
-      .insert(t.pullRequests)
-      .values({
-        workspaceId,
-        repoId,
-        number: 1,
-        title: 'PR',
-        author: 'dev',
-        branch: 'b',
-        base: 'main',
-        headSha: 'x',
-        status: 'needs_review',
-      })
-      .returning();
+    // 3 resolved (2 accepted, 1 dismissed) + 1 unresolved → 67%
+    await addReviewWithFindings(db, world, { agentId: a, runId: r1.id }, [{ accepted: true }, { accepted: true }]);
+    await addReviewWithFindings(db, world, { agentId: a, runId: r2.id }, [{ dismissed: true }, {}]);
 
-    // Two runs for agent A: costs 2.0 and null (avg over non-null = 2.0, not 1.0).
-    const [runA1] = await pg.handle.db
-      .insert(t.agentRuns)
-      .values({ workspaceId, agentId: agentA!.id, prId: pr!.id, costUsd: 2.0, status: 'done' })
-      .returning();
-    const [runA2] = await pg.handle.db
-      .insert(t.agentRuns)
-      .values({ workspaceId, agentId: agentA!.id, prId: pr!.id, costUsd: null, status: 'done' })
-      .returning();
+    const list = (await app.inject({ method: "GET", url: "/agents" })).json();
+    const dtoA = list.find((x: { id: string }) => x.id === a);
+    const dtoB = list.find((x: { id: string }) => x.id === b);
 
-    const [reviewA1] = await pg.handle.db
-      .insert(t.reviews)
-      .values({ workspaceId, prId: pr!.id, agentId: agentA!.id, runId: runA1!.id, kind: 'review' as const })
-      .returning();
-    const [reviewA2] = await pg.handle.db
-      .insert(t.reviews)
-      .values({ workspaceId, prId: pr!.id, agentId: agentA!.id, runId: runA2!.id, kind: 'review' as const })
-      .returning();
-
-    // 3 resolved findings (2 accepted, 1 dismissed) + 1 unresolved (excluded
-    // from the denominator) → accept_rate_pct = round(2/3 * 100) = 67.
-    await pg.handle.db.insert(t.findings).values([
-      {
-        reviewId: reviewA1!.id,
-        file: 'a.ts',
-        startLine: 1,
-        endLine: 1,
-        severity: 'WARNING',
-        category: 'bug',
-        title: 't1',
-        rationale: 'r',
-        confidence: 0.9,
-        acceptedAt: new Date(),
-      },
-      {
-        reviewId: reviewA1!.id,
-        file: 'a.ts',
-        startLine: 2,
-        endLine: 2,
-        severity: 'WARNING',
-        category: 'bug',
-        title: 't2',
-        rationale: 'r',
-        confidence: 0.9,
-        acceptedAt: new Date(),
-      },
-      {
-        reviewId: reviewA2!.id,
-        file: 'a.ts',
-        startLine: 3,
-        endLine: 3,
-        severity: 'WARNING',
-        category: 'bug',
-        title: 't3',
-        rationale: 'r',
-        confidence: 0.9,
-        dismissedAt: new Date(),
-      },
-      {
-        reviewId: reviewA2!.id,
-        file: 'a.ts',
-        startLine: 4,
-        endLine: 4,
-        severity: 'WARNING',
-        category: 'bug',
-        title: 't4 (unresolved)',
-        rationale: 'r',
-        confidence: 0.9,
-      },
-    ]);
-
-    const list = (await app.inject({ method: 'GET', url: '/agents' })).json();
-    const dtoA = list.find((a: { id: string }) => a.id === agentA!.id);
-    const dtoB = list.find((a: { id: string }) => a.id === agentB!.id);
-
-    expect(dtoA.runs_count).toBe(2);
+    expect(dtoA.runs_count).toBe(3);
     expect(dtoA.accept_rate_pct).toBe(67);
     expect(dtoA.avg_cost_usd).toBe(2.0);
+    expect(dtoA.avg_duration_ms).toBe(2000);
 
-    // Agent with zero runs degrades to zeros/null, not undefined/NaN.
+    // An agent with no runs / no decisions has no invented numbers.
     expect(dtoB.runs_count).toBe(0);
-    expect(dtoB.accept_rate_pct).toBe(0);
+    expect(dtoB).not.toHaveProperty("accept_rate_pct");
     expect(dtoB.avg_cost_usd).toBeNull();
+    expect(dtoB.avg_duration_ms).toBeNull();
 
-    // Single-agent GET agrees with the list view.
-    const single = (await app.inject({ method: 'GET', url: `/agents/${agentA!.id}` })).json();
-    expect(single.runs_count).toBe(2);
-    expect(single.accept_rate_pct).toBe(67);
-    expect(single.avg_cost_usd).toBe(2.0);
+    // The single-agent GET agrees with the list view.
+    const single = (await app.inject({ method: "GET", url: `/agents/${a}` })).json();
+    expect(single.runs_count).toBe(dtoA.runs_count);
+    expect(single.accept_rate_pct).toBe(dtoA.accept_rate_pct);
+    expect(single.avg_cost_usd).toBe(dtoA.avg_cost_usd);
+    expect(single.avg_duration_ms).toBe(dtoA.avg_duration_ms);
+  });
 
-    await app.close();
+  it("the list numbers equal the Agent Stats KPIs over an all-time-wide period", async () => {
+    const db = pg.handle.db;
+    const a = await addAgent(db, world, "Parity Agent");
+    const r = await addRun(db, world, { agentId: a, ranAt: hoursAgo(6), costUsd: 0.5, durationMs: 2500 });
+    await addReviewWithFindings(db, world, { agentId: a, runId: r.id }, [{ accepted: true }, { dismissed: true }]);
+
+    const list = (await app.inject({ method: "GET", url: "/agents" })).json();
+    const dto = list.find((x: { id: string }) => x.id === a);
+    const stats = (await app.inject({ method: "GET", url: `/agents/${a}/stats?range=30d&tz=UTC` })).json();
+
+    expect(dto.runs_count).toBe(stats.kpis.runs);
+    expect(dto.avg_cost_usd).toBeCloseTo(stats.kpis.avgCostUsd, 9);
+    expect(dto.avg_duration_ms).toBe(stats.kpis.avgDurationMs);
+    expect(dto.accept_rate_pct).toBe(Math.round((stats.kpis.accept.accepted / stats.kpis.accept.resolved) * 100));
   });
 });

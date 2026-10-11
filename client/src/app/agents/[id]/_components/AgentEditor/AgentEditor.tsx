@@ -1,6 +1,5 @@
-/* AgentEditor — basic agent config editor (model + system prompt). Later
-   lessons add Skills/Evals/Stats/CI tabs; the Part-0 starter ships Config only.
-   Tab state still lives in ?tab= for forward-compatibility. */
+/* AgentEditor — agent editor with Config, Skills, Context, Evals, Stats and CI
+   tabs. Tab state lives in ?tab= (so /agents/:id?tab=stats deep-links). */
 "use client";
 
 import React from "react";
@@ -10,6 +9,7 @@ import type { Agent } from "@devdigest/shared";
 import { ConfigTab } from "./_components/ConfigTab";
 import { SkillsTab } from "./_components/SkillsTab/SkillsTab";
 import { ContextTab } from "./_components/ContextTab/ContextTab";
+import { StatsTab } from "./_components/StatsTab";
 import { EvalsTab } from "@/components/evals/EvalsTab";
 import { CiTab } from "../CiTab";
 import { TABS } from "./constants";
@@ -40,6 +40,7 @@ export function AgentEditor({
         {tab === "skills" && <SkillsTab agentId={agent.id} />}
         {tab === "context" && <ContextTab agent={agent} />}
         {tab === "evals" && <EvalsTab ownerKind="agent" ownerId={agent.id} />}
+        {tab === "stats" && <StatsTab agentId={agent.id} agentName={agent.name} />}
         {tab === "ci" && <CiTab agent={agent} />}
       </div>
     </div>

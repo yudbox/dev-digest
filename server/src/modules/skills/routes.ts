@@ -1,11 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { SkillSource, SkillType } from "@devdigest/shared";
+import { SkillSource, SkillStatsResponse, SkillType, StatsQuery } from "@devdigest/shared";
 import { getContext } from "../_shared/context.js";
 import { IdParams } from "../_shared/schemas.js";
 import { NotFoundError, ValidationError } from "../../platform/errors.js";
 import { SkillsService } from "./service.js";
+import { parseStatsQuery } from "../performance/query.js";
 import { regexScan, llmScan, THREAT_LEVEL } from "./scanner.js";
 import type { ThreatLevel } from "./scanner.js";
 
@@ -190,12 +191,16 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
 
   app.get(
     "/skills/:id/stats",
-    { schema: { params: IdParams } },
+    {
+      schema: {
+        params: IdParams,
+        querystring: StatsQuery,
+        response: { 200: SkillStatsResponse },
+      },
+    },
     async (req) => {
       const { workspaceId } = await getContext(app.container, req);
-      const stats = await service.stats(workspaceId, req.params.id);
-      if (!stats) throw new NotFoundError("Skill not found");
-      return stats;
+      return service.stats(workspaceId, req.params.id, parseStatsQuery(req.query));
     },
   );
 

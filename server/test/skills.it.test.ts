@@ -222,7 +222,7 @@ d("Skills CRUD + versioning (Testcontainers)", () => {
     await app.close();
   });
 
-  it("GET /skills/:id/stats → returns stats shape", async () => {
+  it("GET /skills/:id/stats → returns the period-aware stats shape", async () => {
     const app = await buildApp({
       config,
       db: pg.handle.db,
@@ -233,13 +233,14 @@ d("Skills CRUD + versioning (Testcontainers)", () => {
 
     const res = await app.inject({
       method: "GET",
-      url: `/skills/${skillId}/stats`,
+      url: `/skills/${skillId}/stats?range=30d&tz=UTC`,
     });
     expect(res.statusCode).toBe(200);
     const stats = res.json();
-    expect(typeof stats.agent_count).toBe("number");
-    expect(typeof stats.pull_frequency_pct).toBe("number");
-    expect(typeof stats.accept_rate_pct).toBe("number");
+    expect(typeof stats.usedBy).toBe("number");
+    expect(typeof stats.pullFrequency.prsLoaded).toBe("number");
+    expect(typeof stats.accept.resolved).toBe("number");
+    expect(stats.categories).toHaveLength(5);
     await app.close();
   });
 
